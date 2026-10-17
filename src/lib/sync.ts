@@ -1,18 +1,21 @@
 import { supabase } from "@/integrations/supabase/client";
-import { clearDeleted, loadDeleted, loadIdeas, replaceIdeas, type Idea } from "./ideas";
+import { clearDeleted, loadDeleted, loadIdeas, mergeIdeas, replaceIdeas, type Idea } from "./ideas";
 
 const getSession = async () => (await supabase.auth.getSession()).data.session;
+
+const cloudRow = (idea: Idea, userId: string) => ({
+  id: idea.id, user_id: userId, text: idea.text, created_at: idea.createdAt,
+  article_title: idea.articleTitle ?? null, article_body: idea.articleBody ?? null,
+  updated_at: idea.updatedAt ?? 0,
+});
 
 /** Push one idea to the cloud backup (silently skipped when offline or signed out). */
 export const pushIdea = async (idea: Idea) => {
   const s = await getSession();
   if (!s || !navigator.onLine) return;
-  await supabase.from("ideas").upsert({
-    id: idea.id,
-    user_id: s.user.id,
-    text: idea.text,
-    created_at: idea.createdAt,
-  });
+  if (loadDeleted().includes(idea.id)) return;
+  // Reconciliation prevents a stale edition from overwriting another device's edit.
+  await syncNow();
 };
 
 /** Delete one idea from the cloud backup (silently skipped when offline or signed out). */
@@ -33,7 +36,7 @@ export const syncNow = async (): Promise<number> => {
   const s = await getSession();
   if (!s || !navigator.onLine) return 0;
   const uid = s.user.id;
-  const { data } = await supabase.from("ideas").select("id,text,created_at").eq("user_id", uid);
+  const { data } = await supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at").eq("user_id", uid);
   if (!data) return 0;
 
   const local = loadIdeas();
@@ -41,25 +44,28 @@ export const syncNow = async (): Promise<number> => {
 
   // Apply offline deletions to the cloud, then stop tracking them.
   if (deleted.length) {
-    await supabase.from("ideas").delete().in("id", deleted).eq("user_id", uid);
-    clearDeleted(deleted);
+    const { error } = await supabase.from("ideas").delete().in("id", deleted).eq("user_id", uid);
+    if (!error) clearDeleted(deleted);
   }
 
-  const rows = data as { id: string; text: string; created_at: number }[];
   const localIds = new Set(local.map((i) => i.id));
-  const cloudIds = new Set(rows.map((r) => r.id));
-  const deletedSet = new Set(deleted);
-
-  const restored: Idea[] = rows
-    .filter((r) => !localIds.has(r.id) && !deletedSet.has(r.id))
-    .map((r) => ({ id: r.id, text: r.text, createdAt: Number(r.created_at) }));
-  const missing = local.filter((i) => !cloudIds.has(i.id));
-
-  if (restored.length) replaceIdeas([...restored, ...local]);
-  if (missing.length) {
-    await supabase.from("ideas").upsert(
-      missing.map((i) => ({ id: i.id, user_id: uid, text: i.text, created_at: i.createdAt })),
-    );
+  const remote: Idea[] = data.map((r) => ({
+    id: r.id, text: r.text, createdAt: Number(r.created_at),
+    articleTitle: r.article_title ?? undefined, articleBody: r.article_body ?? undefined,
+    updatedAt: Number(r.updated_at),
+  }));
+  // Read again after network awaits so edits/deletions made during sync are preserved.
+  const tombstones = [...new Set([...deleted, ...loadDeleted()])];
+  const merged = mergeIdeas(loadIdeas(), remote, tombstones);
+  replaceIdeas(merged);
+  const cloudById = new Map(remote.map((i) => [i.id, i]));
+  const changed = merged.filter((i) => {
+    const cloud = cloudById.get(i.id);
+    return !cloud || (i.updatedAt ?? 0) > (cloud.updatedAt ?? 0);
+  });
+  if (changed.length) {
+    await supabase.from("ideas").upsert(changed.map((i) => cloudRow(i, uid)));
   }
-  return restored.length;
+  window.dispatchEvent(new Event("afkari:ideas-changed"));
+  return merged.filter((i) => !localIds.has(i.id)).length;
 };
