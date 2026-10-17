@@ -132,6 +132,28 @@
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
+:root {
+  --background: oklch(0.96 0.02 80);
+  --foreground: oklch(0.28 0.05 50);
+  --card: oklch(0.985 0.012 85);
+  --card-foreground: oklch(0.28 0.05 50);
+  --primary: oklch(0.42 0.09 45);
+  --primary-foreground: oklch(0.97 0.02 80);
+  --secondary: oklch(0.9 0.035 75);
+  --secondary-foreground: oklch(0.32 0.06 50);
+  --accent: oklch(0.88 0.06 70);
+  --accent-foreground: oklch(0.32 0.07 45);
+  --muted-foreground: oklch(0.52 0.04 55);
+  --border: oklch(0.87 0.03 75);
+  --ring: oklch(0.6 0.09 50);
+}
+
+@theme inline {
+  --font-sans: "Tajawal", system-ui, sans-serif;
+  --font-display: "Reem Kufi", "Tajawal", sans-serif;
+  --font-article: "Amiri", serif;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -140,5 +162,36 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
   }
+}
+
+@utility paper {
+  background: radial-gradient(circle at 30% 20%, var(--card), var(--background) 70%);
+}
+
+@utility record-btn {
+  width: 13rem;
+  height: 13rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, oklch(0.55 0.11 45), var(--primary));
+  color: var(--primary-foreground);
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  box-shadow: 0 20px 50px -15px color-mix(in oklab, var(--primary) 60%, transparent),
+    0 0 0 12px color-mix(in oklab, var(--primary) 10%, transparent);
+  transition: transform 0.2s;
+  &:active { transform: scale(0.95); }
+}
+
+@utility icon-btn {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background: var(--card);
+  color: var(--primary);
+  border: 1px solid var(--border);
+  font-size: 1.4rem;
 }
