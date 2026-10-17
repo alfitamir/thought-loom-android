@@ -44,13 +44,29 @@ export function toArticle(text: string): { title: string; paragraphs: string[] }
 }
 
 const KEY = "afkari.ideas";
+const DEL_KEY = "afkari.deleted";
+
 export const loadIdeas = (): Idea[] => {
   try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; }
 };
-export const saveIdea = (text: string) => {
-  const all = loadIdeas();
-  all.unshift({ id: crypto.randomUUID(), text, createdAt: Date.now() });
-  localStorage.setItem(KEY, JSON.stringify(all));
+export const replaceIdeas = (all: Idea[]) => localStorage.setItem(KEY, JSON.stringify(all));
+
+// Ids deleted on this device — used to propagate offline deletions to the cloud backup.
+export const loadDeleted = (): string[] => {
+  try { return JSON.parse(localStorage.getItem(DEL_KEY) || "[]"); } catch { return []; }
 };
-export const deleteIdea = (id: string) =>
+export const clearDeleted = (ids: string[]) =>
+  localStorage.setItem(DEL_KEY, JSON.stringify(loadDeleted().filter((d) => !ids.includes(d))));
+
+export const saveIdea = (text: string): Idea => {
+  const all = loadIdeas();
+  const idea: Idea = { id: crypto.randomUUID(), text, createdAt: Date.now() };
+  all.unshift(idea);
+  localStorage.setItem(KEY, JSON.stringify(all));
+  return idea;
+};
+export const deleteIdea = (id: string) => {
   localStorage.setItem(KEY, JSON.stringify(loadIdeas().filter((i) => i.id !== id)));
+  const del = loadDeleted();
+  if (!del.includes(id)) localStorage.setItem(DEL_KEY, JSON.stringify([...del, id]));
+};
