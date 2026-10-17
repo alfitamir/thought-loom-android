@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { saveIdea } from "@/lib/ideas";
+import { supabase } from "@/integrations/supabase/client";
+import { pushIdea, syncNow } from "@/lib/sync";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,7 +23,33 @@ function Index() {
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const [msg, setMsg] = useState("");
+  const [cloud, setCloud] = useState<"off" | "on" | "syncing">("off");
   const recRef = useRef<any>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!alive) return;
+      if (data.session) {
+        setCloud("syncing");
+        await syncNow();
+        if (alive) setCloud("on");
+      } else {
+        setCloud("off");
+      }
+    };
+    check();
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") check();
+    });
+    window.addEventListener("online", check);
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+      window.removeEventListener("online", check);
+    };
+  }, []);
 
   const toggleMic = () => {
     if (listening) { recRef.current?.stop(); return; }
@@ -41,7 +69,9 @@ function Index() {
 
   const save = () => {
     if (!text.trim()) return;
-    saveIdea(text.trim()); setText(""); setOpen(false); setMsg("حُفظت الفكرة ✓");
+    const idea = saveIdea(text.trim());
+    setText(""); setOpen(false); setMsg("حُفظت الفكرة ✓");
+    pushIdea(idea);
   };
 
   return (
@@ -66,6 +96,13 @@ function Index() {
         </div>
       )}
       {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
+      {cloud === "on" ? (
+        <p className="text-center text-sm text-muted-foreground">☁️ أفكارك محفوظة في السحابة</p>
+      ) : cloud === "syncing" ? (
+        <p className="text-center text-sm text-muted-foreground">☁️ جاري مزامنة أفكارك...</p>
+      ) : (
+        <Link to="/auth" className="text-center text-sm text-primary underline">☁️ فعّل الحفظ في السحابة</Link>
+      )}
     </main>
   );
 }

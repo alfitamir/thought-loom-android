@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { classify, deleteIdea, loadIdeas, toArticle, type Idea } from "@/lib/ideas";
+import { deleteIdeaCloud } from "@/lib/sync";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -48,7 +49,7 @@ function Library() {
                       <h2 className="font-display text-lg text-primary">{a.title}</h2>
                       <p className="mb-2 text-xs text-muted-foreground">{new Date(i.createdAt).toLocaleDateString("ar")}</p>
                       {a.paragraphs.map((p, k) => <p key={k} className="mb-2 font-article text-lg leading-loose text-card-foreground">{p}</p>)}
-                      <button onClick={() => { deleteIdea(i.id); setIdeas(loadIdeas()); }} className="text-xs text-destructive">حذف</button>
+                      <button onClick={() => { deleteIdea(i.id); deleteIdeaCloud(i.id); setIdeas(loadIdeas()); }} className="text-xs text-destructive">حذف</button>
                     </article>
                   );
                 })}
