@@ -14,26 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_access_state: {
+        Row: {
+          blocked_at: string
+          message: string
+          status: number
+          user_id: string
+        }
+        Insert: {
+          blocked_at?: string
+          message: string
+          status: number
+          user_id: string
+        }
+        Update: {
+          blocked_at?: string
+          message?: string
+          status?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       ideas: {
         Row: {
+          article_body: string | null
+          article_title: string | null
           created_at: number
           id: string
           synced_at: string
           text: string
+          updated_at: number
           user_id: string
         }
         Insert: {
+          article_body?: string | null
+          article_title?: string | null
           created_at: number
           id: string
           synced_at?: string
           text: string
+          updated_at?: number
           user_id: string
         }
         Update: {
+          article_body?: string | null
+          article_title?: string | null
           created_at?: number
           id?: string
           synced_at?: string
           text?: string
+          updated_at?: number
           user_id?: string
         }
         Relationships: []

@@ -8,6 +8,13 @@
       "when": 1792228379486,
       "tag": "0000_create_ideas_backup",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792228942114,
+      "tag": "0001_article_edits_and_ai_access",
+      "breakpoints": true
     }
   ]
 }

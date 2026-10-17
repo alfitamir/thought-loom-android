@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as ApiArticlesImproveRouteImport } from './routes/api/articles/improve'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const LibraryRoute = LibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiArticlesImproveRoute = ApiArticlesImproveRouteImport.update({
+  id: '/api/articles/improve',
+  path: '/api/articles/improve',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
+  '/api/articles/improve': typeof ApiArticlesImproveRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
+  '/api/articles/improve': typeof ApiArticlesImproveRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
+  '/api/articles/improve': typeof ApiArticlesImproveRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/library'
+  fullPaths: '/' | '/auth' | '/library' | '/api/articles/improve'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/library'
-  id: '__root__' | '/' | '/auth' | '/library'
+  to: '/' | '/auth' | '/library' | '/api/articles/improve'
+  id: '__root__' | '/' | '/auth' | '/library' | '/api/articles/improve'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   LibraryRoute: typeof LibraryRoute
+  ApiArticlesImproveRoute: typeof ApiArticlesImproveRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/articles/improve': {
+      id: '/api/articles/improve'
+      path: '/api/articles/improve'
+      fullPath: '/api/articles/improve'
+      preLoaderRoute: typeof ApiArticlesImproveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   LibraryRoute: LibraryRoute,
+  ApiArticlesImproveRoute: ApiArticlesImproveRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

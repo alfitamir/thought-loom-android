@@ -1,4 +1,11 @@
-export type Idea = { id: string; text: string; createdAt: number };
+export type Idea = {
+  id: string;
+  text: string;
+  createdAt: number;
+  articleTitle?: string;
+  articleBody?: string;
+  updatedAt?: number;
+};
 
 export const TOPICS: Record<string, string[]> = {
   "الإيمان والروح": ["الله", "صلاة", "دين", "إيمان", "قرآن", "دعاء", "رمضان", "الجنة", "روح"],
@@ -18,7 +25,10 @@ export function classify(text: string): string {
   const t = strip(text);
   let best = OTHER, score = 0;
   for (const [topic, words] of Object.entries(TOPICS)) {
-    const n = words.filter((w) => t.includes(strip(w))).length;
+    const n = words.filter((w) => {
+      const word = strip(w);
+      return word.length > 2 ? t.includes(word) : new RegExp(`(^|\\s)(ال)?${word}(?=\\s|[،.!؟?]|$)`).test(t);
+    }).length;
     if (n > score) { score = n; best = topic; }
   }
   return best;
@@ -50,6 +60,47 @@ export const loadIdeas = (): Idea[] => {
   try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; }
 };
 export const replaceIdeas = (all: Idea[]) => localStorage.setItem(KEY, JSON.stringify(all));
+
+export function getArticle(idea: Idea): { title: string; body: string } {
+  const local = toArticle(idea.text);
+  return {
+    title: idea.articleTitle ?? local.title,
+    body: idea.articleBody ?? local.paragraphs.join("\n\n"),
+  };
+}
+
+export function matchesArticle(idea: Idea, query: string): boolean {
+  const article = getArticle(idea);
+  const normalized = strip(query).trim().toLocaleLowerCase();
+  return !normalized || strip(`${article.title}\n${article.body}\n${idea.text}`).toLocaleLowerCase().includes(normalized);
+}
+
+export function updateArticle(id: string, title: string, body: string): Idea | undefined {
+  if (!title.trim() || !body.trim()) return;
+  const all = loadIdeas();
+  const current = all.find((idea) => idea.id === id);
+  if (!current) return;
+  const updated = {
+    ...current,
+    articleTitle: title.trim(),
+    articleBody: body.trim(),
+    updatedAt: Math.max(Date.now(), (current.updatedAt ?? 0) + 1),
+  };
+  replaceIdeas(all.map((idea) => idea.id === id ? updated : idea));
+  return updated;
+}
+
+/** Merge editions without overwriting newer local work; deletion always wins. */
+export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Idea[] {
+  const tombstones = new Set(deleted);
+  const merged = new Map(local.filter((i) => !tombstones.has(i.id)).map((i) => [i.id, i]));
+  for (const idea of remote) {
+    if (tombstones.has(idea.id)) continue;
+    const existing = merged.get(idea.id);
+    if (!existing || (idea.updatedAt ?? 0) > (existing.updatedAt ?? 0)) merged.set(idea.id, idea);
+  }
+  return [...merged.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
 
 // Ids deleted on this device — used to propagate offline deletions to the cloud backup.
 export const loadDeleted = (): string[] => {
