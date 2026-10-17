@@ -25,7 +25,10 @@ export function classify(text: string): string {
   const t = strip(text);
   let best = OTHER, score = 0;
   for (const [topic, words] of Object.entries(TOPICS)) {
-    const n = words.filter((w) => t.includes(strip(w))).length;
+    const n = words.filter((w) => {
+      const word = strip(w);
+      return word.length > 2 ? t.includes(word) : new RegExp(`(^|\\s)(ال)?${word}(?=\\s|[،.!؟?]|$)`).test(t);
+    }).length;
     if (n > score) { score = n; best = topic; }
   }
   return best;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Pencil, Share2, Sparkles, Square, Trash2, X } from "lucide-react";
+import { Check, Pencil, Share2, Sparkles, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
@@ -76,7 +76,7 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
       <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{article.body}</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="icon" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
-        <Button variant="ghost" size="icon" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}>{typeof navigator !== "undefined" && navigator.share ? <Share2 /> : <Copy />}</Button>
+        <Button variant="ghost" size="icon" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
         <Button variant="ghost" size="icon" aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onClick={improve}><Sparkles /></Button>
         <Button variant="ghost" size="icon" className="text-destructive" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>

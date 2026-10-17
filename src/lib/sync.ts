@@ -51,7 +51,8 @@ export const syncNow = async (): Promise<number> => {
   const localIds = new Set(local.map((i) => i.id));
   const remote: Idea[] = data.map((r) => ({
     id: r.id, text: r.text, createdAt: Number(r.created_at),
-    articleTitle: r.article_title ?? undefined, articleBody: r.article_body ?? undefined,
+    ...(r.article_title === null ? {} : { articleTitle: r.article_title }),
+    ...(r.article_body === null ? {} : { articleBody: r.article_body }),
     updatedAt: Number(r.updated_at),
   }));
   // Read again after network awaits so edits/deletions made during sync are preserved.

@@ -94,7 +94,7 @@ export async function improveArticle(request: Request): Promise<Response> {
         if (!request.signal.aborted) emit({ type: "error", message: upstreamMessage });
       } finally { controller.close(); }
     },
-    cancel() { return iterator.return?.(); },
+    async cancel() { await iterator.return?.(); },
   });
   return new Response(stream, { headers: getLovableAiGatewayResponseHeaders(upstreamHeaders, {
     "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store, no-transform",
