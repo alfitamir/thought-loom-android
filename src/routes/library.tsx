@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { classify, deleteIdea, loadIdeas, toArticle, type Idea } from "@/lib/ideas";
-import { deleteIdeaCloud } from "@/lib/sync";
+import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, type Idea } from "@/lib/ideas";
+import { deleteIdeaCloud, syncNow } from "@/lib/sync";
+import { Button } from "@/components/ui/button";
+import { ArticleEditor } from "@/components/article-editor";
+import { ArrowRight, ChevronDown, Search, X } from "lucide-react";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -20,44 +23,60 @@ export const Route = createFileRoute("/library")({
 function Library() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [openTopic, setOpenTopic] = useState<string | null>(null);
-  useEffect(() => setIdeas(loadIdeas()), []);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [online, setOnline] = useState(true);
+  const refresh = () => setIdeas(loadIdeas());
+  useEffect(() => {
+    refresh(); setOnline(navigator.onLine);
+    const connect = () => { setOnline(true); void syncNow().catch(() => {}); };
+    const disconnect = () => setOnline(false);
+    void syncNow().catch(() => {});
+    window.addEventListener("online", connect);
+    window.addEventListener("offline", disconnect);
+    window.addEventListener("afkari:ideas-changed", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("online", connect); window.removeEventListener("offline", disconnect);
+      window.removeEventListener("afkari:ideas-changed", refresh); window.removeEventListener("storage", refresh);
+    };
+  }, []);
 
   const groups: Record<string, Idea[]> = {};
-  ideas.forEach((i) => (groups[classify(i.text)] ??= []).push(i));
+  ideas.filter((i) => matchesArticle(i, query)).forEach((i) => (groups[classify(getArticle(i).body)] ??= []).push(i));
 
   return (
-    <main dir="rtl" className="paper min-h-screen px-5 py-6">
+    <main dir="rtl" className="paper min-h-screen px-5 py-6"><div className="mx-auto max-w-3xl">
       <header className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-3xl text-foreground">مقالاتي</h1>
-        <Link to="/" className="icon-btn" aria-label="رجوع">→</Link>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="icon" aria-label="بحث في المقالات" title="بحث في المقالات" onClick={() => { setSearchOpen(!searchOpen); setQuery(""); }}><Search /></Button>
+          <Button asChild variant="ghost" size="icon"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
+        </div>
       </header>
+      {searchOpen && <div className="mb-6 flex items-center gap-2 border-b border-border pb-3">
+        <Search className="size-5 shrink-0 text-muted-foreground" />
+        <input autoFocus type="search" aria-label="كلمة البحث" placeholder="ابحث بكلمة…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-lg outline-none" />
+        <Button variant="ghost" size="icon" aria-label="إغلاق البحث" onClick={() => { setSearchOpen(false); setQuery(""); }}><X /></Button>
+      </div>}
       {ideas.length === 0 && <p className="mt-20 text-center text-muted-foreground">لا توجد أفكار بعد.</p>}
+      {ideas.length > 0 && Object.keys(groups).length === 0 && <p className="mt-16 text-center text-muted-foreground">لا توجد مقالات تحتوي على هذه الكلمة.</p>}
       <div className="space-y-3">
         {Object.entries(groups).map(([topic, list]) => (
-          <section key={topic} className="rounded-2xl border border-border bg-card">
-            <button onClick={() => setOpenTopic(openTopic === topic ? null : topic)}
-              className="flex w-full items-center justify-between p-4 text-start">
-              <span className="font-display text-xl text-card-foreground">{topic}</span>
-              <span className="rounded-full bg-accent px-3 py-1 text-sm text-accent-foreground">{list.length}</span>
-            </button>
-            {openTopic === topic && (
-              <div className="space-y-6 border-t border-border p-4">
-                {list.map((i) => {
-                  const a = toArticle(i.text);
-                  return (
-                    <article key={i.id}>
-                      <h2 className="font-display text-lg text-primary">{a.title}</h2>
-                      <p className="mb-2 text-xs text-muted-foreground">{new Date(i.createdAt).toLocaleDateString("ar")}</p>
-                      {a.paragraphs.map((p, k) => <p key={k} className="mb-2 font-article text-lg leading-loose text-card-foreground">{p}</p>)}
-                      <button onClick={() => { deleteIdea(i.id); deleteIdeaCloud(i.id); setIdeas(loadIdeas()); }} className="text-xs text-destructive">حذف</button>
-                    </article>
-                  );
-                })}
+          <section key={topic}>
+            <Button variant="ghost" onClick={() => setOpenTopic(openTopic === topic ? null : topic)} aria-expanded={!!query.trim() || openTopic === topic}
+              className="h-auto w-full justify-between border-b border-border px-0 py-4 text-start">
+              <span className="whitespace-normal font-display text-xl text-foreground">{topic}</span>
+              <span className="flex items-center gap-3 text-muted-foreground">{list.length}<ChevronDown className={openTopic === topic ? "rotate-180" : ""} /></span>
+            </Button>
+            {(query.trim() || openTopic === topic) && (
+              <div>
+                {list.map((i) => <ArticleEditor key={i.id} idea={i} online={online} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }} />)}
               </div>
             )}
           </section>
         ))}
       </div>
-    </main>
+    </div></main>
   );
 }

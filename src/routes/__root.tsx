@@ -89,7 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
     scripts: [
-      { children: "if('serviceWorker' in navigator && location.hostname!=='localhost' && !location.hostname.includes('id-preview')){navigator.serviceWorker.register('/sw.js')}" },
+      { children: "if('serviceWorker' in navigator && location.hostname!=='localhost' && !location.hostname.includes('id-preview')){navigator.serviceWorker.register('/sw.js').catch(()=>{})}" },
     ],
   }),
   shellComponent: RootShell,
@@ -100,7 +100,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="ar" dir="rtl">
       <head>
         <HeadContent />
       </head>
