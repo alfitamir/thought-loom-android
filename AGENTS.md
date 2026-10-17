@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Ideas stored in browser localStorage; topic classification and article formatting are local rule-based (no network) because the app must work fully offline.

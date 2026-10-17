@@ -1,0 +1,11 @@
+{
+  "name": "أفكاري",
+  "short_name": "أفكاري",
+  "start_url": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "ar",
+  "background_color": "#f6f0e4",
+  "theme_color": "#6b3f1f",
+  "icons": [{ "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" }]
+}
