@@ -46,3 +46,10 @@ describe("article tools", () => {
     expect(mergeIdeas([], [{ id: "1", text: "محذوف", createdAt: 1 }], ["1"])).toEqual([]);
   });
 });
+
+describe("local formatting keeps the ending", () => {
+  it("keeps a final sentence without punctuation", () => {
+    const a = toArticle("الصبر مهم. وفي الآخر لازم نكمل الطريق");
+    expect(a.paragraphs.join(" ")).toContain("وفي الآخر لازم نكمل الطريق");
+  });
+});

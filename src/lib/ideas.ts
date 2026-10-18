@@ -5,6 +5,8 @@ export type Idea = {
   articleTitle?: string;
   articleBody?: string;
   updatedAt?: number;
+  /** Set to updatedAt when the article was last AI-proofread; skip while equal. */
+  aiPolishedAt?: number;
 };
 
 export const TOPICS: Record<string, string[]> = {
@@ -75,17 +77,18 @@ export function matchesArticle(idea: Idea, query: string): boolean {
   return !normalized || strip(`${article.title}\n${article.body}\n${idea.text}`).toLocaleLowerCase().includes(normalized);
 }
 
-export function updateArticle(id: string, title: string, body: string): Idea | undefined {
+export function updateArticle(id: string, title: string, body: string, polished = false): Idea | undefined {
   if (!title.trim() || !body.trim()) return;
   const all = loadIdeas();
   const current = all.find((idea) => idea.id === id);
   if (!current) return;
-  const updated = {
+  const updated: Idea = {
     ...current,
     articleTitle: title.trim(),
     articleBody: body.trim(),
     updatedAt: Math.max(Date.now(), (current.updatedAt ?? 0) + 1),
   };
+  if (polished && updated.updatedAt !== undefined) updated.aiPolishedAt = updated.updatedAt; else delete updated.aiPolishedAt;
   replaceIdeas(all.map((idea) => idea.id === id ? updated : idea));
   return updated;
 }
@@ -98,6 +101,7 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     if (tombstones.has(idea.id)) continue;
     const existing = merged.get(idea.id);
     if (!existing || (idea.updatedAt ?? 0) > (existing.updatedAt ?? 0)) merged.set(idea.id, idea);
+    else if (existing.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) merged.set(idea.id, { ...existing, aiPolishedAt: idea.aiPolishedAt });
   }
   return [...merged.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
@@ -121,3 +125,5 @@ export const deleteIdea = (id: string) => {
   const del = loadDeleted();
   if (!del.includes(id)) localStorage.setItem(DEL_KEY, JSON.stringify([...del, id]));
 };
+
+export const needsPolish = (idea: Idea) => idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0);

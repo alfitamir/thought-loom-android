@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, type Idea } from "@/lib/ideas";
-import { deleteIdeaCloud, syncNow } from "@/lib/sync";
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { improveFull } from "@/lib/article-ai";
+import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolish, updateArticle, type Idea } from "@/lib/ideas";
+import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { ArticleEditor } from "@/components/article-editor";
-import { ArrowRight, ChevronDown, Search, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Search, Sparkles, Square, X } from "lucide-react";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -26,7 +28,41 @@ function Library() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [online, setOnline] = useState(true);
+  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
+  const [bulkMsg, setBulkMsg] = useState("");
+  const bulkAbort = useRef<AbortController | null>(null);
   const refresh = () => setIdeas(loadIdeas());
+  const polishAll = async () => {
+    setBulkMsg("");
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) { setBulkMsg("سجّل الدخول من الصفحة الرئيسية لتفعيل الضبط."); return; }
+    const queue = loadIdeas().filter(needsPolish);
+    if (!queue.length) { setBulkMsg("كل المقالات مضبوطة ✓"); return; }
+    const controller = new AbortController(); bulkAbort.current = controller;
+    let done = 0, skipped = 0; setBulk({ done, total: queue.length });
+    try {
+      for (const idea of queue) {
+        if (controller.signal.aborted || !navigator.onLine) break;
+        const samples = loadIdeas().filter((i) => i.id !== idea.id).slice(0, 3).map((i) => i.text.slice(0, 2000));
+        try {
+          const result = await improveFull(getArticle(idea), idea.text, samples, data.session.access_token, controller.signal, () => {});
+          const latest = loadIdeas().find((i) => i.id === idea.id);
+          if (latest && (latest.updatedAt ?? 0) === (idea.updatedAt ?? 0)) {
+            const updated = updateArticle(idea.id, result.title, result.body, true);
+            if (updated) void pushIdea(updated).catch(() => {});
+          }
+        } catch (error) {
+          if (controller.signal.aborted) break;
+          const msg = error instanceof Error ? error.message : "";
+          if (msg.includes("ناقصة")) { skipped++; } else { setBulkMsg(msg || "توقف الضبط. يمكنك المتابعة لاحقًا."); break; }
+        }
+        done++; setBulk({ done, total: queue.length }); refresh();
+      }
+    } finally {
+      bulkAbort.current = null; setBulk(null); refresh();
+      setBulkMsg((m) => m || (controller.signal.aborted || done < queue.length ? `توقف الضبط بعد ${done} من ${queue.length}. اضغط لاحقًا للمتابعة.` : `تم ضبط المقالات ✓${skipped ? ` (تُرك ${skipped} كما هو لأن النسخة المقترحة كانت ناقصة)` : ""}`));
+    }
+  };
   useEffect(() => {
     refresh(); setOnline(navigator.onLine);
     const connect = () => { setOnline(true); void syncNow().catch(() => {}); };
@@ -50,10 +86,14 @@ function Library() {
       <header className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-3xl text-foreground">مقالاتي</h1>
         <div className="flex gap-2">
+          {online && ideas.length > 0 && (bulk
+            ? <Button variant="ghost" size="icon" aria-label="إيقاف الضبط" title="إيقاف الضبط" onClick={() => bulkAbort.current?.abort()}><Square /></Button>
+            : <Button variant="ghost" size="icon" aria-label="ضبط كل المقالات" title="ضبط كل المقالات" onClick={polishAll}><Sparkles /></Button>)}
           <Button variant="ghost" size="icon" aria-label="بحث في المقالات" title="بحث في المقالات" onClick={() => { setSearchOpen(!searchOpen); setQuery(""); }}><Search /></Button>
           <Button asChild variant="ghost" size="icon"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
         </div>
       </header>
+      {(bulk || bulkMsg) && <p role="status" className="mb-4 text-sm text-muted-foreground">{bulk ? `جارٍ الضبط… تم ${bulk.done} من ${bulk.total}` : bulkMsg}</p>}
       {searchOpen && <div className="mb-6 flex items-center gap-2 border-b border-border pb-3">
         <Search className="size-5 shrink-0 text-muted-foreground" />
         <input autoFocus type="search" aria-label="كلمة البحث" placeholder="ابحث بكلمة…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-lg outline-none" />
