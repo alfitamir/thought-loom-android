@@ -88,7 +88,7 @@ export function updateArticle(id: string, title: string, body: string, polished 
     articleBody: body.trim(),
     updatedAt: Math.max(Date.now(), (current.updatedAt ?? 0) + 1),
   };
-  if (polished) updated.aiPolishedAt = updated.updatedAt; else delete updated.aiPolishedAt;
+  if (polished && updated.updatedAt !== undefined) updated.aiPolishedAt = updated.updatedAt; else delete updated.aiPolishedAt;
   replaceIdeas(all.map((idea) => idea.id === id ? updated : idea));
   return updated;
 }

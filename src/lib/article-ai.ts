@@ -81,7 +81,7 @@ export async function improveFull(
       body: JSON.stringify({ title: article.title, body: chunks[i], original: chunks.length > 1 ? "" : original.slice(0, 40000), samples }),
     });
     const out = parseImprovedArticle(await readArticleStream(response, (t) => onText([...parts, t].join("\n\n"))));
-    if (!isComplete(chunks[i], out.body)) throw new Error(INCOMPLETE);
+    if (!isComplete(chunks[i] ?? "", out.body)) throw new Error(INCOMPLETE);
     if (i === 0) title = out.title;
     parts.push(out.body);
   }
