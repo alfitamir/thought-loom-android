@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { supabase } from "@/integrations/supabase/client";
-import { parseImprovedArticle, readArticleStream } from "@/lib/article-ai";
+import { improveFull } from "@/lib/article-ai";
 
 export function ArticleEditor({ idea, online, onChange, onDelete }: {
   idea: Idea; online: boolean; onChange: () => void; onDelete: () => void;
@@ -24,8 +24,8 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
   const version = useRef(idea.updatedAt ?? 0);
   useEffect(() => () => abort.current?.abort(), []);
 
-  const save = (newTitle: string, newBody: string) => {
-    const updated = updateArticle(idea.id, newTitle, newBody);
+  const save = (newTitle: string, newBody: string, polished = false) => {
+    const updated = updateArticle(idea.id, newTitle, newBody, polished);
     if (!updated) return;
     onChange();
     void pushIdea(updated).catch(() => {});
@@ -33,12 +33,17 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
   };
   const share = async () => {
     setMessage("");
-    try {
-      if (navigator.share) await navigator.share({ title: article.title, text: `${article.title}\n\n${article.body}` });
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${article.title}\n\n${article.body}`); setMessage("نُسخ المقال للمشاركة ✓"); }
+    const full = `${article.title}\n\n${article.body}`;
+    const copy = async () => {
+      if (navigator.clipboard) { await navigator.clipboard.writeText(full); setMessage("نُسخ المقال كاملًا للمشاركة ✓"); }
       else setMessage("النسخ غير متاح هنا؛ يمكنك تحديد نص المقال ونسخه.");
+    };
+    try {
+      if (navigator.share) await navigator.share({ text: full });
+      else await copy();
     } catch (error) {
-      if (!(error instanceof Error && error.name === "AbortError")) setMessage("تعذّرت المشاركة الآن.");
+      if (error instanceof Error && error.name === "AbortError") return;
+      await copy().catch(() => setMessage("تعذّرت المشاركة الآن."));
     }
   };
   const improve = async () => {
@@ -50,13 +55,8 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
     version.current = idea.updatedAt ?? 0;
     setPreview(""); setSuggestion(null); setPreviewOpen(true); setBusy(true);
     try {
-      const response = await fetch("/api/articles/improve", {
-        method: "POST", signal: controller.signal,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
-        body: JSON.stringify({ ...article, original: idea.text.slice(0, 40000), samples: loadIdeas().filter((i) => i.id !== idea.id).slice(0, 3).map((i) => i.text.slice(0, 2000)) }),
-      });
-      const output = await readArticleStream(response, setPreview);
-      setSuggestion(parseImprovedArticle(output));
+      const samples = loadIdeas().filter((i) => i.id !== idea.id).slice(0, 3).map((i) => i.text.slice(0, 2000));
+      setSuggestion(await improveFull(article, idea.text, samples, data.session.access_token, controller.signal, setPreview));
     } catch (error) {
       setMessage(controller.signal.aborted ? "توقف التحسين؛ مقالك لم يتغير." : error instanceof Error ? error.message : "تعذّر الاتصال بخدمة تحسين المقالات.");
     } finally { setBusy(false); abort.current = null; }
@@ -92,7 +92,7 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
           {busy ? <Button variant="outline" onClick={() => abort.current?.abort()}><Square />إيقاف</Button> : <Button disabled={!suggestion} onClick={() => {
             const latest = loadIdeas().find((i) => i.id === idea.id);
             if (!latest || (latest.updatedAt ?? 0) !== version.current) { setMessage("تغير المقال أثناء التحسين. لم نستبدل تعديلاتك."); setSuggestion(null); return; }
-            if (suggestion) save(suggestion.title, suggestion.body);
+            if (suggestion) save(suggestion.title, suggestion.body, true);
           }}><Check />اعتماد التحسين</Button>}
           <Button variant="ghost" onClick={() => { abort.current?.abort(); setPreviewOpen(false); }}>إلغاء</Button>
         </div>
