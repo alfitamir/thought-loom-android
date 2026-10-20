@@ -127,3 +127,11 @@ export const deleteIdea = (id: string) => {
 };
 
 export const needsPolish = (idea: Idea) => idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0);
+
+/** Save a ready article (e.g. a merge) as a new idea; `text` keeps the combined originals. */
+export const saveArticleIdea = (text: string, title: string, body: string): Idea => {
+  const now = Date.now();
+  const idea: Idea = { id: crypto.randomUUID(), text, createdAt: now, articleTitle: title.trim(), articleBody: body.trim(), updatedAt: now, aiPolishedAt: now };
+  replaceIdeas([idea, ...loadIdeas()]);
+  return idea;
+};
