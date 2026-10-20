@@ -67,20 +67,45 @@ export function splitChunks(body: string, maxWords = 1500): string[] {
 
 export const INCOMPLETE = "النسخة المقترحة ناقصة، لم نغير مقالك.";
 
+const norm = (w: string) => w.replace(/[أإآ]/g, "ا").replace(/^(ال|و|ف|ب)/, "");
+
+/** A merged article must keep most words of every source and each source's ending. */
+export function isMergeComplete(sources: string[], output: string): boolean {
+  const out = new Set(words(output).map(norm));
+  return sources.every((source) => {
+    const src = [...new Set(words(source).filter((w) => w.length > 2).map(norm))];
+    if (!src.length) return true;
+    if (src.filter((w) => out.has(w)).length < src.length * 0.7) return false;
+    const tail = words(source).slice(-6).filter((w) => w.length > 2).map(norm);
+    return !tail.length || tail.filter((w) => out.has(w)).length >= Math.ceil(tail.length / 2);
+  });
+}
+
+export type Engine = { kind: "gemini"; key: string } | { kind: "cloud"; token: string };
+
 /** Proofread a full article (chunked), verifying nothing is lost. */
 export async function improveFull(
-  article: { title: string; body: string }, original: string, samples: string[], token: string,
+  article: { title: string; body: string }, original: string, samples: string[], engine: Engine,
   signal: AbortSignal, onText: (text: string) => void,
 ): Promise<{ title: string; body: string }> {
   const chunks = splitChunks(article.body);
   let title = article.title; const parts: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
-    const response = await fetch("/api/articles/improve", {
-      method: "POST", signal,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ title: article.title, body: chunks[i], original: chunks.length > 1 ? "" : original.slice(0, 40000), samples }),
-    });
-    const out = parseImprovedArticle(await readArticleStream(response, (t) => onText([...parts, t].join("\n\n"))));
+    const payload = { title: article.title, body: chunks[i], original: chunks.length > 1 ? "" : original.slice(0, 40000), samples };
+    const show = (t: string) => onText([...parts, t].join("\n\n"));
+    let text: string;
+    if (engine.kind === "gemini") {
+      const { geminiStream, IMPROVE_INSTRUCTIONS } = await import("./gemini");
+      text = await geminiStream(engine.key, IMPROVE_INSTRUCTIONS, JSON.stringify(payload), signal, show);
+    } else {
+      const response = await fetch("/api/articles/improve", {
+        method: "POST", signal,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${engine.token}` },
+        body: JSON.stringify(payload),
+      });
+      text = await readArticleStream(response, show);
+    }
+    const out = parseImprovedArticle(text);
     if (!isComplete(chunks[i] ?? "", out.body)) throw new Error(INCOMPLETE);
     if (i === 0) title = out.title;
     parts.push(out.body);
