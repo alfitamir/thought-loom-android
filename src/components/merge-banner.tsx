@@ -47,7 +47,7 @@ export function MergeBanner({ ideas, online, onChange }: { ideas: Idea[]; online
     <div role="note" className="mb-5 flex items-start gap-3 rounded-xl border border-border bg-card p-4">
       <Lightbulb className="mt-0.5 size-5 shrink-0 text-primary" />
       <button className="min-w-0 flex-1 text-start" onClick={() => setActive(current)}>
-        <span className="block text-foreground">نقترح دمج {current.ids.length} مقالات في مقال واحد: «{current.title}»</span>
+        <span className="block text-foreground">نقترح دمج {current.ids.length === 2 ? "مقالين" : `${current.ids.length} مقالات`} في مقال واحد: «{current.title}»</span>
         {current.reason && <span className="mt-1 block text-sm text-muted-foreground">{current.reason}</span>}
         <span className="mt-1 block text-sm text-primary underline">اضغط للمعاينة</span>
       </button>
@@ -76,11 +76,13 @@ function MergeDialog({ suggestion, online, onClose }: { suggestion: MergeSuggest
     const controller = new AbortController(); abort.current = controller;
     versions.current = new Map(sources.map((s) => [s.id, s.updatedAt ?? 0]));
     setBusy(true); setMessage(""); setResult(null); setPreview("");
+    const mine = () => abort.current === controller;
     try {
-      setResult(await mergeArticles(sources.map(getArticle), key, controller.signal, setPreview));
+      const merged = await mergeArticles(sources.map(getArticle), key, controller.signal, (t) => { if (mine()) setPreview(t); });
+      if (mine()) setResult(merged);
     } catch (error) {
-      setMessage(controller.signal.aborted ? "توقف الدمج؛ مقالاتك لم تتغير." : error instanceof Error ? error.message : "تعذّر الدمج الآن.");
-    } finally { setBusy(false); abort.current = null; }
+      if (mine()) setMessage(controller.signal.aborted ? "توقف الدمج؛ مقالاتك لم تتغير." : error instanceof Error ? error.message : "تعذّر الدمج الآن.");
+    } finally { if (mine()) { setBusy(false); abort.current = null; } }
   };
   useEffect(() => { void run(); return () => abort.current?.abort(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

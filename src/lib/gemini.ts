@@ -28,6 +28,7 @@ export function geminiErrorMessage(status: number, message = ""): string {
   if (status === 400 && /key/i.test(message)) return "مفتاح Gemini غير صحيح. راجعه من الإعدادات ⚙️.";
   if (status === 401 || status === 403) return "مفتاح Gemini غير صالح أو غير مفعّل. راجعه من الإعدادات ⚙️.";
   if (status === 429) return "تجاوزت الحد المجاني المؤقت لـ Gemini. حاول بعد دقيقة.";
+  if (status === 500 || status === 503) return "Gemini مشغول الآن. حاول بعد قليل؛ مقالك محفوظ كما هو.";
   return "تعذّر الاتصال بـ Gemini الآن. مقالك محفوظ كما هو.";
 }
 
@@ -47,8 +48,9 @@ export async function geminiStream(
         generationConfig: { maxOutputTokens: 65536, ...(json ? { responseMimeType: "application/json", responseSchema: json } : {}) },
       }),
     });
-    if (response.status !== 429 || attempt === 2) break;
-    await sleep(20000 * (attempt + 1), signal);
+    const busy = response.status === 500 || response.status === 503;
+    if ((response.status !== 429 && !busy) || attempt === 2) break;
+    await sleep(busy ? 3000 * (attempt + 1) : 20000 * (attempt + 1), signal);
   }
   if (!response) throw new Error(geminiErrorMessage(0));
   if (!response.ok) {
