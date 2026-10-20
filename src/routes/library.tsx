@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { improveFull } from "@/lib/article-ai";
+import { resolveEngine } from "@/lib/ai-engine";
 import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolish, updateArticle, type Idea } from "@/lib/ideas";
 import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { ArticleEditor } from "@/components/article-editor";
-import { ArrowRight, ChevronDown, Search, Sparkles, Square, X } from "lucide-react";
+import { SettingsDialog } from "@/components/settings-dialog";
+import { MergeBanner } from "@/components/merge-banner";
+import { ArrowRight, ChevronDown, Search, Settings, Sparkles, Square, X } from "lucide-react";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -31,11 +33,12 @@ function Library() {
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
   const [bulkMsg, setBulkMsg] = useState("");
   const bulkAbort = useRef<AbortController | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const refresh = () => setIdeas(loadIdeas());
   const polishAll = async () => {
     setBulkMsg("");
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) { setBulkMsg("سجّل الدخول من الصفحة الرئيسية لتفعيل الضبط."); return; }
+    const engine = await resolveEngine();
+    if (typeof engine === "string") { setBulkMsg(engine); return; }
     const queue = loadIdeas().filter(needsPolish);
     if (!queue.length) { setBulkMsg("كل المقالات مضبوطة ✓"); return; }
     const controller = new AbortController(); bulkAbort.current = controller;
@@ -45,7 +48,7 @@ function Library() {
         if (controller.signal.aborted || !navigator.onLine) break;
         const samples = loadIdeas().filter((i) => i.id !== idea.id).slice(0, 3).map((i) => i.text.slice(0, 2000));
         try {
-          const result = await improveFull(getArticle(idea), idea.text, samples, data.session.access_token, controller.signal, () => {});
+          const result = await improveFull(getArticle(idea), idea.text, samples, engine, controller.signal, () => {});
           const latest = loadIdeas().find((i) => i.id === idea.id);
           if (latest && (latest.updatedAt ?? 0) === (idea.updatedAt ?? 0)) {
             const updated = updateArticle(idea.id, result.title, result.body, true);
@@ -90,10 +93,13 @@ function Library() {
             ? <Button variant="ghost" size="icon" aria-label="إيقاف الضبط" title="إيقاف الضبط" onClick={() => bulkAbort.current?.abort()}><Square /></Button>
             : <Button variant="ghost" size="icon" aria-label="ضبط كل المقالات" title="ضبط كل المقالات" onClick={polishAll}><Sparkles /></Button>)}
           <Button variant="ghost" size="icon" aria-label="بحث في المقالات" title="بحث في المقالات" onClick={() => { setSearchOpen(!searchOpen); setQuery(""); }}><Search /></Button>
+          <Button variant="ghost" size="icon" aria-label="الإعدادات" title="الإعدادات" onClick={() => setSettingsOpen(true)}><Settings /></Button>
           <Button asChild variant="ghost" size="icon"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
         </div>
       </header>
       {(bulk || bulkMsg) && <p role="status" className="mb-4 text-sm text-muted-foreground">{bulk ? `جارٍ الضبط… تم ${bulk.done} من ${bulk.total}` : bulkMsg}</p>}
+      <MergeBanner ideas={ideas} online={online} onChange={refresh} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       {searchOpen && <div className="mb-6 flex items-center gap-2 border-b border-border pb-3">
         <Search className="size-5 shrink-0 text-muted-foreground" />
         <input autoFocus type="search" aria-label="كلمة البحث" placeholder="ابحث بكلمة…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-lg outline-none" />

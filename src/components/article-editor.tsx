@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
-import { supabase } from "@/integrations/supabase/client";
 import { improveFull } from "@/lib/article-ai";
+import { resolveEngine } from "@/lib/ai-engine";
 
 export function ArticleEditor({ idea, online, onChange, onDelete }: {
   idea: Idea; online: boolean; onChange: () => void; onDelete: () => void;
@@ -49,14 +49,14 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
   const improve = async () => {
     setMessage("");
     if (!navigator.onLine) { setMessage("تحسين المقال يحتاج اتصالًا بالإنترنت."); return; }
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) { setMessage("سجّل الدخول من الصفحة الرئيسية لتفعيل التحسين."); return; }
+    const engine = await resolveEngine();
+    if (typeof engine === "string") { setMessage(engine); return; }
     const controller = new AbortController(); abort.current = controller;
     version.current = idea.updatedAt ?? 0;
     setPreview(""); setSuggestion(null); setPreviewOpen(true); setBusy(true);
     try {
       const samples = loadIdeas().filter((i) => i.id !== idea.id).slice(0, 3).map((i) => i.text.slice(0, 2000));
-      setSuggestion(await improveFull(article, idea.text, samples, data.session.access_token, controller.signal, setPreview));
+      setSuggestion(await improveFull(article, idea.text, samples, engine, controller.signal, setPreview));
     } catch (error) {
       setMessage(controller.signal.aborted ? "توقف التحسين؛ مقالك لم يتغير." : error instanceof Error ? error.message : "تعذّر الاتصال بخدمة تحسين المقالات.");
     } finally { setBusy(false); abort.current = null; }
