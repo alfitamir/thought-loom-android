@@ -51,24 +51,46 @@ function Index() {
     };
   }, []);
 
-  const toggleMic = () => {
-    if (listening) { recRef.current?.stop(); return; }
+  // Recording runs until the user presses stop: when Android ends listening after a
+  // pause, we start a fresh session immediately and keep everything already said.
+  const wantRef = useRef(false);
+  const failsRef = useRef(0);
+  const stopMic = () => { wantRef.current = false; recRef.current?.stop(); setListening(false); };
+  useEffect(() => () => { wantRef.current = false; recRef.current?.abort?.(); }, []);
+
+  const startSession = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { setMsg("التسجيل الصوتي غير متاح على هذا الجهاز، اكتب فكرتك."); return; }
     const rec = new SR();
-    rec.lang = "ar-SA"; rec.continuous = true; rec.interimResults = false;
+    rec.lang = "ar-SA"; rec.continuous = false; rec.interimResults = false;
     rec.onresult = (e: any) => {
       let s = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) s += e.results[i][0].transcript + " ";
-      setText((t) => (t + " " + s).trim());
+      for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) s += e.results[i][0].transcript + " ";
+      if (s.trim()) { failsRef.current = 0; setText((t) => (t + " " + s).trim()); }
     };
-    rec.onerror = () => setMsg("تعذّر التعرف على الصوت. تأكد من تنزيل اللغة العربية للتعرف دون اتصال.");
-    rec.onend = () => setListening(false);
-    recRef.current = rec; rec.start(); setListening(true); setMsg("");
+    rec.onerror = (e: any) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") { wantRef.current = false; setMsg("اسمح للتطبيق باستخدام المايكروفون من إعدادات الهاتف."); }
+      else if (e.error === "language-not-supported") { wantRef.current = false; setMsg("نزّل اللغة العربية للتعرف على الصوت من إعدادات الهاتف."); }
+      else if (e.error !== "no-speech" && e.error !== "aborted") failsRef.current++;
+    };
+    rec.onend = () => {
+      if (!wantRef.current) { setListening(false); return; }
+      if (failsRef.current > 5) { wantRef.current = false; setListening(false); setMsg("تعذّر التعرف على الصوت. تأكد من تنزيل اللغة العربية للتعرف دون اتصال."); return; }
+      setTimeout(() => { if (wantRef.current) { try { startSession(); } catch { stopMic(); } } }, 120);
+    };
+    recRef.current = rec; rec.start();
+  };
+
+  const toggleMic = () => {
+    if (wantRef.current) { stopMic(); return; }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { setMsg("التسجيل الصوتي غير متاح على هذا الجهاز، اكتب فكرتك."); return; }
+    wantRef.current = true; failsRef.current = 0; setMsg(""); setListening(true);
+    try { startSession(); } catch { stopMic(); }
   };
 
   const save = () => {
     if (!text.trim()) return;
+    stopMic();
     const idea = saveIdea(text.trim());
     setText(""); setOpen(false); setMsg("حُفظت الفكرة ✓");
     pushIdea(idea);
@@ -92,7 +114,7 @@ function Index() {
             </button>
             <button onClick={save} className="flex-1 rounded-full bg-primary py-3 font-semibold text-primary-foreground">حفظ</button>
           </div>
-          <button onClick={() => { recRef.current?.stop(); setOpen(false); }} className="w-full text-sm text-muted-foreground">إلغاء</button>
+          <button onClick={() => { stopMic(); setOpen(false); }} className="w-full text-sm text-muted-foreground">إلغاء</button>
         </div>
       )}
       {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
