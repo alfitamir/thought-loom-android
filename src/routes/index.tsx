@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { saveIdea } from "@/lib/ideas";
 import { supabase } from "@/integrations/supabase/client";
 import { pushIdea, syncNow } from "@/lib/sync";
+import { createVoiceRecorder, type VoiceRecorder } from "@/lib/voice-recorder";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,7 +25,7 @@ function Index() {
   const [listening, setListening] = useState(false);
   const [msg, setMsg] = useState("");
   const [cloud, setCloud] = useState<"off" | "on" | "syncing">("off");
-  const recRef = useRef<any>(null);
+  const recRef = useRef<VoiceRecorder | null>(null);
 
   useEffect(() => {
     let alive = true;
