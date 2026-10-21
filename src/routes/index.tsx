@@ -51,50 +51,35 @@ function Index() {
     };
   }, []);
 
-  // Recording runs until the user presses stop: when Android ends listening after a
-  // pause, we start a fresh session immediately and keep everything already said.
-  const wantRef = useRef(false);
-  const failsRef = useRef(0);
-  const stopMic = () => { wantRef.current = false; recRef.current?.stop(); setListening(false); };
-  useEffect(() => () => { wantRef.current = false; recRef.current?.abort?.(); }, []);
+  // Recording runs until the user presses stop (see createVoiceRecorder).
+  const textRef = useRef("");
+  useEffect(() => { textRef.current = text; }, [text]);
+  useEffect(() => () => { recRef.current?.cancel(); }, []);
 
-  const startSession = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const rec = new SR();
-    rec.lang = "ar-SA"; rec.continuous = false; rec.interimResults = false;
-    rec.onresult = (e: any) => {
-      let s = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) s += e.results[i][0].transcript + " ";
-      if (s.trim()) { failsRef.current = 0; setText((t) => (t + " " + s).trim()); }
-    };
-    rec.onerror = (e: any) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") { wantRef.current = false; setMsg("اسمح للتطبيق باستخدام المايكروفون من إعدادات الهاتف."); }
-      else if (e.error === "language-not-supported") { wantRef.current = false; setMsg("نزّل اللغة العربية للتعرف على الصوت من إعدادات الهاتف."); }
-      else if (e.error !== "no-speech" && e.error !== "aborted") failsRef.current++;
-    };
-    rec.onend = () => {
-      if (!wantRef.current) { setListening(false); return; }
-      if (failsRef.current > 5) { wantRef.current = false; setListening(false); setMsg("تعذّر التعرف على الصوت. تأكد من تنزيل اللغة العربية للتعرف دون اتصال."); return; }
-      setTimeout(() => { if (wantRef.current) { try { startSession(); } catch { stopMic(); } } }, 120);
-    };
-    recRef.current = rec; rec.start();
-  };
-
-  const toggleMic = () => {
-    if (wantRef.current) { stopMic(); return; }
+  const toggleMic = async () => {
+    if (recRef.current?.isRecording()) { await recRef.current.stop(); return; }
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) { setMsg("التسجيل الصوتي غير متاح على هذا الجهاز، اكتب فكرتك."); return; }
-    wantRef.current = true; failsRef.current = 0; setMsg(""); setListening(true);
-    try { startSession(); } catch { stopMic(); }
+    recRef.current?.cancel();
+    recRef.current = createVoiceRecorder(SR, {
+      onText: (s) => setText((t) => { const n = (t + " " + s).trim(); textRef.current = n; return n; }),
+      onListening: setListening,
+      onMessage: setMsg,
+    });
+    recRef.current.start();
   };
 
-  const save = () => {
-    if (!text.trim()) return;
-    stopMic();
-    const idea = saveIdea(text.trim());
+  const save = async () => {
+    if (recRef.current?.isRecording()) await recRef.current.stop();
+    const body = textRef.current.trim();
+    if (!body) return;
+    const idea = saveIdea(body);
+    textRef.current = "";
     setText(""); setOpen(false); setMsg("حُفظت الفكرة ✓");
     pushIdea(idea);
   };
+
+  const cancel = () => { recRef.current?.cancel(); setOpen(false); };
 
   return (
     <main dir="rtl" className="paper flex min-h-screen flex-col items-center justify-center gap-10 px-6">
@@ -108,13 +93,14 @@ function Index() {
         <div className="w-full max-w-md space-y-4">
           <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={8}
             placeholder="اكتب أو تكلم..." className="w-full rounded-2xl border border-border bg-card p-4 text-lg leading-relaxed text-card-foreground outline-none focus:ring-2 focus:ring-ring" />
+          {listening && <p className="text-center text-sm text-destructive">● جاري التسجيل… لن يتوقف إلا بضغطك على «إيقاف التسجيل»</p>}
           <div className="flex gap-3">
-            <button onClick={toggleMic} className={`flex-1 rounded-full py-3 font-semibold ${listening ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-secondary text-secondary-foreground"}`}>
-              {listening ? "إيقاف" : "🎙 بالصوت"}
+            <button onClick={toggleMic} aria-pressed={listening} className={`flex-1 rounded-full py-3 font-semibold ${listening ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-secondary text-secondary-foreground"}`}>
+              {listening ? "■ إيقاف التسجيل" : "🎙 ابدأ التسجيل"}
             </button>
             <button onClick={save} className="flex-1 rounded-full bg-primary py-3 font-semibold text-primary-foreground">حفظ</button>
           </div>
-          <button onClick={() => { stopMic(); setOpen(false); }} className="w-full text-sm text-muted-foreground">إلغاء</button>
+          <button onClick={cancel} className="w-full text-sm text-muted-foreground">إلغاء</button>
         </div>
       )}
       {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
