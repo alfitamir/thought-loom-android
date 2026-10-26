@@ -6,7 +6,7 @@ const sse = (text: string) => new Response(
   { status: 200 },
 );
 const fail = (status: number, message = "") => new Response(JSON.stringify({ error: { message } }), { status });
-const modelOf = (url: unknown) => String(url).split("models/")[1].split(":")[0];
+const modelOf = (url: unknown) => String(url).split("models/")[1]?.split(":")[0];
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -21,7 +21,7 @@ describe("gemini connection", () => {
       .mockResolvedValueOnce(sse("تم"));
     vi.stubGlobal("fetch", fetch);
     await expect(geminiStream("k", "s", "u", new AbortController().signal)).resolves.toBe("تم");
-    expect(fetch.mock.calls.map((c) => modelOf(c[0]))).toEqual([GEMINI_MODELS[0].name, GEMINI_MODELS[1].name]);
+    expect(fetch.mock.calls.map((c) => modelOf(c[0]))).toEqual(GEMINI_MODELS.slice(0, 2).map((m) => m.name));
   });
 
   it("stops at once with a clear message when the key is rejected", async () => {

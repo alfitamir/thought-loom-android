@@ -52,12 +52,12 @@ export async function geminiStream(
   onText: (text: string) => void = () => {}, json?: object,
 ): Promise<string> {
   let last: Error = new Error(geminiErrorMessage(0));
-  for (let m = 0; m < GEMINI_MODELS.length; m++) {
+  for (const [m, model] of GEMINI_MODELS.entries()) {
     const isLast = m === GEMINI_MODELS.length - 1;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       try {
-        return await streamOnce(key, GEMINI_MODELS[m], system, user, signal, onText, json, isLast);
+        return await streamOnce(key, model, system, user, signal, onText, json, isLast);
       } catch (error) {
         if (signal.aborted || !(error instanceof Fallback)) throw error;
         last = new Error(error.message);
