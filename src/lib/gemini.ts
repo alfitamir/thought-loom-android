@@ -47,8 +47,10 @@ export function geminiErrorMessage(status: number, message = ""): string {
 class Fallback extends Error {}
 
 /** Stream a Gemini response; returns the full text. Throws an Arabic message on failure or truncation. */
+export type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
+
 export async function geminiStream(
-  key: string, system: string, user: string, signal: AbortSignal,
+  key: string, system: string, user: string | GeminiPart[], signal: AbortSignal,
   onText: (text: string) => void = () => {}, json?: object,
 ): Promise<string> {
   let last: Error = new Error(geminiErrorMessage(0));
@@ -71,7 +73,7 @@ export async function geminiStream(
 }
 
 async function streamOnce(
-  key: string, model: (typeof GEMINI_MODELS)[number], system: string, user: string, outer: AbortSignal,
+  key: string, model: (typeof GEMINI_MODELS)[number], system: string, user: string | GeminiPart[], outer: AbortSignal,
   onText: (text: string) => void, json: object | undefined, isLast: boolean,
 ): Promise<string> {
   const controller = new AbortController();
@@ -89,7 +91,7 @@ async function streamOnce(
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: [{ text: user }] }],
+          contents: [{ role: "user", parts: typeof user === "string" ? [{ text: user }] : user }],
           generationConfig: {
             maxOutputTokens: 65536,
             thinkingConfig: { thinkingLevel: model.thinkingLevel },
