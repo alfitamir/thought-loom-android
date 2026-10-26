@@ -5,14 +5,16 @@ const KEY = "afkari.geminiKey";
 /**
  * Fast models first. "gemini-flash-latest" points at a heavy thinking model that can take
  * 30s+ even for one word, so it is not used. Each entry falls back to the next on
- * missing model, unsupported setting, overload, or a stalled stream.
+ * missing model, unsupported setting, rate limit (each model has its own free quota),
+ * overload, or a stalled stream.
  */
 export const GEMINI_MODELS = [
   { name: "gemini-3.6-flash", thinkingLevel: "low" },
+  { name: "gemini-3-flash-preview", thinkingLevel: "low" },
   { name: "gemini-flash-lite-latest", thinkingLevel: "minimal" },
 ] as const;
 /** Max wait for the first chunk / between chunks before trying the next model. */
-const FIRST_CHUNK_MS = 45000, IDLE_MS = 30000;
+const FIRST_CHUNK_MS = 25000, IDLE_MS = 30000;
 
 export const getGeminiKey = (): string => {
   try { return localStorage.getItem(KEY)?.trim() ?? ""; } catch { return ""; }
