@@ -7,4 +7,5 @@
 - [x] Settings: personal Gemini key (no credits) used for polish and merge.
 - [x] Merge suggestions with preview, edit, approve (delete originals or keep them).
 - [x] Backup export / restore file (save to Google Drive).
+- [x] Gemini connection: fast models, automatic fallback, no hanging.
 - [ ] Verify signed-in cloud proofreading end-to-end. Blocker: no requesting-user app session available (Gemini path verified).
