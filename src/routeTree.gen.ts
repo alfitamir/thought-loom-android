@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as ApiArticlesImproveRouteImport } from './routes/api/articles/improve'
+import { Route as ApiDriveSyncRouteImport } from './routes/api/drive/sync'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const ApiArticlesImproveRoute = ApiArticlesImproveRouteImport.update({
   path: '/api/articles/improve',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDriveSyncRoute = ApiDriveSyncRouteImport.update({
+  id: '/api/drive/sync',
+  path: '/api/drive/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
+  '/api/drive/sync': typeof ApiDriveSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
+  '/api/drive/sync': typeof ApiDriveSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,21 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
+  '/api/drive/sync': typeof ApiDriveSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/library' | '/api/articles/improve'
+  fullPaths:
+    '/' | '/auth' | '/library' | '/api/articles/improve' | '/api/drive/sync'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/library' | '/api/articles/improve'
-  id: '__root__' | '/' | '/auth' | '/library' | '/api/articles/improve'
+  to: '/' | '/auth' | '/library' | '/api/articles/improve' | '/api/drive/sync'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/library'
+    | '/api/articles/improve'
+    | '/api/drive/sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +83,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   LibraryRoute: typeof LibraryRoute
   ApiArticlesImproveRoute: typeof ApiArticlesImproveRoute
+  ApiDriveSyncRoute: typeof ApiDriveSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArticlesImproveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/drive/sync': {
+      id: '/api/drive/sync'
+      path: '/api/drive/sync'
+      fullPath: '/api/drive/sync'
+      preLoaderRoute: typeof ApiDriveSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +131,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   LibraryRoute: LibraryRoute,
   ApiArticlesImproveRoute: ApiArticlesImproveRoute,
+  ApiDriveSyncRoute: ApiDriveSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

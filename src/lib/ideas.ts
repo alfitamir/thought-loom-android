@@ -112,6 +112,30 @@ export const loadDeleted = (): string[] => {
 };
 export const clearDeleted = (ids: string[]) =>
   localStorage.setItem(DEL_KEY, JSON.stringify(loadDeleted().filter((d) => !ids.includes(d))));
+/** Record deletions that arrived from another backup so the cloud copy is removed too. */
+export const markDeleted = (ids: string[]) => {
+  const del = loadDeleted();
+  localStorage.setItem(DEL_KEY, JSON.stringify([...new Set([...del, ...ids])]));
+};
+
+// Google Drive keeps its own pending lists, cleared only after a successful Drive sync.
+const DRIVE_DEL_KEY = "afkari.driveDeleted";
+const DRIVE_REVIVED_KEY = "afkari.driveRevived";
+const readList = (key: string): string[] => {
+  try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; }
+};
+const writeList = (key: string, ids: string[]) => localStorage.setItem(key, JSON.stringify([...new Set(ids)]));
+export const loadDriveDeleted = () => readList(DRIVE_DEL_KEY);
+export const loadDriveRevived = () => readList(DRIVE_REVIVED_KEY);
+/** A restore brings ideas back everywhere, including ones deleted on another device. */
+export const markRevived = (ids: string[]) => {
+  writeList(DRIVE_REVIVED_KEY, [...loadDriveRevived(), ...ids]);
+  writeList(DRIVE_DEL_KEY, loadDriveDeleted().filter((d) => !ids.includes(d)));
+};
+export const clearDriveMarks = (deleted: string[], revived: string[]) => {
+  writeList(DRIVE_DEL_KEY, loadDriveDeleted().filter((d) => !deleted.includes(d)));
+  writeList(DRIVE_REVIVED_KEY, loadDriveRevived().filter((d) => !revived.includes(d)));
+};
 
 export const saveIdea = (text: string): Idea => {
   const all = loadIdeas();
@@ -124,6 +148,8 @@ export const deleteIdea = (id: string) => {
   localStorage.setItem(KEY, JSON.stringify(loadIdeas().filter((i) => i.id !== id)));
   const del = loadDeleted();
   if (!del.includes(id)) localStorage.setItem(DEL_KEY, JSON.stringify([...del, id]));
+  writeList(DRIVE_DEL_KEY, [...loadDriveDeleted(), id]);
+  writeList(DRIVE_REVIVED_KEY, loadDriveRevived().filter((d) => d !== id));
 };
 
 export const needsPolish = (idea: Idea) => idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0);

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { clearDeleted, loadDeleted, loadIdeas, mergeIdeas, replaceIdeas, type Idea } from "./ideas";
+import { syncDrive } from "./drive-sync";
 
 const getSession = async () => (await supabase.auth.getSession()).data.session;
 
@@ -68,5 +69,6 @@ export const syncNow = async (): Promise<number> => {
     await supabase.from("ideas").upsert(changed.map((i) => cloudRow(i, uid)));
   }
   window.dispatchEvent(new Event("afkari:ideas-changed"));
+  void syncDrive().catch(() => {});
   return merged.filter((i) => !localIds.has(i.id)).length;
 };

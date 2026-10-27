@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, KeyRound, Trash2, Upload } from "lucide-react";
+import { CloudUpload, Download, KeyRound, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getGeminiKey, setGeminiKey, testGeminiKey } from "@/lib/gemini";
 import { buildBackup, parseBackup, restoreBackup } from "@/lib/backup";
+import { lastDriveSync, syncDrive } from "@/lib/drive-sync";
 import { loadIdeas } from "@/lib/ideas";
 import { syncNow } from "@/lib/sync";
 
@@ -13,9 +14,24 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const [keyMsg, setKeyMsg] = useState("");
   const [testing, setTesting] = useState(false);
   const [backupMsg, setBackupMsg] = useState("");
+  const [driveAt, setDriveAt] = useState(0);
+  const [driveMsg, setDriveMsg] = useState("");
+  const [driveBusy, setDriveBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { if (open) { setSaved(!!getGeminiKey()); setDraft(""); setKeyMsg(""); setBackupMsg(""); } }, [open]);
+  useEffect(() => { if (open) { setSaved(!!getGeminiKey()); setDraft(""); setKeyMsg(""); setBackupMsg(""); setDriveMsg(""); setDriveAt(lastDriveSync()); } }, [open]);
+  useEffect(() => {
+    const update = () => setDriveAt(lastDriveSync());
+    window.addEventListener("afkari:drive-synced", update);
+    return () => window.removeEventListener("afkari:drive-synced", update);
+  }, []);
+
+  const syncDriveNow = async () => {
+    setDriveBusy(true); setDriveMsg("جارٍ المزامنة مع Google Drive…");
+    const result = await syncDrive().catch(() => ({ ok: false as const, message: "تعذّرت المزامنة مع Google Drive الآن." }));
+    setDriveBusy(false);
+    setDriveMsg(result.ok ? (result.restored ? `تمت المزامنة ✓ واستُعيدت ${result.restored} فكرة من Drive.` : "تمت المزامنة ✓ كل أفكارك محفوظة في Google Drive.") : result.message);
+  };
 
   const saveKey = async () => {
     const key = draft.trim();
@@ -76,6 +92,13 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
         <p className="text-xs text-muted-foreground">تحصل على المفتاح من aistudio.google.com/apikey</p>
         {keyMsg && <p role="status" className="break-words text-sm text-muted-foreground">{keyMsg}</p>}
+      </section>
+      <section className="space-y-3 border-t border-border pt-4">
+        <h3 className="font-display text-lg">Google Drive</h3>
+        <p className="text-sm text-muted-foreground">تُحفظ أفكارك ومقالاتك تلقائيًا في ملف «afkari-sync.json» على Google Drive كلما اتصلت بالإنترنت وأنت مسجّل الدخول، وتُستعاد منه على أي هاتف.</p>
+        <p className="text-sm text-muted-foreground">{driveAt ? `آخر مزامنة: ${new Date(driveAt).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}` : "لم تتم المزامنة بعد على هذا الهاتف."}</p>
+        <Button variant="outline" onClick={syncDriveNow} disabled={driveBusy}><CloudUpload />مزامنة الآن</Button>
+        {driveMsg && <p role="status" className="break-words text-sm text-muted-foreground">{driveMsg}</p>}
       </section>
       <section className="space-y-3 border-t border-border pt-4">
         <h3 className="font-display text-lg">النسخة الاحتياطية</h3>
