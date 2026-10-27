@@ -94,6 +94,13 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         {keyMsg && <p role="status" className="break-words text-sm text-muted-foreground">{keyMsg}</p>}
       </section>
       <section className="space-y-3 border-t border-border pt-4">
+        <h3 className="font-display text-lg">Google Drive</h3>
+        <p className="text-sm text-muted-foreground">تُحفظ أفكارك ومقالاتك تلقائيًا في ملف «afkari-sync.json» على Google Drive كلما اتصلت بالإنترنت وأنت مسجّل الدخول، وتُستعاد منه على أي هاتف.</p>
+        <p className="text-sm text-muted-foreground">{driveAt ? `آخر مزامنة: ${new Date(driveAt).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}` : "لم تتم المزامنة بعد على هذا الهاتف."}</p>
+        <Button variant="outline" onClick={syncDriveNow} disabled={driveBusy}><CloudUpload />مزامنة الآن</Button>
+        {driveMsg && <p role="status" className="break-words text-sm text-muted-foreground">{driveMsg}</p>}
+      </section>
+      <section className="space-y-3 border-t border-border pt-4">
         <h3 className="font-display text-lg">النسخة الاحتياطية</h3>
         <p className="text-sm text-muted-foreground">ملف واحد فيه كل أفكارك ومقالاتك. احفظه في Google Drive واستعده على أي هاتف.</p>
         <div className="flex flex-wrap gap-2">
