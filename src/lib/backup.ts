@@ -1,4 +1,4 @@
-import { clearDeleted, loadDeleted, loadIdeas, mergeIdeas, replaceIdeas, type Idea } from "./ideas";
+import { clearDeleted, loadDeleted, loadIdeas, markRevived, mergeIdeas, replaceIdeas, type Idea } from "./ideas";
 
 export function buildBackup(ideas: Idea[], exportedAt = Date.now()): string {
   return JSON.stringify({ app: "afkari", version: 1, exportedAt, ideas }, null, 2);
@@ -29,6 +29,7 @@ export function restoreBackup(imported: Idea[]): number {
   const ids = imported.map((i) => i.id);
   // A restore is an explicit choice: bring back ideas even if they were deleted here.
   if (loadDeleted().some((d) => ids.includes(d))) clearDeleted(ids);
+  markRevived(ids);
   const merged = mergeIdeas(local, imported, []);
   replaceIdeas(merged);
   window.dispatchEvent(new Event("afkari:ideas-changed"));
