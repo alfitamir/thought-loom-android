@@ -83,7 +83,8 @@ export async function driveSync(request: Request): Promise<Response> {
         if (legacy) current = { ideas: mergeIdeas(current.ideas, legacy.ideas, []), deleted: current.deleted };
       }
     }
-    const { ideas, deleted, revived } = parsed.data;
+    const { deleted, revived } = parsed.data;
+    const ideas = parseDriveFile(JSON.stringify(parsed.data.ideas)).ideas;
     const merged = mergeDriveState(current, ideas, deleted, revived);
     const content = buildDriveFile(merged);
     if (own) {
