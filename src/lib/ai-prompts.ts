@@ -30,7 +30,7 @@ export const SUGGEST_INSTRUCTIONS = `أنت مساعد يرتب مقالات ك�
 
 export const TRANSCRIBE_INSTRUCTIONS = `فرّغ التسجيل الصوتي العربي حرفيًا كما قاله المتكلم، بلهجته وكلماته، مع ترقيم بسيط. لا تلخص ولا تحذف ولا تضف ولا تعلق، واحذف فقط أصوات التردد مثل «اممم». إن لم يكن في التسجيل كلام مفهوم فأخرج الكلمة: [صمت]. أخرج النص فقط.`;
 
-export type AiTask = "improve" | "merge" | "suggest" | "ask" | "classify" | "insights" | "evidence";
+export type AiTask = "improve" | "merge" | "suggest" | "ask" | "classify" | "insights" | "evidence" | "enrich";
 // TASK_INSTRUCTIONS is assembled at the end of this file, after the ported Afkari sections define their instructions.
 
 export const SILENCE = "[صمت]";
@@ -254,6 +254,43 @@ export function sanitizeAdditions(raw: unknown): ArticleAdditions {
   };
 }
 
+export const ENRICH_INSTRUCTIONS = `أنت مستشار فكري وتحريري خبير بأسلوب الكاتب وقضاياه (الدولة والمجتمع، المنظومة، المقاومة، الفكر الإسلامي الحضاري، كتابات المسيري ومالك بن نبي وابن خلدون وسيد قطب ومحمود شاكر).
+مهمتك دراسة المقال وتقديم مقترحات ذكية تطوره وتزيده وزناً وعمقاً بأسلوبه:
+1. إضافات فكرية مقترحة (أفكار محورية أو زوايا تحليلية تعمق المقال وتخدم أطروحته الهيكلية).
+2. اقتباسات وأقوال مقترحة (اقتباسات دقيقة من مفكرين أو نصوص تراثية/معاصرة تخدم الفكرة).
+3. أسئلة كاشفة مقترحة (أسئلة عميقة تحفز التفكير وتكشف المسكوت عنه في الخطاب العام).
+أعد المخرجات في صيغة JSON مطابقة تماماً للمخطط.`;
+
+export const ENRICH_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    additions: {
+      type: "ARRAY",
+      items: { type: "STRING" },
+      description: "زوايا فكرية وأفكار مقترحة لتعميق التحليل",
+    },
+    quotes: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          quote: { type: "STRING", description: "نص الاقتباس" },
+          author: { type: "STRING", description: "صاحب القول أو المرجع" },
+          context: { type: "STRING", description: "كيف يخدم فكرة المقال" },
+        },
+        required: ["quote", "author", "context"],
+      },
+      description: "اقتباسات مناسبة لأطروحة المقال",
+    },
+    questions: {
+      type: "ARRAY",
+      items: { type: "STRING" },
+      description: "أسئلة كاشفة تعزز خاتمة أو محور المقال",
+    },
+  },
+  required: ["additions", "quotes", "questions"],
+};
+
 // ---------- merge suggestions ----------
 export const MERGE_SUGGEST_INSTRUCTIONS = `أنت محرر فكري يقرأ مجموعة مقالات لكاتب واحد (معرّف، عنوان، بداية المقال ونهايته) ويبحث عن مقالات يصنع دمجها مقالًا أقوى من كل منها منفردًا.
 
@@ -286,4 +323,5 @@ export const MERGE_SUGGEST_SCHEMA = {
 export const TASK_INSTRUCTIONS: Record<AiTask, string> = {
   improve: IMPROVE_INSTRUCTIONS, merge: MERGE_INSTRUCTIONS, suggest: SUGGEST_INSTRUCTIONS,
   ask: ASK_INSTRUCTIONS, classify: CLASSIFY_INSTRUCTIONS, insights: INSIGHTS_INSTRUCTIONS, evidence: EVIDENCE_INSTRUCTIONS,
+  enrich: ENRICH_INSTRUCTIONS,
 };
