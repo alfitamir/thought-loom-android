@@ -11,8 +11,8 @@ import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
 import { getGeminiKey } from "@/lib/gemini";
-import { blobToBytes, concatPcm, GEMINI_TTS_VOICE, mapWithConcurrency, pcmToWav, speakWithDevice, splitForSpeech, synthesizeGeminiChunk, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
-import { audioFileName, deleteArticleAudio, getAudioChunk, getCachedAudio, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest } from "@/lib/article-audio";
+import { blobToBytes, concatPcm, createTtsSession, mapWithConcurrency, modelForVoiceKey, pcmToWav, speakWithDevice, splitForSpeech, synthesizeGeminiChunkWithModel, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
+import { audioFileName, deleteArticleAudio, findCachedAudio, getAudioChunk, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest } from "@/lib/article-audio";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -406,7 +406,10 @@ const SPEECH_RATES = [0.75, 1, 1.25, 1.5];
  * while the rest are still generating. A half-finished generation keeps its
  * chunks and can be completed later; sharing stitches the chunks back into
  * one WAV file. Audio saved by the first listen release (a single combined
- * WAV) still plays and shares as before.
+ * WAV) still plays and shares as before. One generation always comes from
+ * ONE Gemini TTS model (the session resolves it on the first chunk), and
+ * its cache entry is keyed by that model — a cached generation is played,
+ * shared, and completed as-is, never mixed with another model's audio.
  */
 function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   open: boolean; onOpenChange: (open: boolean) => void; articleId: string; title: string; body: string;
@@ -443,6 +446,9 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   const playIndexRef = useRef(-1);
   const waitingRef = useRef(false);
   const legacyRef = useRef<ArticleAudioRecord | null>(null);
+  /** Voice key of the generation currently loaded or being generated; it
+   * embeds the producing model, and chunks are saved/loaded under it. */
+  const voiceKeyRef = useRef("");
   const totalRef = useRef(0);
   const pendingPlay = useRef(false);
   const rateRef = useRef(1);
@@ -510,7 +516,7 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     readyIdx.current.add(i);
     setReadyCount(readyIdx.current.size);
     void saveAudioChunk({
-      articleId, engine: "gemini", voiceKey: GEMINI_TTS_VOICE, index: i,
+      articleId, engine: "gemini", voiceKey: voiceKeyRef.current, index: i,
       pcm: new Blob([pcm as BlobPart], { type: PCM_CHUNK_MIME }),
     }).catch(() => {});
     if (playIndexRef.current === -1) maybeStartPlayback();
@@ -532,10 +538,12 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     setTotalChunks(0); totalRef.current = 0;
     if (legacyUrl.current) { URL.revokeObjectURL(legacyUrl.current); legacyUrl.current = ""; }
     setAudioUrl("");
-    const cached = await getCachedAudio(articleId, "gemini", GEMINI_TTS_VOICE, title, body).catch(() => null);
+    voiceKeyRef.current = "";
+    const cached = await findCachedAudio(articleId, "gemini", title, body).catch(() => null);
     if (!cached) { setCacheState("none"); return; }
     if (cached.kind === "legacy") {
       setLegacy(cached.record); legacyRef.current = cached.record;
+      voiceKeyRef.current = cached.record.voiceKey;
       setLegacyFresh(cached.fresh);
       const url = URL.createObjectURL(cached.blob);
       legacyUrl.current = url;
@@ -544,11 +552,12 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
       return;
     }
     setManifest(cached.manifest);
+    voiceKeyRef.current = cached.manifest.voiceKey;
     setManifestFresh(cached.fresh);
     setTotalChunks(cached.manifest.chunkCount);
     totalRef.current = cached.manifest.chunkCount;
     for (const i of cached.readyIndexes) {
-      const blob = await getAudioChunk(articleId, "gemini", GEMINI_TTS_VOICE, i).catch(() => null);
+      const blob = await getAudioChunk(articleId, "gemini", cached.manifest.voiceKey, i).catch(() => null);
       if (blob) {
         readyPcm.current.set(i, await blobToBytes(blob));
         readyIdx.current.add(i);
@@ -617,8 +626,11 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
 
   /**
    * Generate (or complete) the Gemini audio and start playing it. With a
-   * fresh manifest this synthesizes only the missing chunks; otherwise —
-   * and always when `force` is set — it starts over and writes a new one.
+   * fresh manifest this synthesizes only the missing chunks — always with
+   * the model that started that generation. Otherwise — and always when
+   * `force` is set — it starts over: a session resolves one current model
+   * on the first chunk, and the new manifest is written under that model's
+   * voice key the moment the model is known.
    */
   const generate = async (force = false) => {
     if (generatingRef.current) return;
@@ -628,9 +640,10 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     if (!key) { setError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت."); return; }
     const chunks = splitForSpeech(text);
     if (!chunks.length) { setError("لا يوجد نص للقراءة."); return; }
-    const resume = !force && !!manifest && manifestFresh && !legacy;
-    if (!resume) {
-      await deleteArticleAudio(articleId, "gemini", GEMINI_TTS_VOICE).catch(() => {});
+    const resumeManifest = !force && !legacy && manifestFresh ? manifest : null;
+    const session = resumeManifest ? null : createTtsSession(key);
+    if (!resumeManifest) {
+      await deleteArticleAudio(articleId, "gemini").catch(() => {});
       readyPcm.current.clear();
       readyIdx.current.clear();
       revokeChunkUrls();
@@ -638,26 +651,44 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
       setPlayIndex(-1);
       setReadyCount(0);
       setLegacy(null); legacyRef.current = null;
+      voiceKeyRef.current = "";
+      setManifest(null);
       if (legacyUrl.current) { URL.revokeObjectURL(legacyUrl.current); legacyUrl.current = ""; }
       setAudioUrl("");
-      const mf = await saveAudioManifest({
-        articleId, engine: "gemini", voiceKey: GEMINI_TTS_VOICE, title, body, chunkCount: chunks.length,
-      });
-      setManifest(mf);
-      setManifestFresh(true);
     }
     setTotalChunks(chunks.length);
     totalRef.current = chunks.length;
     const missing = chunks.map((_, i) => i).filter((i) => !readyIdx.current.has(i));
     maybeStartPlayback();
     if (!missing.length) { setStatus("الصوت مكتمل ومحفوظ على هذا الهاتف ✓"); return; }
+    // A fresh generation's manifest can only be written once the session
+    // has resolved its model (on the first successful chunk); every worker
+    // awaits the same one-time write before caching its chunk.
+    let manifestWrite: Promise<void> | null = null;
+    const ensureManifest = async () => {
+      if (!session) return;
+      manifestWrite ??= (async () => {
+        voiceKeyRef.current = session.voiceKey;
+        const mf = await saveAudioManifest({
+          articleId, engine: "gemini", voiceKey: session.voiceKey, modelId: session.model,
+          title, body, chunkCount: chunks.length,
+        });
+        setManifest(mf);
+        setManifestFresh(true);
+      })();
+      await manifestWrite;
+    };
     const controller = new AbortController();
     genAbort.current = controller;
     generatingRef.current = true;
     setGenerating(true);
     try {
       await mapWithConcurrency(missing, 3, async (i) => {
-        const pcm = await synthesizeGeminiChunk(chunks[i] as string, key, controller.signal);
+        const chunk = chunks[i] as string;
+        const pcm = resumeManifest
+          ? await synthesizeGeminiChunkWithModel(chunk, key, modelForVoiceKey(resumeManifest.voiceKey), controller.signal)
+          : await (session as NonNullable<typeof session>).synthesizeChunk(chunk, controller.signal);
+        await ensureManifest();
         handleChunkReady(i, pcm);
       }, controller.signal);
       setStatus("حُفظ الصوت على هذا الهاتف ✓");
@@ -687,7 +718,7 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
       for (let i = 0; i < manifest.chunkCount; i++) {
         let pcm = readyPcm.current.get(i);
         if (!pcm) {
-          const stored = await getAudioChunk(articleId, "gemini", GEMINI_TTS_VOICE, i).catch(() => null);
+          const stored = await getAudioChunk(articleId, "gemini", manifest.voiceKey, i).catch(() => null);
           if (stored) pcm = await blobToBytes(stored);
         }
         if (!pcm) { setError("تعذّر تجهيز ملف الصوت للمشاركة."); return; }
@@ -710,7 +741,8 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   const removeSaved = async () => {
     genAbort.current?.abort();
     audioRef.current?.pause();
-    await deleteArticleAudio(articleId, "gemini", GEMINI_TTS_VOICE).catch(() => {});
+    await deleteArticleAudio(articleId, "gemini").catch(() => {});
+    voiceKeyRef.current = "";
     readyPcm.current.clear();
     readyIdx.current.clear();
     revokeChunkUrls();

@@ -13,7 +13,9 @@
 //   one WAV. New generations always write v2; v1 records stay playable and
 //   shareable until replaced.
 
-import { GEMINI_TTS_SAMPLE_RATE, toSpeechText, type TtsEngine } from "./tts";
+import {
+  CURRENT_TTS_VOICE_KEY, GEMINI_TTS_SAMPLE_RATE, modelForVoiceKey, toSpeechText, type TtsEngine,
+} from "./tts";
 
 export type ArticleAudioRecord = {
   /** Composite key: `${articleId}:${engine}:${voiceKey}`. */
@@ -34,6 +36,12 @@ export type ChunkedAudioManifest = {
   articleId: string;
   engine: TtsEngine;
   voiceKey: string;
+  /** The TTS model that produced (or is producing) this generation. The
+   * voiceKey embeds it for new keys; manifests written before the model
+   * upgrade have no modelId field at runtime — modelForVoiceKey derives it
+   * from their bare voice key instead. A generation is only ever resumed or
+   * completed by the model recorded here. */
+  modelId: string;
   textHash: string;
   version: 2;
   format: "pcm-chunks";
@@ -180,22 +188,50 @@ export type CachedAudio =
  * those indexes). `fresh` compares the stored hash against the article's
  * current spoken text.
  */
+async function cachedFromRecord(
+  rec: StoredAudioRecord, articleId: string, title: string, body: string,
+  store: ArticleAudioStore,
+): Promise<CachedAudio | null> {
+  if (isChunkedManifest(rec)) {
+    return {
+      kind: "chunks",
+      manifest: rec,
+      readyIndexes: await listReadyChunks(articleId, rec.engine, rec.voiceKey, store),
+      fresh: isManifestFresh(rec, title, body),
+    };
+  }
+  if (isAudioChunk(rec)) return null; // a chunk key was passed, not a base key
+  return { kind: "legacy", record: rec, blob: rec.blob, fresh: isAudioFresh(rec, title, body) };
+}
+
 export async function getCachedAudio(
   articleId: string, engine: TtsEngine, voiceKey: string, title: string, body: string,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<CachedAudio | null> {
   const rec = await store.get(audioKey(articleId, engine, voiceKey));
   if (!rec) return null;
-  if (isChunkedManifest(rec)) {
-    return {
-      kind: "chunks",
-      manifest: rec,
-      readyIndexes: await listReadyChunks(articleId, engine, voiceKey, store),
-      fresh: isManifestFresh(rec, title, body),
-    };
-  }
-  if (isAudioChunk(rec)) return null; // a chunk key was passed, not a base key
-  return { kind: "legacy", record: rec, blob: rec.blob, fresh: isAudioFresh(rec, title, body) };
+  return cachedFromRecord(rec, articleId, title, body, store);
+}
+
+/**
+ * Find whatever audio is cached for an article + engine, across models:
+ * the current model's entry first, then the newest chunked generation,
+ * then the newest legacy record. The returned manifest/record carries its
+ * own voiceKey (and with it, its model) — callers play and share it as-is,
+ * and resume it only with that same model.
+ */
+export async function findCachedAudio(
+  articleId: string, engine: TtsEngine, title: string, body: string,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<CachedAudio | null> {
+  const all = (await store.listForArticle(articleId)).filter((r) => r.engine === engine);
+  const manifests = all.filter(isChunkedManifest)
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const chosenManifest = manifests.find((m) => m.voiceKey === CURRENT_TTS_VOICE_KEY) ?? manifests[0];
+  if (chosenManifest) return cachedFromRecord(chosenManifest, articleId, title, body, store);
+  const legacy = all.filter(isLegacyAudio).sort((a, b) => b.createdAt - a.createdAt)[0];
+  if (legacy) return cachedFromRecord(legacy, articleId, title, body, store);
+  return null;
 }
 
 /** Sorted indexes of the chunks of one generation that are on this device. */
@@ -214,7 +250,7 @@ export async function listReadyChunks(
 export async function saveAudioManifest(
   input: {
     articleId: string; engine: TtsEngine; voiceKey: string; title: string; body: string;
-    chunkCount: number; sampleRate?: number;
+    chunkCount: number; sampleRate?: number; modelId?: string;
   },
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<ChunkedAudioManifest> {
@@ -223,6 +259,7 @@ export async function saveAudioManifest(
     articleId: input.articleId,
     engine: input.engine,
     voiceKey: input.voiceKey,
+    modelId: input.modelId ?? modelForVoiceKey(input.voiceKey),
     textHash: articleTextHash(input.title, input.body),
     version: 2,
     format: "pcm-chunks",

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  articleTextHash, audioFileName, audioKey, deleteArticleAudio, getAudioChunk, getCachedAudio,
-  isAudioFresh, listReadyChunks, memoryArticleAudioStore, saveArticleAudio, saveAudioChunk,
-  saveAudioManifest, textHash,
+  articleTextHash, audioFileName, audioKey, deleteArticleAudio, findCachedAudio, getAudioChunk,
+  getCachedAudio, isAudioFresh, listReadyChunks, memoryArticleAudioStore, saveArticleAudio,
+  saveAudioChunk, saveAudioManifest, textHash,
+  type AudioChunkRecord, type ChunkedAudioManifest,
 } from "./article-audio";
 import { blobToBytes, concatPcm, pcmToWav, toSpeechText } from "./tts";
 
@@ -148,5 +149,84 @@ describe("chunked article audio (v2, memory store)", () => {
     const v = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
     expect(v.getUint32(40, true)).toBe(5);
     expect([...wav.slice(44)]).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("findCachedAudio across TTS models", () => {
+  const pcmBlob = (bytes: number[]) => new Blob([new Uint8Array(bytes)], { type: "audio/L16" });
+  const LITE = "gemini-3.8-flash-lite-tts:Charon"; // the current primary key
+  const FLASH = "gemini-3.8-flash-tts:Charon";
+
+  it("finds a generation stored under a non-current model's key, model recorded on the manifest", async () => {
+    const store = memoryArticleAudioStore();
+    const mf = await saveAudioManifest(
+      { articleId: "m1", engine: "gemini", voiceKey: FLASH, title: "عنوان", body: "نص", chunkCount: 2 }, store);
+    expect(mf.modelId).toBe("gemini-3.8-flash-tts");
+    await saveAudioChunk({ articleId: "m1", engine: "gemini", voiceKey: FLASH, index: 0, pcm: pcmBlob([1]) }, store);
+    const found = await findCachedAudio("m1", "gemini", "عنوان", "نص", store);
+    expect(found?.kind).toBe("chunks");
+    if (found?.kind === "chunks") {
+      expect(found.manifest.voiceKey).toBe(FLASH);
+      expect(found.manifest.modelId).toBe("gemini-3.8-flash-tts");
+      expect(found.readyIndexes).toEqual([0]);
+      expect(found.fresh).toBe(true);
+    }
+    // An exact-key lookup under a different model finds nothing: no mixing.
+    expect(await getCachedAudio("m1", "gemini", LITE, "عنوان", "نص", store)).toBeNull();
+    expect(await listReadyChunks("m1", "gemini", LITE, store)).toEqual([]);
+  });
+
+  it("never mixes chunks across models, and prefers the current model's entry over a newer one", async () => {
+    const store = memoryArticleAudioStore();
+    const manifestRec = (id: string, voiceKey: string, createdAt: number): ChunkedAudioManifest => ({
+      key: audioKey(id, "gemini", voiceKey),
+      articleId: id, engine: "gemini", voiceKey,
+      modelId: voiceKey.split(":")[0]!,
+      textHash: articleTextHash("عنوان", "نص"),
+      version: 2, format: "pcm-chunks", sampleRate: 24000, chunkCount: 3, createdAt,
+    });
+    const chunkRec = (id: string, voiceKey: string, index: number, createdAt: number): AudioChunkRecord => ({
+      key: `${audioKey(id, "gemini", voiceKey)}#${index}`,
+      articleId: id, engine: "gemini", voiceKey, index,
+      mime: "audio/L16", blob: pcmBlob([index]), createdAt,
+    });
+
+    // The current (Lite) generation is the OLDER one and has only chunk 0;
+    // a newer Flash generation of the same article has chunks 0 and 1. The
+    // current model's entry must still win, with only its own chunks.
+    await store.put(manifestRec("m2", LITE, 500));
+    await store.put(chunkRec("m2", LITE, 0, 501));
+    await store.put(manifestRec("m2", FLASH, 3000));
+    await store.put(chunkRec("m2", FLASH, 0, 3001));
+    await store.put(chunkRec("m2", FLASH, 1, 3002));
+    const found = await findCachedAudio("m2", "gemini", "عنوان", "نص", store);
+    expect(found?.kind).toBe("chunks");
+    if (found?.kind === "chunks") {
+      expect(found.manifest.voiceKey).toBe(LITE);
+      // Flash's chunk 1 must NOT leak into the Lite generation.
+      expect(found.readyIndexes).toEqual([0]);
+    }
+
+    // Without a current-model entry, the NEWEST other-model entry wins.
+    await store.put(manifestRec("m3", FLASH, 3000));
+    await store.put(chunkRec("m3", FLASH, 0, 3001));
+    await store.put(manifestRec("m3", "gemini-2.5-flash-preview-tts:Charon", 2000));
+    const foundOld = await findCachedAudio("m3", "gemini", "عنوان", "نص", store);
+    expect(foundOld?.kind).toBe("chunks");
+    if (foundOld?.kind === "chunks") {
+      expect(foundOld.manifest.voiceKey).toBe(FLASH);
+      expect(foundOld.manifest.modelId).toBe("gemini-3.8-flash-tts");
+      expect(foundOld.readyIndexes).toEqual([0]);
+    }
+  });
+
+  it("still surfaces a legacy single-file record and reports nothing for uncached articles", async () => {
+    const store = memoryArticleAudioStore();
+    await saveArticleAudio(
+      { articleId: "m4", engine: "gemini", voiceKey: "Charon", title: "عنوان", body: "نص", blob: pcmBlob([9]) }, store);
+    const found = await findCachedAudio("m4", "gemini", "عنوان", "نص", store);
+    expect(found?.kind).toBe("legacy");
+    expect(found?.fresh).toBe(true);
+    expect(await findCachedAudio("m5", "gemini", "عنوان", "نص", store)).toBeNull();
   });
 });

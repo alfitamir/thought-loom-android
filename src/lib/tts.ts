@@ -11,12 +11,48 @@ import { geminiErrorMessage } from "./gemini";
 
 export type TtsEngine = "device" | "gemini";
 
-/** Gemini TTS model and one documented prebuilt voice: "Charon", an
- * informative male voice. Gemini TTS detects Arabic from the text itself. */
-export const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
+/**
+ * Gemini TTS models in preference order (docs: ai.google.dev/gemini-api/docs/speech-generation).
+ * The 3.8 models are served by the Interactions API; the 2.5 preview model
+ * keeps the classic generateContent shape as the final fallback. A session
+ * resolves ONE model — probing with its first chunk — and never mixes
+ * models inside one article's audio. Flash-Lite leads: it is the model
+ * Google positions for high-throughput read-aloud.
+ */
+export const GEMINI_TTS_MODELS = [
+  "gemini-3.8-flash-lite-tts",
+  "gemini-3.8-flash-tts",
+  "gemini-2.5-flash-preview-tts",
+] as const;
+export type GeminiTtsModelId = (typeof GEMINI_TTS_MODELS)[number];
+/** The final fallback model (the only one the first listen release used). */
+export const GEMINI_TTS_MODEL: GeminiTtsModelId = "gemini-2.5-flash-preview-tts";
+/** One documented prebuilt voice, present in both the 2.5 and 3.8 voice
+ * lists: "Charon", an informative male voice. Gemini TTS detects Arabic
+ * from the text itself — 3.8 speech_config has no language field. */
 export const GEMINI_TTS_VOICE = "Charon";
-/** Gemini TTS returns raw PCM: 16-bit little-endian, mono, 24 kHz. */
+/** Gemini TTS audio is raw PCM: 16-bit little-endian, mono, 24 kHz. */
 export const GEMINI_TTS_SAMPLE_RATE = 24000;
+
+/**
+ * Cache voice key for one model + voice. A generation's manifest and chunks
+ * are stored under this key, so audio is only ever resumed, completed, or
+ * exported by the exact model that produced it — never mixed across models.
+ */
+export const ttsVoiceKey = (model: string): string => `${model}:${GEMINI_TTS_VOICE}`;
+
+/** The voice key new generations write under (the primary model's). */
+export const CURRENT_TTS_VOICE_KEY = ttsVoiceKey(GEMINI_TTS_MODELS[0]);
+
+/**
+ * The model that produced a cache voice key. Keys written before the model
+ * upgrade are the bare voice name ("Charon") — those came from the 2.5
+ * pipeline, so they map to the fallback model.
+ */
+export function modelForVoiceKey(voiceKey: string): string {
+  const sep = voiceKey.indexOf(":");
+  return sep > 0 ? voiceKey.slice(0, sep) : GEMINI_TTS_MODEL;
+}
 
 export class TtsError extends Error {}
 
@@ -179,28 +215,224 @@ export function parseGeminiTtsAudio(json: unknown): Uint8Array {
 
 export type SynthProgress = (done: number, total: number) => void;
 
-/** One Gemini TTS request for a single chunk of text; returns raw PCM bytes. */
-export async function synthesizeGeminiChunk(
-  chunk: string, key: string, signal?: AbortSignal,
+/** The 3.8 models are served by the Interactions API; older ones are not. */
+const INTERACTIONS_MODELS: ReadonlySet<string> = new Set([GEMINI_TTS_MODELS[0], GEMINI_TTS_MODELS[1]]);
+const usesInteractionsApi = (model: string): boolean => INTERACTIONS_MODELS.has(model);
+
+/** Internal signal: this model cannot serve the request at all, so a session
+ * may fall through to the next model in GEMINI_TTS_MODELS. Never user-facing. */
+export class ModelUnavailableError extends Error {
+  constructor(readonly status: number, message: string) { super(message); }
+}
+
+/**
+ * Whether an HTTP failure means "this model is unavailable" (fall through to
+ * the next model) rather than a real error (surface it). Only a 404, or a
+ * 400/403 whose message says the model is missing/unsupported, qualifies —
+ * quota (429), bad keys, and everything else never fall through.
+ */
+export function isModelUnavailable(status: number, message: string): boolean {
+  if (status === 404) return true;
+  if (status !== 400 && status !== 403) return false;
+  return /not found|not available|not supported|unsupported|does not exist|unknown model|invalid model/i.test(message);
+}
+
+const responseErrorMessage = (json: unknown): string => {
+  const err = json as { error?: { message?: unknown }; message?: unknown };
+  if (typeof err?.error?.message === "string") return err.error.message;
+  if (typeof err?.message === "string") return err.message;
+  return "";
+};
+
+/**
+ * The single-speaker Interactions API request for the 3.8 models. It asks
+ * explicitly for headerless PCM (`audio/l16`): the unary default is a full
+ * WAV file, which could not be concatenated chunk-by-chunk like raw PCM.
+ */
+export function buildInteractionsTtsRequest(model: string, text: string) {
+  return {
+    model,
+    input: [{ type: "user_input", content: [{ type: "text", text }] }],
+    response_format: { type: "audio", mime_type: "audio/l16", sample_rate: GEMINI_TTS_SAMPLE_RATE },
+    generation_config: { speech_config: [{ voice: GEMINI_TTS_VOICE }] },
+  };
+}
+
+const ascii = (bytes: Uint8Array, off: number, len: number): string =>
+  String.fromCharCode(...bytes.slice(off, off + len));
+
+/**
+ * Normalize a TTS payload to headerless PCM. Raw PCM passes through; a WAV
+ * payload (the 3.8 unary default, in case the server ignored the audio/l16
+ * request) is unwrapped to its data chunk — the format is fixed at 24 kHz
+ * mono 16-bit, so the PCM frames are directly concatenable either way.
+ */
+export function unwrapPcm(bytes: Uint8Array, mimeType?: string): Uint8Array {
+  const isWav = mimeType?.toLowerCase().includes("wav") ||
+    (bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 4) === "WAVE");
+  if (!isWav) return bytes;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let off = 12;
+  while (off + 8 <= bytes.length) {
+    const id = ascii(bytes, off, 4);
+    const size = view.getUint32(off + 4, true);
+    if (id === "data") return bytes.slice(off + 8, Math.min(off + 8 + size, bytes.length));
+    off += 8 + size + (size % 2); // chunk payloads are word-aligned
+  }
+  return bytes; // malformed WAV: keep the bytes rather than dropping audio
+}
+
+/**
+ * Extract the audio from an Interactions API response: the LAST audio block
+ * of the model_output steps (raw REST keeps base64 audio in
+ * steps[].content[].data). Normalized to headerless PCM. Throws a TtsError
+ * when the response carries no audio.
+ */
+export function parseInteractionsTtsAudio(json: unknown): Uint8Array {
+  const root = json as {
+    steps?: { type?: string; content?: { type?: string; data?: unknown; mime_type?: string }[] }[];
+    output_audio?: { data?: unknown; mime_type?: string };
+  };
+  let data: unknown;
+  let mimeType: string | undefined;
+  for (const step of root?.steps ?? []) {
+    if (step?.type !== "model_output") continue;
+    for (const part of step.content ?? []) {
+      if (part?.type === "audio") { data = part.data; mimeType = part.mime_type; }
+    }
+  }
+  // Defensive: SDK-shaped convenience field, if a gateway ever returns it.
+  if (typeof data !== "string" && typeof root?.output_audio?.data === "string") {
+    data = root.output_audio.data;
+    mimeType = root.output_audio.mime_type;
+  }
+  if (typeof data !== "string" || !data) throw new TtsError("لم يصل صوت من Gemini. حاول مرة أخرى.");
+  return unwrapPcm(base64ToBytes(data), mimeType);
+}
+
+/** One TTS request for a single chunk through one specific model's API. */
+export async function synthesizeGeminiChunkWithModel(
+  chunk: string, key: string, model: string, signal?: AbortSignal,
 ): Promise<Uint8Array> {
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  const interactions = usesInteractionsApi(model);
   let response: Response;
   try {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent`, {
-      method: "POST",
-      ...(signal ? { signal } : {}),
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify(buildGeminiTtsRequest(chunk)),
-    });
+    response = await fetch(
+      interactions
+        ? "https://generativelanguage.googleapis.com/v1beta/interactions"
+        : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        ...(signal ? { signal } : {}),
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify(interactions ? buildInteractionsTtsRequest(model, chunk) : buildGeminiTtsRequest(chunk)),
+      },
+    );
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new TtsError("تعذّر الوصول إلى Gemini. تأكد من الإنترنت وحاول مرة أخرى.");
   }
   if (!response.ok) {
-    const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
-    throw new TtsError(geminiErrorMessage(response.status, err?.error?.message ?? ""));
+    const err = await response.json().catch(() => ({}));
+    const message = responseErrorMessage(err);
+    if (isModelUnavailable(response.status, message)) throw new ModelUnavailableError(response.status, message);
+    throw new TtsError(geminiErrorMessage(response.status, message));
   }
-  return parseGeminiTtsAudio(await response.json().catch(() => null));
+  const json = await response.json().catch(() => null);
+  return interactions ? parseInteractionsTtsAudio(json) : parseGeminiTtsAudio(json);
+}
+
+/** One Gemini TTS request for a single chunk of text; returns raw PCM bytes.
+ * Pinned to the 2.5 fallback model (the classic generateContent shape). */
+export async function synthesizeGeminiChunk(
+  chunk: string, key: string, signal?: AbortSignal,
+): Promise<Uint8Array> {
+  return synthesizeGeminiChunkWithModel(chunk, key, GEMINI_TTS_MODEL, signal);
+}
+
+export type TtsSession = {
+  /** The resolved model, or the primary until the first chunk resolves it. */
+  readonly model: string;
+  /** Cache voice key binding this session's audio to its model. Only final
+   * once the first chunk has resolved the model — read it from onChunkReady
+   * time onward, never before synthesis starts. */
+  readonly voiceKey: string;
+  synthesizeChunk: (chunk: string, signal?: AbortSignal) => Promise<Uint8Array>;
+};
+
+type PendingChunk = {
+  chunk: string;
+  signal?: AbortSignal;
+  resolve: (pcm: Uint8Array) => void;
+  reject: (error: unknown) => void;
+};
+
+/**
+ * A synthesis session bound to ONE model, resolved lazily: the first chunk
+ * probes GEMINI_TTS_MODELS in order, falling through only on model-level
+ * failures (see isModelUnavailable). Chunks requested while the probe is in
+ * flight wait, then synthesize with the resolved model — an article's audio
+ * therefore never mixes models. A failed probe rejects the waiting chunks
+ * with the same error and re-arms, so a later call can probe again.
+ */
+export function createTtsSession(key: string): TtsSession {
+  let resolved: string | null = null;
+  let probing = false;
+  let waiters: PendingChunk[] = [];
+
+  const settleWaiters = (error: unknown) => {
+    const pending = waiters;
+    waiters = [];
+    for (const w of pending) w.reject(error);
+  };
+
+  const runProbe = async (first: PendingChunk) => {
+    let lastUnavailable: ModelUnavailableError | null = null;
+    for (const candidate of GEMINI_TTS_MODELS) {
+      try {
+        const pcm = await synthesizeGeminiChunkWithModel(first.chunk, key, candidate, first.signal);
+        resolved = candidate;
+        first.resolve(pcm);
+        const pending = waiters;
+        waiters = [];
+        for (const w of pending) {
+          void synthesizeGeminiChunkWithModel(w.chunk, key, candidate, w.signal).then(w.resolve, w.reject);
+        }
+        return;
+      } catch (error) {
+        if (error instanceof ModelUnavailableError) { lastUnavailable = error; continue; }
+        probing = false;
+        first.reject(error);
+        settleWaiters(error);
+        return;
+      }
+    }
+    probing = false;
+    const error = new TtsError(geminiErrorMessage(lastUnavailable?.status ?? 404, lastUnavailable?.message ?? ""));
+    first.reject(error);
+    settleWaiters(error);
+  };
+
+  const synthesizeChunk = (chunk: string, signal?: AbortSignal): Promise<Uint8Array> => {
+    if (resolved) return synthesizeGeminiChunkWithModel(chunk, key, resolved, signal);
+    if (signal?.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+    return new Promise<Uint8Array>((resolve, reject) => {
+      const waiter: PendingChunk = { chunk, ...(signal ? { signal } : {}), resolve, reject };
+      if (!probing) {
+        probing = true;
+        void runProbe(waiter);
+      } else {
+        waiters.push(waiter);
+      }
+    });
+  };
+
+  return {
+    get model() { return resolved ?? GEMINI_TTS_MODELS[0]; },
+    get voiceKey() { return ttsVoiceKey(resolved ?? GEMINI_TTS_MODELS[0]); },
+    synthesizeChunk,
+  };
 }
 
 export type SynthesizeChunksOptions = {
@@ -219,8 +451,9 @@ async function synthesizeChunkList(
 ): Promise<Uint8Array[]> {
   if (!key.trim()) throw new TtsError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت.");
   if (!chunks.length) throw new TtsError("لا يوجد نص للقراءة.");
+  const session = createTtsSession(key);
   return mapWithConcurrency(chunks, opts.concurrency ?? 3, async (chunk, i) => {
-    const pcm = await synthesizeGeminiChunk(chunk, key, opts.signal);
+    const pcm = await session.synthesizeChunk(chunk, opts.signal);
     opts.onChunkReady?.(i, pcm);
     return pcm;
   }, opts.signal);
