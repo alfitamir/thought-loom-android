@@ -11,8 +11,8 @@ import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
 import { getGeminiKey } from "@/lib/gemini";
-import { GEMINI_TTS_VOICE, speakWithDevice, synthesizeGemini, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
-import { audioFileName, deleteArticleAudio, getCachedAudio, isAudioFresh, saveArticleAudio, type ArticleAudioRecord } from "@/lib/article-audio";
+import { blobToBytes, concatPcm, GEMINI_TTS_VOICE, mapWithConcurrency, pcmToWav, speakWithDevice, splitForSpeech, synthesizeGeminiChunk, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
+import { audioFileName, deleteArticleAudio, getAudioChunk, getCachedAudio, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest } from "@/lib/article-audio";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -400,9 +400,13 @@ const SPEECH_RATES = [0.75, 1, 1.25, 1.5];
 
 /**
  * Listen to an article. Two engines: the device voice (heard live, no file —
- * so nothing to share) and Gemini TTS with the author's personal key, which
- * produces a real WAV file that is cached on this phone and shared like the
- * article text itself.
+ * so nothing to share) and Gemini TTS with the author's personal key.
+ * Gemini synthesis runs chunk by chunk in parallel; every finished chunk is
+ * cached on this phone immediately and playback starts with the first chunk
+ * while the rest are still generating. A half-finished generation keeps its
+ * chunks and can be completed later; sharing stitches the chunks back into
+ * one WAV file. Audio saved by the first listen release (a single combined
+ * WAV) still plays and shares as before.
  */
 function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   open: boolean; onOpenChange: (open: boolean) => void; articleId: string; title: string; body: string;
@@ -416,31 +420,142 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   const [speaking, setSpeaking] = useState(false);
   const [chunkLabel, setChunkLabel] = useState("");
   const speechRef = useRef<DeviceSpeech | null>(null);
-  // Gemini file mode
+  // Gemini file mode. Playback order is driven through refs because chunk
+  // completions arrive asynchronously, outside React's render cycle.
   const [cacheState, setCacheState] = useState<"checking" | "none" | "ready">("checking");
-  const [cached, setCached] = useState<ArticleAudioRecord | null>(null);
-  const [audioUrl, setAudioUrl] = useState("");
+  const [legacy, setLegacy] = useState<ArticleAudioRecord | null>(null);
+  const [legacyFresh, setLegacyFresh] = useState(true);
+  const [manifest, setManifest] = useState<ChunkedAudioManifest | null>(null);
+  const [manifestFresh, setManifestFresh] = useState(true);
+  const [readyCount, setReadyCount] = useState(0);
+  const [totalChunks, setTotalChunks] = useState(0);
   const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState<[number, number]>([0, 0]);
+  const [playIndex, setPlayIndex] = useState(-1);
+  const [waiting, setWaiting] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const genAbort = useRef<AbortController | null>(null);
-  const urlRef = useRef("");
+  const generatingRef = useRef(false);
+  const readyPcm = useRef<Map<number, Uint8Array>>(new Map());
+  const readyIdx = useRef<Set<number>>(new Set());
+  const chunkUrls = useRef<Map<number, string>>(new Map());
+  const legacyUrl = useRef("");
+  const playIndexRef = useRef(-1);
+  const waitingRef = useRef(false);
+  const legacyRef = useRef<ArticleAudioRecord | null>(null);
+  const totalRef = useRef(0);
+  const pendingPlay = useRef(false);
+  const rateRef = useRef(1);
+  rateRef.current = rate;
 
   const text = toSpeechText(title, body);
-  const stale = cached ? !isAudioFresh(cached, title, body) : false;
+  const complete = !!manifest && totalChunks > 0 && readyCount >= totalChunks;
+  const stale = legacy ? !legacyFresh : manifest ? !manifestFresh : false;
+  const hasPlayable = !!legacy || readyCount > 0;
 
-  const replaceUrl = (url: string) => {
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    urlRef.current = url;
+  const revokeChunkUrls = () => {
+    for (const u of chunkUrls.current.values()) URL.revokeObjectURL(u);
+    chunkUrls.current.clear();
+  };
+
+  const chunkUrl = (i: number): string | null => {
+    const hit = chunkUrls.current.get(i);
+    if (hit) return hit;
+    const pcm = readyPcm.current.get(i);
+    if (!pcm) return null;
+    const url = URL.createObjectURL(new Blob([pcmToWav(pcm) as BlobPart], { type: "audio/wav" }));
+    chunkUrls.current.set(i, url);
+    return url;
+  };
+
+  /** Start playing chunk i (chunks only ever start in index order). */
+  const playChunk = (i: number) => {
+    const url = chunkUrl(i);
+    if (!url) return;
+    playIndexRef.current = i;
+    setPlayIndex(i);
+    waitingRef.current = false;
+    setWaiting(false);
+    pendingPlay.current = true;
     setAudioUrl(url);
+  };
+
+  // Kick playback once React has applied the new src.
+  useEffect(() => {
+    if (!pendingPlay.current || !audioUrl) return;
+    pendingPlay.current = false;
+    const el = audioRef.current;
+    if (!el) return;
+    el.playbackRate = rateRef.current;
+    void el.play().catch(() => {});
+  }, [audioUrl]);
+
+  const maybeStartPlayback = () => {
+    if (playIndexRef.current === -1 && readyIdx.current.has(0)) playChunk(0);
+  };
+
+  const handleEnded = () => {
+    if (legacyRef.current) return; // a legacy file is a single item
+    const next = playIndexRef.current + 1;
+    if (readyIdx.current.has(next)) { playChunk(next); return; }
+    if (generatingRef.current && next < totalRef.current) {
+      waitingRef.current = true;
+      setWaiting(true);
+    }
+  };
+
+  /** A chunk finished generating: cache it at once, then feed the player. */
+  const handleChunkReady = (i: number, pcm: Uint8Array) => {
+    readyPcm.current.set(i, pcm);
+    readyIdx.current.add(i);
+    setReadyCount(readyIdx.current.size);
+    void saveAudioChunk({
+      articleId, engine: "gemini", voiceKey: GEMINI_TTS_VOICE, index: i,
+      pcm: new Blob([pcm as BlobPart], { type: PCM_CHUNK_MIME }),
+    }).catch(() => {});
+    if (playIndexRef.current === -1) maybeStartPlayback();
+    else if (waitingRef.current && i === playIndexRef.current + 1) playChunk(i);
   };
 
   const loadCache = async () => {
     setCacheState("checking");
-    const rec = await getCachedAudio(articleId, "gemini", GEMINI_TTS_VOICE).catch(() => null);
-    setCached(rec);
-    if (rec) { replaceUrl(URL.createObjectURL(rec.blob)); setCacheState("ready"); }
-    else { replaceUrl(""); setCacheState("none"); }
+    readyPcm.current.clear();
+    readyIdx.current.clear();
+    revokeChunkUrls();
+    playIndexRef.current = -1;
+    setPlayIndex(-1);
+    waitingRef.current = false;
+    setWaiting(false);
+    setLegacy(null); legacyRef.current = null;
+    setManifest(null);
+    setReadyCount(0);
+    setTotalChunks(0); totalRef.current = 0;
+    if (legacyUrl.current) { URL.revokeObjectURL(legacyUrl.current); legacyUrl.current = ""; }
+    setAudioUrl("");
+    const cached = await getCachedAudio(articleId, "gemini", GEMINI_TTS_VOICE, title, body).catch(() => null);
+    if (!cached) { setCacheState("none"); return; }
+    if (cached.kind === "legacy") {
+      setLegacy(cached.record); legacyRef.current = cached.record;
+      setLegacyFresh(cached.fresh);
+      const url = URL.createObjectURL(cached.blob);
+      legacyUrl.current = url;
+      setAudioUrl(url);
+      setCacheState("ready");
+      return;
+    }
+    setManifest(cached.manifest);
+    setManifestFresh(cached.fresh);
+    setTotalChunks(cached.manifest.chunkCount);
+    totalRef.current = cached.manifest.chunkCount;
+    for (const i of cached.readyIndexes) {
+      const blob = await getAudioChunk(articleId, "gemini", GEMINI_TTS_VOICE, i).catch(() => null);
+      if (blob) {
+        readyPcm.current.set(i, await blobToBytes(blob));
+        readyIdx.current.add(i);
+      }
+    }
+    setReadyCount(readyIdx.current.size);
+    setCacheState(readyIdx.current.size > 0 ? "ready" : "none");
   };
 
   useEffect(() => {
@@ -460,13 +575,24 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     setChunkLabel("");
   };
 
-  useEffect(() => () => { speechRef.current?.stop(); genAbort.current?.abort(); }, []);
+  useEffect(() => () => {
+    speechRef.current?.stop();
+    genAbort.current?.abort();
+    revokeChunkUrls();
+    if (legacyUrl.current) URL.revokeObjectURL(legacyUrl.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const close = (next: boolean) => {
     if (!next) {
       stopDevice();
       genAbort.current?.abort();
-      replaceUrl("");
+      audioRef.current?.pause();
+      playIndexRef.current = -1;
+      setPlayIndex(-1);
+      revokeChunkUrls();
+      if (legacyUrl.current) { URL.revokeObjectURL(legacyUrl.current); legacyUrl.current = ""; }
+      setAudioUrl("");
     }
     onOpenChange(next);
   };
@@ -489,27 +615,59 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     }
   };
 
-  const generate = async () => {
+  /**
+   * Generate (or complete) the Gemini audio and start playing it. With a
+   * fresh manifest this synthesizes only the missing chunks; otherwise —
+   * and always when `force` is set — it starts over and writes a new one.
+   */
+  const generate = async (force = false) => {
+    if (generatingRef.current) return;
     setError(""); setStatus("");
     if (!navigator.onLine) { setError("توليد الصوت يحتاج اتصالًا بالإنترنت."); return; }
     const key = getGeminiKey();
     if (!key) { setError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت."); return; }
+    const chunks = splitForSpeech(text);
+    if (!chunks.length) { setError("لا يوجد نص للقراءة."); return; }
+    const resume = !force && !!manifest && manifestFresh && !legacy;
+    if (!resume) {
+      await deleteArticleAudio(articleId, "gemini", GEMINI_TTS_VOICE).catch(() => {});
+      readyPcm.current.clear();
+      readyIdx.current.clear();
+      revokeChunkUrls();
+      playIndexRef.current = -1;
+      setPlayIndex(-1);
+      setReadyCount(0);
+      setLegacy(null); legacyRef.current = null;
+      if (legacyUrl.current) { URL.revokeObjectURL(legacyUrl.current); legacyUrl.current = ""; }
+      setAudioUrl("");
+      const mf = await saveAudioManifest({
+        articleId, engine: "gemini", voiceKey: GEMINI_TTS_VOICE, title, body, chunkCount: chunks.length,
+      });
+      setManifest(mf);
+      setManifestFresh(true);
+    }
+    setTotalChunks(chunks.length);
+    totalRef.current = chunks.length;
+    const missing = chunks.map((_, i) => i).filter((i) => !readyIdx.current.has(i));
+    maybeStartPlayback();
+    if (!missing.length) { setStatus("الصوت مكتمل ومحفوظ على هذا الهاتف ✓"); return; }
     const controller = new AbortController();
     genAbort.current = controller;
-    setGenerating(true); setGenProgress([0, 0]);
+    generatingRef.current = true;
+    setGenerating(true);
     try {
-      const blob = await synthesizeGemini(text, key, {
-        signal: controller.signal,
-        onProgress: (d, t) => setGenProgress([d, t]),
-      });
-      const rec = await saveArticleAudio({ articleId, engine: "gemini", voiceKey: GEMINI_TTS_VOICE, title, body, blob });
-      setCached(rec);
-      replaceUrl(URL.createObjectURL(blob));
-      setCacheState("ready");
+      await mapWithConcurrency(missing, 3, async (i) => {
+        const pcm = await synthesizeGeminiChunk(chunks[i] as string, key, controller.signal);
+        handleChunkReady(i, pcm);
+      }, controller.signal);
       setStatus("حُفظ الصوت على هذا الهاتف ✓");
     } catch (e) {
       if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "تعذّر توليد الصوت الآن.");
-    } finally { setGenerating(false); genAbort.current = null; }
+    } finally {
+      generatingRef.current = false;
+      setGenerating(false);
+      genAbort.current = null;
+    }
   };
 
   const canShareFiles = () => {
@@ -518,14 +676,31 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   };
 
   const shareAudio = async () => {
-    if (!cached) return;
     setStatus("");
-    const file = new File([cached.blob], audioFileName(title, cached.mime), { type: cached.mime });
+    let blob: Blob;
+    let mime = "audio/wav";
+    if (legacy) {
+      blob = legacy.blob;
+      mime = legacy.mime;
+    } else if (manifest && complete) {
+      const parts: Uint8Array[] = [];
+      for (let i = 0; i < manifest.chunkCount; i++) {
+        let pcm = readyPcm.current.get(i);
+        if (!pcm) {
+          const stored = await getAudioChunk(articleId, "gemini", GEMINI_TTS_VOICE, i).catch(() => null);
+          if (stored) pcm = await blobToBytes(stored);
+        }
+        if (!pcm) { setError("تعذّر تجهيز ملف الصوت للمشاركة."); return; }
+        parts.push(pcm);
+      }
+      blob = new Blob([pcmToWav(concatPcm(parts)) as BlobPart], { type: "audio/wav" });
+    } else return;
+    const file = new File([blob], audioFileName(title, mime), { type: mime });
     if (canShareFiles()) {
       try { await navigator.share({ files: [file], title }); return; }
       catch (e) { if (e instanceof Error && e.name === "AbortError") return; }
     }
-    const url = URL.createObjectURL(cached.blob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = file.name; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -533,15 +708,32 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   };
 
   const removeSaved = async () => {
+    genAbort.current?.abort();
+    audioRef.current?.pause();
     await deleteArticleAudio(articleId, "gemini", GEMINI_TTS_VOICE).catch(() => {});
-    setCached(null);
-    replaceUrl("");
+    readyPcm.current.clear();
+    readyIdx.current.clear();
+    revokeChunkUrls();
+    playIndexRef.current = -1;
+    setPlayIndex(-1);
+    setLegacy(null); legacyRef.current = null;
+    setManifest(null);
+    setReadyCount(0);
+    setTotalChunks(0); totalRef.current = 0;
+    if (legacyUrl.current) { URL.revokeObjectURL(legacyUrl.current); legacyUrl.current = ""; }
+    setAudioUrl("");
     setCacheState("none");
     setStatus("حُذف الصوت المحفوظ.");
   };
 
   const pickEngine = (next: TtsEngine) => {
-    if (next !== engine && speaking) stopDevice();
+    if (next !== engine) {
+      if (speaking) stopDevice();
+      if (next === "device") {
+        genAbort.current?.abort();
+        audioRef.current?.pause();
+      }
+    }
     setEngine(next);
     setError("");
   };
@@ -596,44 +788,66 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
               <p className="text-sm leading-relaxed text-muted-foreground">
                 أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد صوت لهذا المقال — نفس مفتاح الضبط والدمج. الصوت المولّد ملف حقيقي: يُحفَظ على هاتفك ويُشارَك مثل المقال تمامًا.
               </p>
-            ) : generating ? (
-              <div className="py-6 text-center space-y-3">
-                <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                <p className="text-sm text-muted-foreground">
-                  {genProgress[1] > 0 ? `جارٍ توليد الصوت… جزء ${genProgress[0]} من ${genProgress[1]}` : "جارٍ توليد الصوت…"}
-                </p>
-                <Button variant="outline" onClick={() => genAbort.current?.abort()}><Square />إيقاف التوليد</Button>
-              </div>
             ) : cacheState === "checking" ? (
               <div className="py-6 text-center space-y-3">
                 <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 <p className="text-sm text-muted-foreground">جارٍ التحقق من الصوت المحفوظ…</p>
               </div>
-            ) : cacheState === "ready" && cached ? (
-              <div className="space-y-3">
+            ) : (
+              <>
                 {stale && (
                   <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
                     النص تغيّر منذ توليد هذا الصوت — ما تسمعه الآن هو النسخة السابقة. أعد التوليد لسماع النص الحالي.
                   </p>
                 )}
-                <audio ref={audioRef} src={audioUrl} controls className="w-full"
+                {/* The element stays mounted in Gemini mode so progressive
+                    playback can start the moment the first chunk lands. */}
+                <audio ref={audioRef} src={audioUrl || undefined} controls={hasPlayable}
+                  className={hasPlayable ? "w-full" : "hidden"}
+                  onEnded={handleEnded}
                   onLoadedMetadata={() => { if (audioRef.current) audioRef.current.playbackRate = rate; }} />
-                <div className="flex flex-wrap items-center gap-2">
-                  {rateSelect((r) => { setRate(r); if (audioRef.current) audioRef.current.playbackRate = r; })}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={shareAudio}>{canShareFiles() ? <><Share2 />مشاركة الصوت</> : <><Download />تنزيل الصوت</>}</Button>
-                  <Button variant="outline" onClick={generate}><RefreshCw />إعادة التوليد</Button>
-                  <Button variant="ghost" className="text-destructive" onClick={removeSaved}><Trash2 />حذف الصوت المحفوظ</Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  لا يوجد صوت محفوظ لهذا المقال على هذا الهاتف بعد. ولّد الصوت مرة واحدة وسيُحفَظ هنا للاستماع والمشاركة في أي وقت.
-                </p>
-                <Button onClick={generate}><Volume2 />توليد الصوت</Button>
-              </div>
+                {!legacy && playIndex >= 0 && (
+                  <p className="text-sm text-muted-foreground">الجزء {playIndex + 1} من {totalChunks}</p>
+                )}
+                {!legacy && playIndex < 0 && (generating || readyCount > 0) && (
+                  <p className="text-sm text-muted-foreground">تم توليد {readyCount} من {totalChunks} جزء</p>
+                )}
+                {waiting && <p role="status" className="text-sm text-muted-foreground">جارٍ التوليد…</p>}
+                {generating ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" onClick={() => genAbort.current?.abort()}><Square />إيقاف التوليد</Button>
+                    <span className="text-sm text-muted-foreground">يبدأ التشغيل مع أول جزء ويستمر التوليد في الخلفية</span>
+                  </div>
+                ) : !legacy && !complete ? (
+                  <div className="space-y-3">
+                    {!manifest && (
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        لا يوجد صوت محفوظ لهذا المقال على هذا الهاتف بعد. ولّد الصوت مرة واحدة وسيُحفَظ هنا للاستماع والمشاركة في أي وقت.
+                      </p>
+                    )}
+                    <Button onClick={() => void generate()}>
+                      <Volume2 />{manifest || readyCount > 0 ? "إكمال التوليد" : "توليد وتشغيل"}
+                    </Button>
+                  </div>
+                ) : null}
+                {hasPlayable && !generating && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {rateSelect((r) => { setRate(r); if (audioRef.current) audioRef.current.playbackRate = r; })}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={shareAudio} disabled={!!manifest && !complete}>
+                        {canShareFiles() ? <><Share2 />مشاركة الصوت</> : <><Download />تنزيل الصوت</>}
+                      </Button>
+                      <Button variant="outline" onClick={() => void generate(true)}><RefreshCw />إعادة التوليد</Button>
+                      <Button variant="ghost" className="text-destructive" onClick={removeSaved}><Trash2 />حذف الصوت المحفوظ</Button>
+                    </div>
+                    {!!manifest && !complete && (
+                      <p className="text-xs text-muted-foreground">اكتمال التوليد أولًا للمشاركة</p>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </div>
         )}
