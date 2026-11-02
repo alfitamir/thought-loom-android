@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { improveFull } from "@/lib/article-ai";
+import { cleanFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
 import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolish, updateArticle, type Idea } from "@/lib/ideas";
 import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
@@ -60,9 +60,8 @@ function Library() {
     try {
       for (const idea of queue) {
         if (controller.signal.aborted || !navigator.onLine) break;
-        const samples = loadIdeas().filter((i) => i.id !== idea.id).slice(0, 3).map((i) => i.text.slice(0, 2000));
         try {
-          const result = await improveFull(getArticle(idea), idea.text, samples, engine, controller.signal, () => {});
+          const result = await cleanFull(getArticle(idea), engine, controller.signal, () => {});
           const latest = loadIdeas().find((i) => i.id === idea.id);
           if (latest && (latest.updatedAt ?? 0) === (idea.updatedAt ?? 0)) {
             const updated = updateArticle(idea.id, result.title, result.body, true);
@@ -106,7 +105,7 @@ function Library() {
         <div className="flex gap-2">
           {online && ideas.length > 0 && (bulk
             ? <Button variant="ghost" size="icon" aria-label="إيقاف الضبط" title="إيقاف الضبط" onClick={() => bulkAbort.current?.abort()}><Square /></Button>
-            : <Button variant="ghost" size="icon" aria-label="ضبط كل المقالات" title="ضبط كل المقالات" onClick={polishAll}><Sparkles /></Button>)}
+            : <Button variant="ghost" size="icon" aria-label="تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)" title="تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)" onClick={polishAll}><Sparkles /></Button>)}
           <Button variant="ghost" size="icon" aria-label="بحث في المقالات" title="بحث في المقالات" onClick={() => { setSearchOpen(!searchOpen); setQuery(""); }}><Search /></Button>
           <Button asChild variant="ghost" size="icon"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
         </div>

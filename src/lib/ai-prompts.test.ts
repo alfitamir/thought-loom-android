@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLASSIFY_INSTRUCTIONS, TOPIC_LIST, sanitizeAdditions, sanitizeAsk, sanitizeInsights, sanitizeLabels } from "./ai-prompts";
+import { CLEAN_INSTRUCTIONS, CLASSIFY_INSTRUCTIONS, TASK_INSTRUCTIONS, TOPIC_LIST, sanitizeAdditions, sanitizeAsk, sanitizeInsights, sanitizeLabels } from "./ai-prompts";
 import { OTHER } from "./topics";
 
 describe("sanitizeAsk", () => {
@@ -88,5 +88,28 @@ describe("sanitizeAdditions", () => {
     expect(out.additions).toHaveLength(10);
     expect(out.quotes).toHaveLength(8);
     expect(out.questions).toHaveLength(10);
+  });
+});
+
+describe("clean task instructions (library bulk cleanup)", () => {
+  it("is wired bare: exactly CLEAN_INSTRUCTIONS, no voice wrapper", () => {
+    expect(TASK_INSTRUCTIONS.clean).toBe(CLEAN_INSTRUCTIONS);
+  });
+  it("never sees the author voice profile or the style guide", () => {
+    // Distinctive markers: profile header + a profile-only phrase, style-guide header + a guide-only phrase.
+    expect(TASK_INSTRUCTIONS.clean).not.toContain("ملف صوت المؤلف");
+    expect(TASK_INSTRUCTIONS.clean).not.toContain("أدلة المعايرة المتاحة");
+    expect(TASK_INSTRUCTIONS.clean).not.toContain("دليل أسلوب الكاتب");
+    expect(TASK_INSTRUCTIONS.clean).not.toContain("الهوية: كاتب صاحب موقف");
+  });
+  it("forbids wording, order and style changes outright", () => {
+    expect(CLEAN_INSTRUCTIONS).toContain("ممنوع منعًا باتًا");
+    expect(CLEAN_INSTRUCTIONS).toContain("تغيير أي كلمة بكلمة أخرى");
+    expect(CLEAN_INSTRUCTIONS).toContain("تطبيق أي دليل أسلوب");
+    expect(CLEAN_INSTRUCTIONS).toContain("حذف الشوائب");
+  });
+  it("improve still carries the voice profile and the style guide", () => {
+    expect(TASK_INSTRUCTIONS.improve).toContain("ملف صوت المؤلف");
+    expect(TASK_INSTRUCTIONS.improve).toContain("دليل أسلوب الكاتب");
   });
 });
