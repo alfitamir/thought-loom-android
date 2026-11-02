@@ -98,6 +98,17 @@ function Index() {
     navigate({ to: "/", search: {}, replace: true });
   }, [record, navigate]);
 
+  // Recording runs until the user presses stop (see createVoiceRecorder).
+  const textRef = useRef("");
+  useEffect(() => { textRef.current = text; }, [text]);
+  useEffect(() => () => { recRef.current?.cancel(); }, []);
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    if (drainTimerRef.current) clearInterval(drainTimerRef.current);
+    // Release the microphone; the audio saved so far stays on the phone for the resume pass.
+    void audioRef.current?.stop().catch(() => {});
+  }, []);
+
   // Recordings left on the phone by an earlier session (their transcription was
   // interrupted) become ideas on a later open — the pipeline's resume pass.
   useEffect(() => {
@@ -118,17 +129,6 @@ function Index() {
     void resume();
     window.addEventListener("online", resume);
     return () => window.removeEventListener("online", resume);
-  }, []);
-
-  // Recording runs until the user presses stop (see createVoiceRecorder).
-  const textRef = useRef("");
-  useEffect(() => { textRef.current = text; }, [text]);
-  useEffect(() => () => { recRef.current?.cancel(); }, []);
-  useEffect(() => () => {
-    abortRef.current?.abort();
-    if (drainTimerRef.current) clearInterval(drainTimerRef.current);
-    // Release the microphone; the audio saved so far stays on the phone for the resume pass.
-    void audioRef.current?.stop().catch(() => {});
   }, []);
 
   const setTextBoth = (next: string | ((cur: string) => string)) => {
