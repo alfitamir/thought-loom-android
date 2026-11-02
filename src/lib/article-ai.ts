@@ -1,3 +1,5 @@
+import { TASK_INSTRUCTIONS, type AiTask } from "./ai-prompts";
+
 export function parseImprovedArticle(text: string): { title: string; body: string } {
   const lines = text.trim().split("\n");
   const title = (lines.shift() ?? "").replace(/^#+\s*/, "").trim();
@@ -83,6 +85,23 @@ export function isMergeComplete(sources: string[], output: string): boolean {
 
 export type Engine = { kind: "gemini"; key: string } | { kind: "cloud"; token: string };
 
+/** Run one AI task on the chosen engine and return its full streamed text. */
+export async function runAi(
+  engine: Engine, task: AiTask, payload: string, signal: AbortSignal,
+  onText: (text: string) => void = () => {}, json?: object,
+): Promise<string> {
+  if (engine.kind === "gemini") {
+    const { geminiStream } = await import("./gemini");
+    return geminiStream(engine.key, TASK_INSTRUCTIONS[task], payload, signal, onText, json);
+  }
+  const response = await fetch("/api/articles/improve", {
+    method: "POST", signal,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${engine.token}` },
+    body: JSON.stringify({ task, payload }),
+  });
+  return readArticleStream(response, onText);
+}
+
 /** Proofread a full article (chunked), verifying nothing is lost. */
 export async function improveFull(
   article: { title: string; body: string }, original: string, samples: string[], engine: Engine,
@@ -93,18 +112,7 @@ export async function improveFull(
   for (let i = 0; i < chunks.length; i++) {
     const payload = { title: article.title, body: chunks[i], original: chunks.length > 1 ? "" : original.slice(0, 40000), samples };
     const show = (t: string) => onText([...parts, t].join("\n\n"));
-    let text: string;
-    if (engine.kind === "gemini") {
-      const { geminiStream, IMPROVE_INSTRUCTIONS } = await import("./gemini");
-      text = await geminiStream(engine.key, IMPROVE_INSTRUCTIONS, JSON.stringify(payload), signal, show);
-    } else {
-      const response = await fetch("/api/articles/improve", {
-        method: "POST", signal,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${engine.token}` },
-        body: JSON.stringify(payload),
-      });
-      text = await readArticleStream(response, show);
-    }
+    const text = await runAi(engine, "improve", JSON.stringify(payload), signal, show);
     const out = parseImprovedArticle(text);
     if (!isComplete(chunks[i] ?? "", out.body)) throw new Error(INCOMPLETE);
     if (i === 0) title = out.title;
