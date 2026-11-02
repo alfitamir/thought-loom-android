@@ -62,6 +62,8 @@ export type Database = {
           merged_from: string[] | null
           synced_at: string
           text: string
+          topic: string | null
+          topic_manual: boolean
           updated_at: number
           user_id: string
         }
@@ -73,6 +75,8 @@ export type Database = {
           merged_from?: string[] | null
           synced_at?: string
           text: string
+          topic?: string | null
+          topic_manual?: boolean
           updated_at?: number
           user_id: string
         }
@@ -84,6 +88,8 @@ export type Database = {
           merged_from?: string[] | null
           synced_at?: string
           text?: string
+          topic?: string | null
+          topic_manual?: boolean
           updated_at?: number
           user_id?: string
         }
