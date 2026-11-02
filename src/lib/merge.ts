@@ -1,7 +1,8 @@
 import { getArticle, type Idea } from "./ideas";
 import { INCOMPLETE, isMergeComplete, parseImprovedArticle, runAi, type Engine } from "./article-ai";
+import { MERGE_SUGGEST_SCHEMA } from "./ai-prompts";
 
-export type MergeSuggestion = { ids: string[]; title: string; reason: string };
+export type MergeSuggestion = { ids: string[]; title: string; reason: string; thesis?: string; strength?: number };
 
 const CACHE = "afkari.mergeSuggestions";
 const DISMISSED = "afkari.mergeDismissed";
@@ -38,21 +39,30 @@ export function liveSuggestions(list: MergeSuggestion[], ideas: Idea[]): MergeSu
   return list.filter((s) => s.ids.length >= 2 && s.ids.every((id) => ids.has(id) && !sourced.has(id)) && !repeats(s.ids, done));
 }
 
-/** Clean model output: known ids only, no duplicates across groups, 2+ members. */
+/** Clean model output: known ids only, no duplicates across groups, 2-5 members, weak links dropped, strongest first. (Upgraded to Afkari's strength-aware version.) */
 export function sanitizeSuggestions(raw: unknown, ideas: Idea[]): MergeSuggestion[] {
   if (!Array.isArray(raw)) return [];
   const known = new Set(ideas.map((i) => i.id));
   const used = new Set<string>();
   const out: MergeSuggestion[] = [];
-  for (const s of raw) {
-    if (!s || !Array.isArray(s.ids)) continue;
-    const ids = [...new Set((s.ids as unknown[]).filter((id): id is string => typeof id === "string" && known.has(id) && !used.has(id)))];
+  const given = (s: any) => (Number.isInteger(Number(s?.strength)) && s?.strength !== null && s?.strength !== "" ? Math.min(5, Math.max(1, Number(s.strength))) : undefined);
+  // A missing strength counts as an average link (3) for ranking, but is not reported as if the model had said so.
+  const ranked = raw.map((s, i) => ({ s, i, strength: given(s) }))
+    .sort((a, b) => (b.strength ?? 3) - (a.strength ?? 3) || a.i - b.i);
+  for (const { s, strength } of ranked) {
+    if (!s || !Array.isArray(s.ids) || (strength ?? 3) < 3) continue;
+    const ids = [...new Set((s.ids as unknown[]).filter((id): id is string => typeof id === "string" && known.has(id) && !used.has(id)))].slice(0, 5);
     if (ids.length < 2) continue;
     ids.forEach((id) => used.add(id));
-    out.push({ ids, title: String(s.title ?? "").trim() || "مقال مدمج", reason: String(s.reason ?? "").trim() });
+    const thesis = String(s.thesis ?? "").trim();
+    out.push({ ids, title: String(s.title ?? "").trim() || "مقال مدمج", reason: String(s.reason ?? "").trim(), ...(thesis ? { thesis } : {}), ...(strength !== undefined ? { strength } : {}) });
   }
-  return out;
+  return out.slice(0, 5);
 }
+
+/** Opening + ending carry an article's thesis and conclusion; the middle adds little for matching. */
+export const excerptForMatching = (body: string) =>
+  body.length <= 700 ? body : `${body.slice(0, 450)} … ${body.slice(-250)}`;
 
 /** Read a JSON array even when the model wrapped it in prose or code fences. */
 export function parseJsonList(text: string): unknown {
@@ -61,14 +71,7 @@ export function parseJsonList(text: string): unknown {
   try { return JSON.parse(text.slice(start, end + 1)); } catch { return []; }
 }
 
-const SCHEMA = {
-  type: "ARRAY",
-  items: {
-    type: "OBJECT",
-    properties: { ids: { type: "ARRAY", items: { type: "STRING" } }, title: { type: "STRING" }, reason: { type: "STRING" } },
-    required: ["ids", "title", "reason"],
-  },
-};
+const SCHEMA = MERGE_SUGGEST_SCHEMA;
 
 export async function findMerges(ideas: Idea[], engine: Engine, signal: AbortSignal): Promise<MergeSuggestion[]> {
   const sourced = mergedSources(ideas);
@@ -76,7 +79,7 @@ export async function findMerges(ideas: Idea[], engine: Engine, signal: AbortSig
   if (candidates.length < 2) return [];
   const list = candidates.slice(0, 80).map((i) => {
     const a = getArticle(i);
-    return { id: i.id, title: a.title, excerpt: a.body.slice(0, 600) };
+    return { id: i.id, title: a.title, excerpt: excerptForMatching(a.body) };
   });
   const known = new Set(list.map((l) => l.id));
   const avoid = loadDismissed().filter((g) => g.every((id) => known.has(id)));

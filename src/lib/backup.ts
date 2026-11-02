@@ -6,13 +6,19 @@ export function buildBackup(ideas: Idea[], exportedAt = Date.now()): string {
 
 const BAD = "الملف ليس نسخة احتياطية صالحة من أفكاري.";
 
-/** Validate a backup file and return its ideas (throws an Arabic message). */
+/** Validate a backup file and return its ideas (throws an Arabic message).
+ *  Accepts the wrapped export format and, as in Afkari, a bare array of ideas. */
 export function parseBackup(raw: string): Idea[] {
   let data: unknown;
   try { data = JSON.parse(raw); } catch { throw new Error(BAD); }
-  const list = (data as { app?: string; ideas?: unknown })?.app === "afkari" ? (data as { ideas?: unknown }).ideas : null;
+  const obj = data as { app?: string; ideas?: unknown } | null;
+  // A wrapped file from another app gets Afkari's specific message; anything else malformed keeps the generic one.
+  if (!Array.isArray(data) && obj && typeof obj === "object" && "ideas" in obj && obj.app !== "afkari") {
+    throw new Error("هذا الملف ليس نسخة احتياطية من «أفكاري».");
+  }
+  const list = Array.isArray(data) ? data : obj?.app === "afkari" ? obj.ideas : null;
   if (!Array.isArray(list)) throw new Error(BAD);
-  return list.flatMap((i): Idea[] => {
+  const ideas = list.flatMap((i): Idea[] => {
     if (!i || typeof i.id !== "string" || typeof i.text !== "string" || typeof i.createdAt !== "number") return [];
     const idea: Idea = { id: i.id, text: i.text, createdAt: i.createdAt };
     if (typeof i.articleTitle === "string") idea.articleTitle = i.articleTitle;
@@ -22,6 +28,8 @@ export function parseBackup(raw: string): Idea[] {
     if (Array.isArray(i.mergedFrom)) idea.mergedFrom = i.mergedFrom.filter((m: unknown): m is string => typeof m === "string");
     return [idea];
   });
+  if (list.length && !ideas.length) throw new Error("لم نجد أفكارًا صالحة في هذا الملف.");
+  return ideas;
 }
 
 /** Restore ideas into this device without overwriting newer local edits. Returns how many were added. */

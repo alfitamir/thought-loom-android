@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Lightbulb, Square, X } from "lucide-react";
+import { BookOpen, Check, Copy, Lightbulb, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { EvidenceDialog } from "@/components/evidence-dialog";
 import { deleteIdea, getArticle, loadIdeas, saveArticleIdea, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { getGeminiKey } from "@/lib/gemini";
@@ -66,6 +67,7 @@ function MergeDialog({ suggestion, online, onClose }: { suggestion: MergeSuggest
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState("");
   const [result, setResult] = useState<{ title: string; body: string } | null>(null);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [message, setMessage] = useState("");
   const abort = useRef<AbortController | null>(null);
   const versions = useRef(new Map<string, number>());
@@ -118,11 +120,14 @@ function MergeDialog({ suggestion, online, onClose }: { suggestion: MergeSuggest
           className="w-full rounded-md border border-input bg-card p-3 font-article text-xl leading-loose outline-none focus:ring-2 focus:ring-ring" />
       </div> : <div aria-live="polite" className="whitespace-pre-wrap break-words font-article text-xl leading-loose">{busy ? preview || "جارٍ الدمج بأسلوبك…" : ""}</div>}
       {message && <p role="status" className="break-words text-sm text-muted-foreground">{message}</p>}
+      {result && <EvidenceDialog open={evidenceOpen} onOpenChange={setEvidenceOpen} title={result.title} body={result.body} online={online}
+        onInsert={(snippet) => setResult((r) => (r ? { ...r, body: `${r.body}\n\n${snippet}` } : r))} />}
       <div className="flex flex-wrap gap-2">
         {busy ? <Button variant="outline" onClick={() => abort.current?.abort()}><Square />إيقاف</Button>
           : result ? <>
             <Button onClick={() => approve(true)} disabled={!result.title.trim() || !result.body.trim()}><Check />اعتماد وحذف الأصول</Button>
             <Button variant="outline" onClick={() => approve(false)} disabled={!result.title.trim() || !result.body.trim()}><Copy />حفظه كمقال جديد</Button>
+            <Button variant="outline" onClick={() => setEvidenceOpen(true)} disabled={!online || !result.body.trim()}><BookOpen />شواهد للمقال</Button>
           </> : <Button variant="outline" disabled={!online} onClick={run}>إعادة المحاولة</Button>}
         <Button variant="ghost" onClick={() => { abort.current?.abort(); onClose(false); }}>إلغاء</Button>
       </div>
