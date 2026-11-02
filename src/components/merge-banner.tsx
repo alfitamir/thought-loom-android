@@ -3,8 +3,9 @@ import { Check, Copy, Lightbulb, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { deleteIdea, getArticle, loadIdeas, saveArticleIdea, type Idea } from "@/lib/ideas";
-import { deleteIdeaCloud, pushIdea } from "@/lib/sync";
+import { pushIdea } from "@/lib/sync";
 import { getGeminiKey } from "@/lib/gemini";
+import { resolveEngine } from "@/lib/ai-engine";
 import {
   dismissSuggestion, findMerges, fingerprint, liveSuggestions, loadSuggestionCache, mergeArticles, saveSuggestionCache,
   type MergeSuggestion,
@@ -33,7 +34,8 @@ export function MergeBanner({ ideas, online, onChange }: { ideas: Idea[]; online
     const timer = setTimeout(async () => {
       tried.current.add(fp);
       try {
-        const found = await findMerges(ideas, key, controller.signal);
+        // Automatic suggestions use only the free personal key, never platform credits.
+        const found = await findMerges(ideas, { kind: "gemini", key }, controller.signal);
         saveSuggestionCache(fp, found);
         setList(liveSuggestions(found, loadIdeas()));
       } catch { /* suggestions are optional; try again after the next change */ }
@@ -70,15 +72,15 @@ function MergeDialog({ suggestion, online, onClose }: { suggestion: MergeSuggest
   const sources = suggestion.ids.map((id) => loadIdeas().find((i) => i.id === id)).filter((i): i is Idea => !!i);
 
   const run = async () => {
-    const key = getGeminiKey();
-    if (!key) { setMessage("أضف مفتاح Gemini من الإعدادات ⚙️."); return; }
     if (!navigator.onLine) { setMessage("الدمج يحتاج اتصالًا بالإنترنت."); return; }
+    const engine = await resolveEngine();
+    if (typeof engine === "string") { setMessage(engine); return; }
     const controller = new AbortController(); abort.current = controller;
     versions.current = new Map(sources.map((s) => [s.id, s.updatedAt ?? 0]));
     setBusy(true); setMessage(""); setResult(null); setPreview("");
     const mine = () => abort.current === controller;
     try {
-      const merged = await mergeArticles(sources.map(getArticle), key, controller.signal, (t) => { if (mine()) setPreview(t); });
+      const merged = await mergeArticles(sources.map(getArticle), engine, controller.signal, (t) => { if (mine()) setPreview(t); });
       if (mine()) setResult(merged);
     } catch (error) {
       if (mine()) setMessage(controller.signal.aborted ? "توقف الدمج؛ مقالاتك لم تتغير." : error instanceof Error ? error.message : "تعذّر الدمج الآن.");
@@ -94,8 +96,9 @@ function MergeDialog({ suggestion, online, onClose }: { suggestion: MergeSuggest
       return !now || (now.updatedAt ?? 0) !== versions.current.get(s.id);
     });
     if (changed) { setMessage("تغيرت إحدى المقالات أثناء الدمج. لم نغير شيئًا."); return; }
-    const merged = saveArticleIdea(sources.map((s) => s.text).join("\n\n"), result.title, result.body);
-    if (removeOriginals) sources.forEach((s) => { deleteIdea(s.id); void deleteIdeaCloud(s.id).catch(() => {}); });
+    const origins = [...new Set(sources.flatMap((s) => [s.id, ...(s.mergedFrom ?? [])]))];
+    const merged = saveArticleIdea(sources.map((s) => s.text).join("\n\n"), result.title, result.body, origins);
+    if (removeOriginals) sources.forEach((s) => deleteIdea(s.id));
     dismissSuggestion(suggestion.ids);
     void pushIdea(merged).catch(() => {});
     onClose(true);
