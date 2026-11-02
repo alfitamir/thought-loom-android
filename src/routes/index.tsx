@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { Mic, Square } from "lucide-react";
 import { saveIdea } from "@/lib/ideas";
 import { supabase } from "@/integrations/supabase/client";
 import { pushIdea, syncNow } from "@/lib/sync";
@@ -305,8 +306,9 @@ function Index() {
           )}
           {transcribing && <p className="text-center text-sm text-muted-foreground">جارٍ تحويل الصوت إلى نص…</p>}
           <div className="flex gap-3">
-            <button onClick={toggleMic} disabled={transcribing} aria-pressed={listening} className={`flex-1 rounded-full py-3 font-semibold ${listening ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-secondary text-secondary-foreground"}`}>
-              {transcribing ? "جارٍ التحويل…" : listening ? "■ إيقاف التسجيل" : "🎙 ابدأ التسجيل"}
+            <button onClick={toggleMic} disabled={transcribing} aria-pressed={listening} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 font-semibold ${listening ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-secondary text-secondary-foreground"}`}>
+              {listening ? <Square className="size-5" /> : <Mic className="size-5" />}
+              {transcribing ? "جارٍ التحويل…" : listening ? "إيقاف التسجيل" : "ابدأ التسجيل"}
             </button>
             <button onClick={save} className="flex-1 rounded-full bg-primary py-3 font-semibold text-primary-foreground">حفظ</button>
           </div>
