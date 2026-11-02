@@ -83,10 +83,7 @@ function Index() {
   const cancel = () => { recRef.current?.cancel(); setOpen(false); };
 
   return (
-    <main dir="rtl" className="paper flex min-h-screen flex-col items-center justify-center gap-10 px-6">
-      <Link to="/library" aria-label="المقالات" className="icon-btn absolute left-5 top-5">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Zm0 0A2 2 0 0 0 6 22h13"/></svg>
-      </Link>
+    <main dir="rtl" className="paper flex min-h-screen flex-col items-center justify-center gap-10 px-6 pb-24">
       <h1 className="font-display text-4xl text-foreground">أفكاري</h1>
       {!open ? (
         <button onClick={() => setOpen(true)} className="record-btn">سجّل فكرة</button>

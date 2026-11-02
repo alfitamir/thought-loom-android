@@ -11,8 +11,17 @@ import { resolveEngine } from "@/lib/ai-engine";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
-export function ArticleEditor({ idea, online, onChange, onDelete }: {
-  idea: Idea; online: boolean; onChange: () => void; onDelete: () => void;
+/** Arabic reading-time label at ~180 words per minute, with plural agreement. */
+const readingTimeLabel = (text: string) => {
+  const mins = Math.max(1, Math.round(countWords(text) / 180));
+  if (mins === 1) return "قراءة دقيقة";
+  if (mins === 2) return "قراءة دقيقتان";
+  if (mins <= 10) return `قراءة ${mins} دقائق`;
+  return `قراءة ${mins} دقيقة`;
+};
+
+export function ArticleEditor({ idea, topic, online, onChange, onDelete }: {
+  idea: Idea; topic?: string; online: boolean; onChange: () => void; onDelete: () => void;
 }) {
   const article = getArticle(idea);
   const [editing, setEditing] = useState(false);
@@ -147,7 +156,17 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
       </div>
     </div> : <>
       <h2 className="break-words font-display text-xl text-primary">{article.title}</h2>
-      <p className="mb-4 mt-1 text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString("ar")}</p>
+      {topic && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground">{topic}</span>
+        </div>
+      )}
+      <p className="mb-1 mt-1 text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString("ar")} · {readingTimeLabel(article.body)}</p>
+      {(() => {
+        const flat = article.body.replace(/\s+/g, " ").trim();
+        if (!flat) return null;
+        return <p className="mb-4 line-clamp-1 text-sm text-muted-foreground">{flat.length > 90 ? `${flat.slice(0, 90)}…` : flat}</p>;
+      })()}
       <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{article.body}</p>
       <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
       <div className="mt-4">
