@@ -1,7 +1,10 @@
 // Text-to-speech for listening to saved articles.
 // Two engines: the device voice (speechSynthesis — heard live only, never a
-// file) and Gemini TTS with the user's personal key (a real WAV file that can
-// be cached on the device and shared like the article itself).
+// file) and Gemini TTS with the user's personal key (real audio that can be
+// cached on the device chunk by chunk and shared like the article itself).
+// Gemini chunks are synthesized in parallel (bounded concurrency) and each
+// chunk is handed to the caller the moment it lands, so playback can start
+// with the first chunk while the rest are still generating.
 // The personal key is sent only to Google, from this browser, never logged.
 
 import { geminiErrorMessage } from "./gemini";
@@ -41,7 +44,7 @@ function splitSentences(text: string): string[] {
  * boundaries whenever possible. Diacritics are preserved exactly — they
  * guide pronunciation, so speech text is never stripped.
  */
-export function splitForSpeech(text: string, maxChars = 900): string[] {
+export function splitForSpeech(text: string, maxChars = 1800): string[] {
   const chunks: string[] = [];
   let current = "";
   const flush = () => { if (current.trim()) chunks.push(current.trim()); current = ""; };
@@ -99,6 +102,63 @@ export function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
+/** Read a Blob as bytes; FileReader fallback where Blob.arrayBuffer is
+ * missing (older webviews, jsdom) — same approach as ai-features' blobToBase64. */
+export async function blobToBytes(blob: Blob): Promise<Uint8Array> {
+  if (typeof blob.arrayBuffer === "function") return new Uint8Array(await blob.arrayBuffer());
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new TtsError("تعذّرت قراءة الصوت المحفوظ."));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(blob);
+  });
+  return base64ToBytes(dataUrl.split(",")[1] ?? "");
+}
+
+/** Concatenate raw PCM chunks into one continuous PCM stream, in order. */
+export function concatPcm(parts: readonly Uint8Array[]): Uint8Array {
+  let total = 0;
+  for (const p of parts) total += p.length;
+  const all = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) { all.set(p, off); off += p.length; }
+  return all;
+}
+
+/**
+ * Map over items with at most `limit` promises in flight. Results keep the
+ * input order regardless of completion order. The first failure stops new
+ * work from starting (in-flight work may settle) and is rethrown; an aborted
+ * signal does the same and surfaces as an AbortError.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+  signal?: AbortSignal,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length) as R[];
+  let next = 0;
+  let failure: unknown = null;
+  const worker = async () => {
+    while (failure === null && !signal?.aborted) {
+      const i = next++;
+      if (i >= items.length) return;
+      try {
+        results[i] = await fn(items[i] as T, i);
+      } catch (e) {
+        if (failure === null) failure = e;
+        return;
+      }
+    }
+  };
+  const workers = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  if (failure !== null) throw failure;
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  return results;
+}
+
 export function buildGeminiTtsRequest(text: string) {
   return {
     contents: [{ parts: [{ text }] }],
@@ -119,43 +179,76 @@ export function parseGeminiTtsAudio(json: unknown): Uint8Array {
 
 export type SynthProgress = (done: number, total: number) => void;
 
-/** Generate one WAV file for the whole text with Gemini TTS, chunk by chunk. */
+/** One Gemini TTS request for a single chunk of text; returns raw PCM bytes. */
+export async function synthesizeGeminiChunk(
+  chunk: string, key: string, signal?: AbortSignal,
+): Promise<Uint8Array> {
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  let response: Response;
+  try {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent`, {
+      method: "POST",
+      ...(signal ? { signal } : {}),
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify(buildGeminiTtsRequest(chunk)),
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new TtsError("تعذّر الوصول إلى Gemini. تأكد من الإنترنت وحاول مرة أخرى.");
+  }
+  if (!response.ok) {
+    const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new TtsError(geminiErrorMessage(response.status, err?.error?.message ?? ""));
+  }
+  return parseGeminiTtsAudio(await response.json().catch(() => null));
+}
+
+export type SynthesizeChunksOptions = {
+  /** Max requests in flight at once (default 3). */
+  concurrency?: number;
+  /** Chunk size passed to splitForSpeech (default 1800 chars). */
+  maxChars?: number;
+  /** Called as EACH chunk completes — possibly out of index order — with the
+   * chunk's index and its raw PCM, so callers can cache and play early. */
+  onChunkReady?: (index: number, pcm: Uint8Array) => void;
+  signal?: AbortSignal;
+};
+
+async function synthesizeChunkList(
+  chunks: string[], key: string, opts: SynthesizeChunksOptions,
+): Promise<Uint8Array[]> {
+  if (!key.trim()) throw new TtsError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت.");
+  if (!chunks.length) throw new TtsError("لا يوجد نص للقراءة.");
+  return mapWithConcurrency(chunks, opts.concurrency ?? 3, async (chunk, i) => {
+    const pcm = await synthesizeGeminiChunk(chunk, key, opts.signal);
+    opts.onChunkReady?.(i, pcm);
+    return pcm;
+  }, opts.signal);
+}
+
+/**
+ * Synthesize the whole text with Gemini TTS, chunks in parallel. Resolves
+ * with the PCM of every chunk in text order; onChunkReady fires earlier, per
+ * completion, for progressive playback.
+ */
+export async function synthesizeGeminiChunks(
+  text: string, key: string, opts: SynthesizeChunksOptions = {},
+): Promise<Uint8Array[]> {
+  return synthesizeChunkList(splitForSpeech(text, opts.maxChars), key, opts);
+}
+
+/** Generate one WAV file for the whole text with Gemini TTS. */
 export async function synthesizeGemini(
   text: string, key: string,
-  opts: { signal?: AbortSignal; onProgress?: SynthProgress } = {},
+  opts: { signal?: AbortSignal; onProgress?: SynthProgress; maxChars?: number } = {},
 ): Promise<Blob> {
-  if (!key.trim()) throw new TtsError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت.");
-  const chunks = splitForSpeech(text);
-  if (!chunks.length) throw new TtsError("لا يوجد نص للقراءة.");
-  const parts: Uint8Array[] = [];
-  let total = 0;
-  for (let i = 0; i < chunks.length; i++) {
-    if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    let response: Response;
-    try {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent`, {
-        method: "POST",
-        ...(opts.signal ? { signal: opts.signal } : {}),
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(buildGeminiTtsRequest(chunks[i] as string)),
-      });
-    } catch (error) {
-      if (opts.signal?.aborted) throw error;
-      throw new TtsError("تعذّر الوصول إلى Gemini. تأكد من الإنترنت وحاول مرة أخرى.");
-    }
-    if (!response.ok) {
-      const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
-      throw new TtsError(geminiErrorMessage(response.status, err?.error?.message ?? ""));
-    }
-    const pcm = parseGeminiTtsAudio(await response.json().catch(() => null));
-    parts.push(pcm);
-    total += pcm.length;
-    opts.onProgress?.(i + 1, chunks.length);
-  }
-  const all = new Uint8Array(total);
-  let off = 0;
-  for (const p of parts) { all.set(p, off); off += p.length; }
-  return new Blob([pcmToWav(all) as BlobPart], { type: "audio/wav" });
+  const chunks = splitForSpeech(text, opts.maxChars);
+  let done = 0;
+  const parts = await synthesizeChunkList(chunks, key, {
+    ...(opts.signal ? { signal: opts.signal } : {}),
+    onChunkReady: () => { done++; opts.onProgress?.(done, chunks.length); },
+  });
+  return new Blob([pcmToWav(concatPcm(parts)) as BlobPart], { type: "audio/wav" });
 }
 
 export type DeviceSpeech = { stop: () => void; done: Promise<void> };
