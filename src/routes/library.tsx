@@ -5,12 +5,14 @@ import { resolveEngine } from "@/lib/ai-engine";
 import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolish, updateArticle, type Idea } from "@/lib/ideas";
 import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { listArticleIdsWithAudio } from "@/lib/article-audio";
 import { ArticleEditor } from "@/components/article-editor";
 import { MergeBanner } from "@/components/merge-banner";
 import { AskDialog } from "@/components/ask-dialog";
 import { InsightsDialog } from "@/components/insights-dialog";
 import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
-import { ArrowRight, ChevronDown, ChevronUp, Feather, Lightbulb, MessageCircleQuestion, Search, Sparkles, Square, Tags, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Feather, Lightbulb, MessageCircleQuestion, MoreHorizontal, Search, Sparkles, Square, Tags, X } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
 
 export const Route = createFileRoute("/library")({
@@ -40,6 +42,14 @@ function Library() {
   const [askOpen, setAskOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [labels, setLabels] = useState(loadLabels);
+  // Articles with generated audio cached on this device (one store pass per
+  // ideas change) — drives the «صوت» badge on article cards.
+  const [audioIds, setAudioIds] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    let alive = true;
+    listArticleIdsWithAudio().then((ids) => { if (alive) setAudioIds(ids); }).catch(() => {});
+    return () => { alive = false; };
+  }, [ideas]);
   const [labeling, setLabeling] = useState<{ done: number; total: number } | null>(null);
   const [labelError, setLabelError] = useState("");
   const refresh = () => { setIdeas(loadIdeas()); setLabels(loadLabels()); };
@@ -135,38 +145,52 @@ function Library() {
       <header className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-3xl text-foreground">مقالاتي{ideas.length > 0 && <span className="text-xl text-muted-foreground"> ({ideas.length})</span>}</h1>
         <div className="flex gap-2">
-          {online && ideas.length > 0 && (bulk
-            ? <Button variant="ghost" size="icon" aria-label="إيقاف الضبط" title="إيقاف الضبط" onClick={() => bulkAbort.current?.abort()}><Square /></Button>
-            : <Button variant="ghost" size="icon" aria-label="تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)" title="تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)" onClick={polishAll}><Sparkles /></Button>)}
-          <Button variant="ghost" size="icon" aria-label="بحث في المقالات" title="بحث في المقالات" onClick={() => { setSearchOpen(!searchOpen); setQuery(""); }}><Search /></Button>
-          <Button asChild variant="ghost" size="icon"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
+          {/* Cleanup now lives in the tools row's «المزيد» menu; while a bulk
+              cleanup runs, its stop control stays here in the header. */}
+          {online && ideas.length > 0 && bulk
+            ? <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="إيقاف الضبط" title="إيقاف الضبط" onClick={() => bulkAbort.current?.abort()}><Square /></Button>
+            : null}
+          <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="بحث في المقالات" title="بحث في المقالات" onClick={() => { setSearchOpen(!searchOpen); setQuery(""); }}><Search /></Button>
+          <Button asChild variant="ghost" size="icon" className="[&_svg]:size-5"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
         </div>
       </header>
       {(bulk || bulkMsg) && <p role="status" className="mb-4 text-sm text-muted-foreground">{bulk ? `جارٍ الضبط… تم ${bulk.done} من ${bulk.total}` : bulkMsg}</p>}
       {ideas.length > 0 && <div className="mb-4 flex flex-wrap gap-2">
-        <button onClick={() => setAskOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"><MessageCircleQuestion className="size-4" />اسأل أفكاري</button>
-        <button onClick={() => setInsightsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Lightbulb className="size-4" />رؤى</button>
-        {stale > 0 && (
-          <button onClick={() => void classifyAll()} disabled={!online || !!labeling} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50">
-            <Tags className="size-4" />{labeling ? `جارٍ التصنيف ${labeling.done}/${labeling.total}…` : `صنّف بالذكاء الاصطناعي (${stale})`}
-          </button>
-        )}
+        <button onClick={() => setAskOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"><MessageCircleQuestion className="size-5" />اسأل أفكاري</button>
+        <button onClick={() => setInsightsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Lightbulb className="size-5" />رؤى</button>
+        <DropdownMenu dir="rtl">
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-label="المزيد" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><MoreHorizontal className="size-5" />المزيد</button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-64">
+            <DropdownMenuItem aria-label="تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)" disabled={!online || !!bulk} onSelect={() => void polishAll()} className="[&>svg]:size-5"><Sparkles />تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)</DropdownMenuItem>
+            {stale > 0 && (
+              <DropdownMenuItem aria-label="صنّف بالذكاء الاصطناعي" disabled={!online || !!labeling} onSelect={() => void classifyAll()} className="[&>svg]:size-5">
+                <Tags />{labeling ? `جارٍ التصنيف ${labeling.done}/${labeling.total}…` : `صنّف بالذكاء الاصطناعي (${stale})`}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>}
       {labelError && <p role="alert" className="mb-4 text-sm text-destructive">{labelError}</p>}
       <MergeBanner ideas={ideas} online={online} onChange={refresh} />
       <AskDialog open={askOpen} onOpenChange={setAskOpen} ideas={ideas} online={online} onPick={pick} />
       <InsightsDialog open={insightsOpen} onOpenChange={setInsightsOpen} ideas={ideas} online={online} onChange={refresh} onPick={pick} />
-      {searchOpen && <div className="mb-6 flex items-center gap-2 border-b border-border pb-3">
-        <Search className="size-5 shrink-0 text-muted-foreground" />
-        <input autoFocus type="search" aria-label="كلمة البحث" placeholder="ابحث بكلمة…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-lg outline-none" />
-        {queryActive && totalMatches > 0 && <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">{totalMatches} مرة في {articlesCount} مقالة</span>}
-        {queryActive && totalMatches === 0 && articlesCount > 0 && <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">لا نتائج</span>}
-        {queryActive && safeCurrent !== null && <span className="shrink-0 whitespace-nowrap text-sm font-medium text-foreground">{safeCurrent + 1} من {totalMatches}</span>}
-        {queryActive && <>
-          <Button variant="ghost" size="icon" aria-label="النتيجة السابقة" title="النتيجة السابقة" disabled={!totalMatches} onClick={() => goToMatch(-1)}><ChevronUp /></Button>
-          <Button variant="ghost" size="icon" aria-label="النتيجة التالية" title="النتيجة التالية" disabled={!totalMatches} onClick={() => goToMatch(1)}><ChevronDown /></Button>
-        </>}
-        <Button variant="ghost" size="icon" aria-label="إغلاق البحث" onClick={() => { setSearchOpen(false); setQuery(""); }}><X /></Button>
+      {searchOpen && <div className="mb-6">
+        <div className="flex items-center gap-2 border-b border-border pb-3">
+          <Search className="size-5 shrink-0 text-muted-foreground" />
+          <input autoFocus type="search" aria-label="كلمة البحث" placeholder="ابحث بكلمة…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-lg outline-none" />
+          <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="إغلاق البحث" onClick={() => { setSearchOpen(false); setQuery(""); }}><X /></Button>
+        </div>
+        {queryActive && <div className="flex items-center gap-2 pt-2">
+          {totalMatches > 0 && <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">{totalMatches} مرة في {articlesCount} مقالة</span>}
+          {totalMatches === 0 && articlesCount > 0 && <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">لا نتائج</span>}
+          {safeCurrent !== null && <span className="shrink-0 whitespace-nowrap text-sm font-medium text-foreground">{safeCurrent + 1} من {totalMatches}</span>}
+          <span className="ms-auto flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="النتيجة السابقة" title="النتيجة السابقة" disabled={!totalMatches} onClick={() => goToMatch(-1)}><ChevronUp /></Button>
+            <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="النتيجة التالية" title="النتيجة التالية" disabled={!totalMatches} onClick={() => goToMatch(1)}><ChevronDown /></Button>
+          </span>
+        </div>}
       </div>}
       {ideas.length === 0 && !query.trim() && (
         <div className="mt-20 flex flex-col items-center gap-4 text-center">
@@ -196,7 +220,7 @@ function Library() {
                         ))}
                       </div>
                     )}
-                    <ArticleEditor idea={i} topic={topic} online={online} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }}
+                    <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }}
                       searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
                   </div>;
                 })}
