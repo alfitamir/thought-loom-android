@@ -1,6 +1,6 @@
 import {
-  ASK_SCHEMA, CLASSIFY_SCHEMA, ENRICH_SCHEMA, EVIDENCE_SCHEMA, INSIGHTS_SCHEMA, TRANSCRIBE_INSTRUCTIONS,
-  sanitizeAdditions, sanitizeAsk, sanitizeInsights, sanitizeLabels,
+  ASK_SCHEMA, CLASSIFY_SCHEMA, ENRICH_SCHEMA, EVIDENCE_SCHEMA, FACEBOOK_SCHEMA, INSIGHTS_SCHEMA, TRANSCRIBE_INSTRUCTIONS,
+  sanitizeAdditions, sanitizeAsk, sanitizeFacebookPost, sanitizeInsights, sanitizeLabels,
   type AiTask, type ArticleAdditions, type AskAnswer, type AskArticle, type ClassifyItem, type InsightItem, type Insights, type Label,
 } from "./ai-prompts";
 import { verifyAll, type EvidenceResult } from "./evidence";
@@ -164,6 +164,33 @@ export async function getArticleEnrichment(article: { title: string; body: strin
   const payload = `بناءً على المقال التالي للكاتب، اقترح إضافات فكرية واقتباسات ملهمة لتعميق المقال:\nالعنوان: ${article.title.slice(0, 200)}\n\nالنص:\n${article.body}`;
   const raw = await runTask("enrich", payload, ENRICH_SCHEMA, o);
   return sanitizeAdditions(raw);
+}
+
+// ---------- facebook post suggestion ----------
+export type FacebookOptions = AIOptions & {
+  /** 0 = first suggestion; >0 = a regeneration attempt whose opening/angle must differ. */
+  variation?: number;
+};
+
+/**
+ * One Facebook post suggested from the article, in the author's own published voice
+ * (FACEBOOK_INSTRUCTIONS carries the rules from his real posts). Dispatched like the
+ * other features (personal key in-browser, else the authenticated server route with
+ * the `facebook` task) and sanitized client-side. Copy-only by design: the app never
+ * posts to Facebook — the author pastes the text himself. Regeneration passes a
+ * variation number so the prompt demands a different opening and angle.
+ */
+export async function getFacebookPost(article: { title: string; body: string }, o: FacebookOptions = {}): Promise<string> {
+  if (!article.body.trim()) throw new Error("نص المقال مطلوب");
+  const variation = o.variation ?? 0;
+  let payload = `حوّل المقال التالي للكاتب إلى منشور فيسبوك واحد قصير بصوته:\nالعنوان: ${article.title.slice(0, 200)}\n\nالنص:\n${article.body}`;
+  if (variation > 0) {
+    payload += `\n\nتنبيه: هذه المحاولة رقم ${variation + 1} لصياغة المنشور. غيّر جملة الافتتاح وزاوية العرض تغييرًا واضحًا عن أي صياغة مباشرة، ولا تبدأ بتلخيص للمقال؛ اختر مدخلًا مختلفًا من داخل أفكاره.`;
+  }
+  const raw = await runTask("facebook", payload, FACEBOOK_SCHEMA, o);
+  const post = sanitizeFacebookPost(raw);
+  if (!post) throw new Error("لم يقترح الذكاء الاصطناعي منشورًا لهذا المقال. حاول مرة أخرى.");
+  return post;
 }
 
 // ---------- evidence from Quran, Sunnah and other writings ----------

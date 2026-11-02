@@ -30,7 +30,7 @@ export const SUGGEST_INSTRUCTIONS = `أنت مساعد يرتب مقالات ك�
 
 export const TRANSCRIBE_INSTRUCTIONS = `فرّغ التسجيل الصوتي العربي حرفيًا كما قاله المتكلم، بلهجته وكلماته، مع ترقيم بسيط. لا تلخص ولا تحذف ولا تضف ولا تعلق، واحذف فقط أصوات التردد مثل «اممم». إن لم يكن في التسجيل كلام مفهوم فأخرج الكلمة: [صمت]. أخرج النص فقط.`;
 
-export type AiTask = "improve" | "merge" | "suggest" | "ask" | "classify" | "insights" | "evidence" | "enrich";
+export type AiTask = "improve" | "merge" | "suggest" | "ask" | "classify" | "insights" | "evidence" | "enrich" | "facebook";
 // TASK_INSTRUCTIONS is assembled at the end of this file, after the ported Afkari sections define their instructions.
 
 export const SILENCE = "[صمت]";
@@ -291,6 +291,55 @@ export const ENRICH_SCHEMA = {
   required: ["additions", "quotes", "questions"],
 };
 
+// ---------- facebook post suggestion ----------
+// Voice rules distilled from the author's real published posts (X/Facebook): simplified
+// فصحى, first person, short, opened by a direct question or a striking line, hedged
+// general claims, no emoji/hashtag/marketing layer. The post must stay faithful to the
+// article — it is an edited excerpt of his own thinking, never new content.
+export const FACEBOOK_INSTRUCTIONS = `أنت محرر منشورات لكاتب واحد، تصوغ بصوته هو لا بصوت مسوّق. ستصلك مقال من مقالاته؛ حوّله إلى منشور فيسبوك واحد قصير يقف وحده ويليق بصفحته.
+
+قواعد الصوت (من منشورات الكاتب الحقيقية):
+- فصحى مبسطة واضحة بضمير المتكلم وبأسلوب الكاتب نفسه. التزم بفكرة المقال المركزية: لا تخترع ادعاءً أو رقمًا أو قصة أو تجربة ليست في المقال، ولا تنسب إليه ما لم يكتبه.
+- قصير: بين 40 و90 كلمة تقريبًا. المنشور ليس تلخيصًا للمقال ولا قائمة بمحتوياته؛ التقط فكرته الأقوى واعرضها عرضًا مستقلًا.
+- ابدأ بسؤال مباشر أو بجملة لافتة مأخوذة من قلب الفكرة، كما يفتتح الكاتب منشوراته.
+- عبّر عن الأحكام العامة بصيغ محتاطة (عادةً، غالبًا، قد). وإن كان المقال طبيًا فاربط أي قرار بـ«التقييم الطبي» واختم المنشور بـ«هذه المعلومات لا تغني عن التقييم الطبي».
+- ممنوع منعًا باتًا: الرموز التعبيرية، والهاشتاغات، وتكرار علامات التعجب، وعبارات التسويق أو الحث على التفاعل مثل «شارك المنشور» أو «تابعونا».
+- إن كان المقال نفسه مكتوبًا بالعامية المصرية فلك لمسة عامية خفيفة في جملة الافتتاح فقط؛ وما عدا ذلك ابقَ في الفصحى المبسطة.
+- فقرات قصيرة يفصل بينها سطر فارغ عند الحاجة، فالمنشور يُقرأ على الهاتف.
+
+أعد الناتج JSON فقط مطابقًا للمخطط: {"post": "..."}`;
+
+export const FACEBOOK_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    post: { type: "STRING", description: "نص منشور فيسبوك واحد قصير بصوت الكاتب" },
+  },
+  required: ["post"],
+};
+
+/**
+ * Clean a model-suggested Facebook post before it is shown: the model sometimes wraps
+ * the text in markdown fences or quotation marks, pads it with blank lines, or runs
+ * long. Strip one wrapping layer, collapse 3+ newlines to a blank line, and hard-cap
+ * the length so the dialog always shows a post-sized text.
+ */
+export function sanitizeFacebookPost(raw: unknown): string {
+  const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  let post = typeof r["post"] === "string" ? (r["post"] as string) : "";
+  post = post.trim();
+  post = post.replace(/^```(?:json|text|markdown|md)?\s*/i, "").replace(/\s*```$/, "").trim();
+  const wraps: [string, string][] = [['"', '"'], ["'", "'"], ["«", "»"], ["“", "”"], ["„", "“"]];
+  for (const [open, close] of wraps) {
+    if (post.length > open.length + close.length && post.startsWith(open) && post.endsWith(close)) {
+      post = post.slice(open.length, post.length - close.length).trim();
+      break;
+    }
+  }
+  post = post.replace(/\n{3,}/g, "\n\n");
+  if (post.length > 1500) post = post.slice(0, 1500).trimEnd();
+  return post;
+}
+
 // ---------- merge suggestions ----------
 export const MERGE_SUGGEST_INSTRUCTIONS = `أنت محرر فكري يقرأ مجموعة مقالات لكاتب واحد (معرّف، عنوان، بداية المقال ونهايته) ويبحث عن مقالات يصنع دمجها مقالًا أقوى من كل منها منفردًا.
 
@@ -324,4 +373,5 @@ export const TASK_INSTRUCTIONS: Record<AiTask, string> = {
   improve: IMPROVE_INSTRUCTIONS, merge: MERGE_INSTRUCTIONS, suggest: SUGGEST_INSTRUCTIONS,
   ask: ASK_INSTRUCTIONS, classify: CLASSIFY_INSTRUCTIONS, insights: INSIGHTS_INSTRUCTIONS, evidence: EVIDENCE_INSTRUCTIONS,
   enrich: ENRICH_INSTRUCTIONS,
+  facebook: FACEBOOK_INSTRUCTIONS,
 };

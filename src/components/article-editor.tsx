@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, HelpCircle, Lightbulb, Pencil, PlusCircle, Quote, Share2, ShieldAlert, Sparkles, Square, Trash2, X } from "lucide-react";
+import { BookOpen, Check, Copy, Facebook, HelpCircle, Pencil, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, WandSparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceDialog } from "@/components/evidence-dialog";
-import { getArticleEnrichment, type ArticleEnrichment } from "@/lib/ai-features";
+import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
+
+const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
 export function ArticleEditor({ idea, online, onChange, onDelete }: {
   idea: Idea; online: boolean; onChange: () => void; onDelete: () => void;
@@ -28,6 +30,13 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
   const [enrichment, setEnrichment] = useState<ArticleEnrichment | null>(null);
   const [enrichTab, setEnrichTab] = useState<"additions" | "quotes" | "questions">("quotes");
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  // Facebook post suggestion state (one post, copy-only; cached while the editor stays open)
+  const [fbOpen, setFbOpen] = useState(false);
+  const [fbBusy, setFbBusy] = useState(false);
+  const [fbPost, setFbPost] = useState<string | null>(null);
+  const [fbVariation, setFbVariation] = useState(0);
+  const [fbError, setFbError] = useState("");
+  const [fbStatus, setFbStatus] = useState("");
   const abort = useRef<AbortController | null>(null);
   const version = useRef(idea.updatedAt ?? 0);
   useEffect(() => () => abort.current?.abort(), []);
@@ -87,6 +96,39 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
     }
   };
 
+  const loadFacebookPost = async (variation: number) => {
+    setFbBusy(true);
+    setFbError("");
+    setFbStatus("");
+    try {
+      const post = await getFacebookPost(article, { variation });
+      setFbPost(post);
+      setFbVariation(variation);
+    } catch (err: any) {
+      setFbError(err?.message || "تعذّر إعداد المنشور المقترح.");
+    } finally {
+      setFbBusy(false);
+    }
+  };
+
+  const openFacebook = () => {
+    setMessage("");
+    if (!navigator.onLine) { setMessage("اقتراح المنشور يحتاج اتصالًا بالإنترنت."); return; }
+    setFbOpen(true);
+    if (fbPost) return;
+    void loadFacebookPost(0);
+  };
+
+  const copyFacebookPost = async () => {
+    if (!fbPost) return;
+    try {
+      if (navigator.clipboard) { await navigator.clipboard.writeText(fbPost); setMessage("نُسخ المنشور ✓"); setFbStatus("نُسخ المنشور ✓"); }
+      else setFbStatus("النسخ غير متاح هنا؛ يمكنك تحديد نص المنشور ونسخه.");
+    } catch {
+      setFbStatus("تعذّرت النسخ الآن.");
+    }
+  };
+
   const insertTextIntoArticle = (textToAppend: string, notice: string) => {
     const updatedBody = `${article.body.trim()}\n\n${textToAppend.trim()}`;
     save(article.title, updatedBody);
@@ -98,6 +140,7 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
     {editing ? <div className="space-y-3">
       <input aria-label="عنوان المقال" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
       <textarea aria-label="نص المقال" value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="w-full rounded-md border border-input bg-card p-3 font-article text-xl leading-loose outline-none focus:ring-2 focus:ring-ring" />
+      <p className="text-xs text-muted-foreground">عدد الكلمات: {countWords(body)}</p>
       <div className="flex gap-2">
         <Button onClick={() => save(title, body)} disabled={!title.trim() || !body.trim()}><Check />حفظ</Button>
         <Button variant="ghost" onClick={() => setEditing(false)}><X />إلغاء</Button>
@@ -106,12 +149,19 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
       <h2 className="break-words font-display text-xl text-primary">{article.title}</h2>
       <p className="mb-4 mt-1 text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString("ar")}</p>
       <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{article.body}</p>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">أدوات ذكية</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onClick={improve} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><Sparkles className="size-4" />تحسين</button>
+          <button type="button" aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onClick={() => setEvidenceOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><BookOpen className="size-4 text-emerald-600" />شواهد</button>
+          <button type="button" aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onClick={openEnrichment} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><WandSparkles className="size-4 text-amber-500" />إثراء</button>
+          <button type="button" aria-label="منشور فيسبوك" title={online ? "اقتراح منشور فيسبوك من هذا المقال" : "المنشور يحتاج الإنترنت"} disabled={!online || fbBusy} onClick={openFacebook} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><Facebook className="size-4 text-[#1877F2]" />منشور فيسبوك</button>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="icon" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
         <Button variant="ghost" size="icon" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
-        <Button variant="ghost" size="icon" aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onClick={improve}><Sparkles /></Button>
-        <Button variant="ghost" size="icon" aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onClick={() => setEvidenceOpen(true)}><BookOpen className="text-emerald-600" /></Button>
-        <Button variant="ghost" size="icon" aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onClick={openEnrichment}><Lightbulb className="text-amber-500" /></Button>
         <Button variant="ghost" size="icon" className="text-destructive" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
     </>}
@@ -127,7 +177,7 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
     <Dialog open={enrichOpen} onOpenChange={setEnrichOpen}>
       <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
         <DialogTitle className="text-start font-display flex items-center gap-2">
-          <Lightbulb className="size-5 text-amber-500" />
+          <WandSparkles className="size-5 text-amber-500" />
           <span>تطوير وإثراء المقال بذكاء</span>
         </DialogTitle>
         <p className="text-xs text-muted-foreground">
@@ -244,6 +294,40 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
 
         <div className="flex justify-end pt-2">
           <Button variant="ghost" onClick={() => setEnrichOpen(false)}>إغلاق</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    {/* Facebook post suggestion dialog: one post in the author's voice, copy-only —
+        the app never posts to Facebook; the author pastes the text himself. */}
+    <Dialog open={fbOpen} onOpenChange={setFbOpen}>
+      <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
+        <DialogTitle className="text-start font-display flex items-center gap-2">
+          <Facebook className="size-5 text-[#1877F2]" />
+          <span>منشور فيسبوك مقترح</span>
+        </DialogTitle>
+        <p className="text-xs text-muted-foreground">
+          منشور واحد قصير بصوتك، مأخوذ من هذا المقال وحده. انسخه والصقه في فيسبوك بنفسك — التطبيق لا ينشر نيابة عنك.
+        </p>
+
+        {fbBusy ? (
+          <div className="py-8 text-center space-y-3">
+            <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-sm text-muted-foreground">جارٍ إعداد المنشور…</p>
+          </div>
+        ) : fbPost ? (
+          <div className="space-y-2">
+            <div className="whitespace-pre-wrap break-words rounded-xl border border-border bg-card p-4 font-article text-lg leading-relaxed text-foreground">{fbPost}</div>
+            {fbVariation > 0 && <p className="text-xs text-muted-foreground">اقتراح رقم {fbVariation + 1}</p>}
+          </div>
+        ) : null}
+
+        {fbError && <p role="alert" className="text-sm text-destructive">{fbError}</p>}
+        {fbStatus && <p role="status" className="text-sm text-muted-foreground">{fbStatus}</p>}
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Button disabled={!fbPost || fbBusy} onClick={copyFacebookPost}><Copy />نسخ المنشور</Button>
+          <Button variant="outline" disabled={fbBusy} onClick={() => void loadFacebookPost(fbPost ? fbVariation + 1 : fbVariation)}><RefreshCw />اقتراح آخر</Button>
+          <Button variant="ghost" onClick={() => setFbOpen(false)}>إغلاق</Button>
         </div>
       </DialogContent>
     </Dialog>
