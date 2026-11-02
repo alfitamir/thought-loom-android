@@ -10,7 +10,7 @@ vi.mock("./gemini", async (orig) => ({ ...(await orig<typeof import("./gemini")>
 // /api/articles/improve; transcription goes to /api/voice/transcribe (SSE).
 vi.mock("./ai-engine", () => ({ resolveEngine: async () => ({ kind: "cloud", token: "T" }) }));
 
-import { askIdeas, classifyBatch, excerptFor, getArticleEnrichment, getEvidence, getInsights, retrieveRelevant, transcribeAudio } from "./ai-features";
+import { askIdeas, classifyBatch, excerptFor, getArticleEnrichment, getEvidence, getFacebookPost, getInsights, retrieveRelevant, transcribeAudio } from "./ai-features";
 import { clearEvidenceCache } from "./evidence";
 
 const idea = (id: string, title: string, body: string, createdAt = 1): Idea => ({ id, text: body, createdAt, articleTitle: title, articleBody: body, updatedAt: createdAt });
@@ -215,5 +215,70 @@ describe("getArticleEnrichment", () => {
     await expect(getArticleEnrichment({ title: "t", body: "ن".repeat(50_001) })).rejects.toThrow("أطول من الحد");
     expect(fetchMock).not.toHaveBeenCalled();
     expect(geminiStream).not.toHaveBeenCalled();
+  });
+});
+
+describe("getFacebookPost", () => {
+  const art = { title: "حصوات المرارة", body: "كثيرون يكتشفون حصوات المرارة مصادفة، ولا تعني كل حصوة عملية جراحية؛ القرار يبنى على الأعراض والتقييم الطبي." };
+  const clean = "هل كل حصوة مرارة تعني عملية؟\n\nغالبًا لا؛ القرار يبنى على الأعراض والتقييم الطبي.";
+
+  it("uses the server route with the facebook task when no personal key is saved, and sanitizes the post", async () => {
+    // Model wrapped the post in Arabic quotes and padded it with extra blank lines.
+    replyModel({ post: `«${clean.replace("\n\n", "\n\n\n\n")}»` });
+    const out = await getFacebookPost(art);
+    expect(fetchMock.mock.calls[0]![0]).toBe("/api/articles/improve");
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.task).toBe("facebook");
+    expect(body.payload).toContain(art.title);
+    expect(body.payload).toContain(art.body);
+    expect(body.payload).not.toContain("المحاولة رقم");
+    expect(out).toBe(clean); // wrapping quotes stripped, 3+ newlines collapsed to one blank line
+  });
+
+  it("uses the user's own Gemini key directly when provided, sanitizing the same way", async () => {
+    geminiStream.mockResolvedValue(JSON.stringify({ post: `"${clean}"` }));
+    const out = await getFacebookPost(art, { key: "K" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(geminiStream.mock.calls[0]![0]).toBe("K");
+    expect(out).toBe(clean); // straight wrapping quotes stripped
+  });
+
+  it("strips markdown fences inside the post and hard-caps it at 1500 chars", async () => {
+    geminiStream.mockResolvedValue(JSON.stringify({ post: "```\n" + "كلمة ".repeat(400) + "\n```" }));
+    const out = await getFacebookPost(art, { key: "K" });
+    expect(out).not.toContain("```");
+    expect(out.length).toBeLessThanOrEqual(1500);
+    expect(out.startsWith("كلمة")).toBe(true);
+  });
+
+  it("adds the variation instruction to the payload when regenerating", async () => {
+    geminiStream.mockResolvedValue(JSON.stringify({ post: clean }));
+    await getFacebookPost(art, { key: "K", variation: 2 });
+    const payload = geminiStream.mock.calls[0]![2] as string;
+    expect(payload).toContain("المحاولة رقم 3");
+    expect(payload).toContain(art.body);
+  });
+
+  it("adds the variation instruction on the server path too", async () => {
+    replyModel({ post: clean });
+    await getFacebookPost(art, { variation: 1 });
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.payload).toContain("المحاولة رقم 2");
+  });
+
+  it("refuses an empty article before any request", async () => {
+    await expect(getFacebookPost({ title: "t", body: "   " })).rejects.toThrow("نص المقال مطلوب");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(geminiStream).not.toHaveBeenCalled();
+  });
+
+  it("explains malformed model JSON instead of crashing", async () => {
+    geminiStream.mockResolvedValue("{not json");
+    await expect(getFacebookPost(art, { key: "K" })).rejects.toThrow("غير مكتمل");
+  });
+
+  it("rejects an empty suggested post with a retryable Arabic message", async () => {
+    replyModel({ post: "   " });
+    await expect(getFacebookPost(art)).rejects.toThrow("لم يقترح");
   });
 });

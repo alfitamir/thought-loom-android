@@ -5,7 +5,7 @@ import { TASK_INSTRUCTIONS } from "./ai-prompts";
 import { getLovableAiGatewayResponseHeaders } from "./ai/run-id.ts";
 
 const inputSchema = z.object({
-  task: z.enum(["improve", "merge", "suggest", "ask", "classify", "insights", "evidence", "enrich"]),
+  task: z.enum(["improve", "merge", "suggest", "ask", "classify", "insights", "evidence", "enrich", "facebook"]),
   payload: z.string().min(2).max(200000),
 });
 
