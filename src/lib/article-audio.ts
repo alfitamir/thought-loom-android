@@ -1,1 +1,345 @@
-Ly8gR2VuZXJhdGVkIGFydGljbGUgYXVkaW8sIGtlcHQgb24gdGhpcyBkZXZpY2UgKEluZGV4ZWREQikgc28gYW4gYXJ0aWNsZQovLyB0aGF0IHdhcyB0dXJuZWQgaW50byBzcGVlY2ggb25jZSBwbGF5cyBpbnN0YW50bHkgbmV4dCB0aW1lIOKAlCBhbmQgY2FuIGJlCi8vIHNoYXJlZCBhcyBhIGZpbGUuIEEgY2FjaGVkIHJlY29yZCBjb3VudHMgYXMgZnJlc2ggb25seSB3aGlsZSB0aGUgYXJ0aWNsZSdzCi8vIHNwb2tlbiB0ZXh0IHN0aWxsIGhhc2hlcyB0byB0aGUgdmFsdWUgaXQgd2FzIGdlbmVyYXRlZCBmcm9tOyBlZGl0aW5nIHRoZQovLyBhcnRpY2xlIG1ha2VzIHRoZSBvbGQgYXVkaW8gc3RhbGUsIG5ldmVyIHNpbGVudGx5IHdyb25nLgovLwovLyBUd28gc3RvcmFnZSBmb3JtYXRzIHNoYXJlIG9uZSBzdG9yZToKLy8gLSB2MSAobGVnYWN5LCB3cml0dGVuIGJ5IHRoZSBmaXJzdCBsaXN0ZW4gcmVsZWFzZSk6IG9uZSByZWNvcmQgcGVyIGFydGljbGUKLy8gICBob2xkaW5nIGEgc2luZ2xlIGNvbWJpbmVkIFdBViBibG9iIGluIGBibG9iYC4KLy8gLSB2MiAoY3VycmVudCk6IGEgbWFuaWZlc3QgcmVjb3JkIHBsdXMgb25lIHJlY29yZCBwZXIgc3ludGhlc2l6ZWQgY2h1bmsKLy8gICBob2xkaW5nIHJhdyBQQ00sIHNvIGNodW5rcyBjYW4gYmUgY2FjaGVkIGFzIHRoZXkgYXJlIGdlbmVyYXRlZCwgcGxheWVkCi8vICAgcHJvZ3Jlc3NpdmVseSwgYW5kIGNvbXBsZXRlZCBsYXRlcjsgc2hhcmluZyBjb25jYXRlbmF0ZXMgdGhlbSBiYWNrIGludG8KLy8gICBvbmUgV0FWLiBOZXcgZ2VuZXJhdGlvbnMgYWx3YXlzIHdyaXRlIHYyOyB2MSByZWNvcmRzIHN0YXkgcGxheWFibGUgYW5kCi8vICAgc2hhcmVhYmxlIHVudGlsIHJlcGxhY2VkLgoKaW1wb3J0IHsKICBDVVJSRU5UX1RUU19WT0lDRV9LRVksIEdFTUlOSV9UVFNfU0FNUExFX1JBVEUsIG1vZGVsRm9yVm9pY2VLZXksIHRvU3BlZWNoVGV4dCwgdHlwZSBUdHNFbmdpbmUsCn0gZnJvbSAiLi90dHMiOwoKZXhwb3J0IHR5cGUgQXJ0aWNsZUF1ZGlvUmVjb3JkID0gewogIC8qKiBDb21wb3NpdGUga2V5OiBgJHthcnRpY2xlSWR9OiR7ZW5naW5lfToke3ZvaWNlS2V5fWAuICovCiAga2V5OiBzdHJpbmc7CiAgYXJ0aWNsZUlkOiBzdHJpbmc7CiAgZW5naW5lOiBUdHNFbmdpbmU7CiAgdm9pY2VLZXk6IHN0cmluZzsKICB0ZXh0SGFzaDogc3RyaW5nOwogIG1pbWU6IHN0cmluZzsKICBibG9iOiBCbG9iOwogIGNyZWF0ZWRBdDogbnVtYmVyOwp9OwoKLyoqIHYyIG1hbmlmZXN0OiBkZXNjcmliZXMgYSBjaHVua2VkIGdlbmVyYXRpb247IHRoZSBhdWRpbyBsaXZlcyBpbiBjaHVuayByZWNvcmRzLiAqLwpleHBvcnQgdHlwZSBDaHVua2VkQXVkaW9NYW5pZmVzdCA9IHsKICAvKiogU2FtZSBjb21wb3NpdGUga2V5IGFzIGEgbGVnYWN5IHJlY29yZDogYCR7YXJ0aWNsZUlkfToke2VuZ2luZX06JHt2b2ljZUtleX1gLiAqLwogIGtleTogc3RyaW5nOwogIGFydGljbGVJZDogc3RyaW5nOwogIGVuZ2luZTogVHRzRW5naW5lOwogIHZvaWNlS2V5OiBzdHJpbmc7CiAgLyoqIFRoZSBUVFMgbW9kZWwgdGhhdCBwcm9kdWNlZCAob3IgaXMgcHJvZHVjaW5nKSB0aGlzIGdlbmVyYXRpb24uIFRoZQogICAqIHZvaWNlS2V5IGVtYmVkcyBpdCBmb3IgbmV3IGtleXM7IG1hbmlmZXN0cyB3cml0dGVuIGJlZm9yZSB0aGUgbW9kZWwKICAgKiB1cGdyYWRlIGhhdmUgbm8gbW9kZWxJZCBmaWVsZCBhdCBydW50aW1lIOKAlCBtb2RlbEZvclZvaWNlS2V5IGRlcml2ZXMgaXQKICAgKiBmcm9tIHRoZWlyIGJhcmUgdm9pY2Uga2V5IGluc3RlYWQuIEEgZ2VuZXJhdGlvbiBpcyBvbmx5IGV2ZXIgcmVzdW1lZCBvcgogICAqIGNvbXBsZXRlZCBieSB0aGUgbW9kZWwgcmVjb3JkZWQgaGVyZS4gKi8KICBtb2RlbElkOiBzdHJpbmc7CiAgdGV4dEhhc2g6IHN0cmluZzsKICB2ZXJzaW9uOiAyOwogIGZvcm1hdDogInBjbS1jaHVua3MiOwogIHNhbXBsZVJhdGU6IG51bWJlcjsKICBjaHVua0NvdW50OiBudW1iZXI7CiAgY3JlYXRlZEF0OiBudW1iZXI7Cn07CgovKiogT25lIGdlbmVyYXRlZCBjaHVuayBvZiByYXcgUENNLCBrZXllZCBgJHthdWRpb0tleX0jJHtpbmRleH1gLiAqLwpleHBvcnQgdHlwZSBBdWRpb0NodW5rUmVjb3JkID0gewogIGtleTogc3RyaW5nOwogIGFydGljbGVJZDogc3RyaW5nOwogIGVuZ2luZTogVHRzRW5naW5lOwogIHZvaWNlS2V5OiBzdHJpbmc7CiAgaW5kZXg6IG51bWJlcjsKICBtaW1lOiBzdHJpbmc7CiAgYmxvYjogQmxvYjsKICBjcmVhdGVkQXQ6IG51bWJlcjsKfTsKCmV4cG9ydCB0eXBlIFN0b3JlZEF1ZGlvUmVjb3JkID0gQXJ0aWNsZUF1ZGlvUmVjb3JkIHwgQ2h1bmtlZEF1ZGlvTWFuaWZlc3QgfCBBdWRpb0NodW5rUmVjb3JkOwoKLyoqIENodW5rIHBheWxvYWRzIGFyZSByYXcgMTYtYml0IFBDTSwgZXhhY3RseSBhcyBHZW1pbmkgVFRTIHJldHVybnMgdGhlbS4gKi8KZXhwb3J0IGNvbnN0IFBDTV9DSFVOS19NSU1FID0gImF1ZGlvL0wxNiI7CgpleHBvcnQgY29uc3QgY2h1bmtLZXkgPSAoYmFzZUtleTogc3RyaW5nLCBpbmRleDogbnVtYmVyKTogc3RyaW5nID0+IGAke2Jhc2VLZXl9IyR7aW5kZXh9YDsKCmV4cG9ydCBjb25zdCBpc0NodW5rZWRNYW5pZmVzdCA9IChyZWM6IFN0b3JlZEF1ZGlvUmVjb3JkKTogcmVjIGlzIENodW5rZWRBdWRpb01hbmlmZXN0ID0+CiAgKHJlYyBhcyBDaHVua2VkQXVkaW9NYW5pZmVzdCkudmVyc2lvbiA9PT0gMiAmJiAocmVjIGFzIENodW5rZWRBdWRpb01hbmlmZXN0KS5mb3JtYXQgPT09ICJwY20tY2h1bmtzIjsKCmV4cG9ydCBjb25zdCBpc0F1ZGlvQ2h1bmsgPSAocmVjOiBTdG9yZWRBdWRpb1JlY29yZCk6IHJlYyBpcyBBdWRpb0NodW5rUmVjb3JkID0+CiAgdHlwZW9mIChyZWMgYXMgQXVkaW9DaHVua1JlY29yZCkuaW5kZXggPT09ICJudW1iZXIiICYmICJibG9iIiBpbiByZWM7CgpleHBvcnQgY29uc3QgaXNMZWdhY3lBdWRpbyA9IChyZWM6IFN0b3JlZEF1ZGlvUmVjb3JkKTogcmVjIGlzIEFydGljbGVBdWRpb1JlY29yZCA9PgogICFpc0NodW5rZWRNYW5pZmVzdChyZWMpICYmICFpc0F1ZGlvQ2h1bmsocmVjKTsKCi8qKiBGTlYtMWEgMzItYml0IGhhc2ggb2YgdGhlIHRleHQsIGFzIDggaGV4IGNoYXJzLiAqLwpleHBvcnQgZnVuY3Rpb24gdGV4dEhhc2godGV4dDogc3RyaW5nKTogc3RyaW5nIHsKICBsZXQgaCA9IDB4ODExYzlkYzU7CiAgZm9yIChsZXQgaSA9IDA7IGkgPCB0ZXh0Lmxlbmd0aDsgaSsrKSB7CiAgICBoIF49IHRleHQuY2hhckNvZGVBdChpKTsKICAgIGggPSBNYXRoLmltdWwoaCwgMHgwMTAwMDE5Myk7CiAgfQogIHJldHVybiAoaCA+Pj4gMCkudG9TdHJpbmcoMTYpLnBhZFN0YXJ0KDgsICIwIik7Cn0KCmV4cG9ydCBjb25zdCBhcnRpY2xlVGV4dEhhc2ggPSAodGl0bGU6IHN0cmluZywgYm9keTogc3RyaW5nKTogc3RyaW5nID0+IHRleHRIYXNoKHRvU3BlZWNoVGV4dCh0aXRsZSwgYm9keSkpOwoKZXhwb3J0IGNvbnN0IGF1ZGlvS2V5ID0gKGFydGljbGVJZDogc3RyaW5nLCBlbmdpbmU6IFR0c0VuZ2luZSwgdm9pY2VLZXk6IHN0cmluZyk6IHN0cmluZyA9PgogIGAke2FydGljbGVJZH06JHtlbmdpbmV9OiR7dm9pY2VLZXl9YDsKCmV4cG9ydCBjb25zdCBpc0F1ZGlvRnJlc2ggPSAocmVjOiBBcnRpY2xlQXVkaW9SZWNvcmQsIHRpdGxlOiBzdHJpbmcsIGJvZHk6IHN0cmluZyk6IGJvb2xlYW4gPT4KICByZWMudGV4dEhhc2ggPT09IGFydGljbGVUZXh0SGFzaCh0aXRsZSwgYm9keSk7CgpleHBvcnQgY29uc3QgaXNNYW5pZmVzdEZyZXNoID0gKG1hbmlmZXN0OiBDaHVua2VkQXVkaW9NYW5pZmVzdCwgdGl0bGU6IHN0cmluZywgYm9keTogc3RyaW5nKTogYm9vbGVhbiA9PgogIG1hbmlmZXN0LnRleHRIYXNoID09PSBhcnRpY2xlVGV4dEhhc2godGl0bGUsIGJvZHkpOwoKY29uc3QgRVhURU5TSU9OUzogUmVjb3JkPHN0cmluZywgc3RyaW5nPiA9IHsKICAiYXVkaW8vd2F2IjogIndhdiIsCiAgImF1ZGlvL3gtd2F2IjogIndhdiIsCiAgImF1ZGlvL21wZWciOiAibXAzIiwKICAiYXVkaW8vd2VibSI6ICJ3ZWJtIiwKICAiYXVkaW8vb2dnIjogIm9nZyIsCiAgImF1ZGlvL21wNCI6ICJtNGEiLAp9OwoKLyoqIEEgc2hhcmUvZG93bmxvYWQtc2FmZSBmaWxlIG5hbWUgZnJvbSB0aGUgYXJ0aWNsZSB0aXRsZS4gKi8KZXhwb3J0IGZ1bmN0aW9uIGF1ZGlvRmlsZU5hbWUodGl0bGU6IHN0cmluZywgbWltZTogc3RyaW5nKTogc3RyaW5nIHsKICBjb25zdCBjbGVhbiA9IHRpdGxlCiAgICAucmVwbGFjZSgvW1xcLzoqPyI8PnxcdTAwMDAtXHUwMDFmXS9nLCAiICIpCiAgICAucmVwbGFjZSgvXHMrL2csICIgIikKICAgIC50cmltKCkKICAgIC5zbGljZSgwLCA2MCkKICAgIC50cmltKCk7CiAgcmV0dXJuIGAke2NsZWFuIHx8ICLZhdmC2KfZhCJ9LiR7RVhURU5TSU9OU1ttaW1lXSA/PyAiYXVkaW8ifWA7Cn0KCmV4cG9ydCBpbnRlcmZhY2UgQXJ0aWNsZUF1ZGlvU3RvcmUgewogIGdldChrZXk6IHN0cmluZyk6IFByb21pc2U8U3RvcmVkQXVkaW9SZWNvcmQgfCBudWxsPjsKICBwdXQocmVjOiBTdG9yZWRBdWRpb1JlY29yZCk6IFByb21pc2U8dm9pZD47CiAgcmVtb3ZlKGtleTogc3RyaW5nKTogUHJvbWlzZTx2b2lkPjsKICBsaXN0Rm9yQXJ0aWNsZShhcnRpY2xlSWQ6IHN0cmluZyk6IFByb21pc2U8U3RvcmVkQXVkaW9SZWNvcmRbXT47Cn0KCi8qKiBJbi1tZW1vcnkgc3RvcmUgKHRlc3RzLCBvciBicm93c2VycyB3aXRob3V0IEluZGV4ZWREQikuICovCmV4cG9ydCBmdW5jdGlvbiBtZW1vcnlBcnRpY2xlQXVkaW9TdG9yZSgpOiBBcnRpY2xlQXVkaW9TdG9yZSB7CiAgY29uc3QgbWFwID0gbmV3IE1hcDxzdHJpbmcsIFN0b3JlZEF1ZGlvUmVjb3JkPigpOwogIHJldHVybiB7CiAgICBhc3luYyBnZXQoa2V5KSB7IHJldHVybiBtYXAuZ2V0KGtleSkgPz8gbnVsbDsgfSwKICAgIGFzeW5jIHB1dChyZWMpIHsgbWFwLnNldChyZWMua2V5LCByZWMpOyB9LAogICAgYXN5bmMgcmVtb3ZlKGtleSkgeyBtYXAuZGVsZXRlKGtleSk7IH0sCiAgICBhc3luYyBsaXN0Rm9yQXJ0aWNsZShhcnRpY2xlSWQpIHsgcmV0dXJuIFsuLi5tYXAudmFsdWVzKCldLmZpbHRlcigocikgPT4gci5hcnRpY2xlSWQgPT09IGFydGljbGVJZCk7IH0sCiAgfTsKfQoKY29uc3QgREIgPSAidGhvdWdodC1sb29tLWF1ZGlvIjsKY29uc3QgU1RPUkUgPSAiYXJ0aWNsZS1hdWRpbyI7CmNvbnN0IHJlcSA9IDxULD4ocjogSURCUmVxdWVzdDxUPikgPT4gbmV3IFByb21pc2U8VD4oKHJlcywgcmVqKSA9PiB7IHIub25zdWNjZXNzID0gKCkgPT4gcmVzKHIucmVzdWx0KTsgci5vbmVycm9yID0gKCkgPT4gcmVqKHIuZXJyb3IpOyB9KTsKCmZ1bmN0aW9uIG9wZW5EYigpOiBQcm9taXNlPElEQkRhdGFiYXNlPiB7CiAgcmV0dXJuIG5ldyBQcm9taXNlKChyZXNvbHZlLCByZWplY3QpID0+IHsKICAgIGNvbnN0IHIgPSBpbmRleGVkREIub3BlbihEQiwgMSk7CiAgICByLm9udXBncmFkZW5lZWRlZCA9ICgpID0+IHsKICAgICAgY29uc3Qgc3RvcmUgPSByLnJlc3VsdC5jcmVhdGVPYmplY3RTdG9yZShTVE9SRSwgeyBrZXlQYXRoOiAia2V5IiB9KTsKICAgICAgc3RvcmUuY3JlYXRlSW5kZXgoImFydGljbGVJZCIsICJhcnRpY2xlSWQiKTsKICAgIH07CiAgICByLm9uc3VjY2VzcyA9ICgpID0+IHJlc29sdmUoci5yZXN1bHQpOwogICAgci5vbmVycm9yID0gKCkgPT4gcmVqZWN0KHIuZXJyb3IpOwogIH0pOwp9CgpleHBvcnQgZnVuY3Rpb24gaW5kZXhlZERiQXJ0aWNsZUF1ZGlvU3RvcmUoKTogQXJ0aWNsZUF1ZGlvU3RvcmUgewogIGxldCBkYnA6IFByb21pc2U8SURCRGF0YWJhc2U+IHwgbnVsbCA9IG51bGw7CiAgY29uc3QgZGIgPSAoKSA9PiAoZGJwID8/PSBvcGVuRGIoKSk7CiAgY29uc3QgdHggPSBhc3luYyAobW9kZTogSURCVHJhbnNhY3Rpb25Nb2RlKSA9PiAoYXdhaXQgZGIoKSkudHJhbnNhY3Rpb24oU1RPUkUsIG1vZGUpOwogIGNvbnN0IGRvbmUgPSAodDogSURCVHJhbnNhY3Rpb24pID0+IG5ldyBQcm9taXNlPHZvaWQ+KChyZXMsIHJlaikgPT4geyB0Lm9uY29tcGxldGUgPSAoKSA9PiByZXMoKTsgdC5vbmVycm9yID0gKCkgPT4gcmVqKHQuZXJyb3IpOyB0Lm9uYWJvcnQgPSAoKSA9PiByZWoodC5lcnJvcik7IH0pOwogIHJldHVybiB7CiAgICBhc3luYyBnZXQoa2V5KSB7CiAgICAgIGNvbnN0IHQgPSBhd2FpdCB0eCgicmVhZG9ubHkiKTsKICAgICAgcmV0dXJuICgoYXdhaXQgcmVxKHQub2JqZWN0U3RvcmUoU1RPUkUpLmdldChrZXkpKSkgYXMgU3RvcmVkQXVkaW9SZWNvcmQgfCB1bmRlZmluZWQpID8/IG51bGw7CiAgICB9LAogICAgYXN5bmMgcHV0KHJlYykgeyBjb25zdCB0ID0gYXdhaXQgdHgoInJlYWR3cml0ZSIpOyB0Lm9iamVjdFN0b3JlKFNUT1JFKS5wdXQocmVjKTsgYXdhaXQgZG9uZSh0KTsgfSwKICAgIGFzeW5jIHJlbW92ZShrZXkpIHsgY29uc3QgdCA9IGF3YWl0IHR4KCJyZWFkd3JpdGUiKTsgdC5vYmplY3RTdG9yZShTVE9SRSkuZGVsZXRlKGtleSk7IGF3YWl0IGRvbmUodCk7IH0sCiAgICBhc3luYyBsaXN0Rm9yQXJ0aWNsZShhcnRpY2xlSWQpIHsKICAgICAgY29uc3QgdCA9IGF3YWl0IHR4KCJyZWFkb25seSIpOwogICAgICByZXR1cm4gKGF3YWl0IHJlcSh0Lm9iamVjdFN0b3JlKFNUT1JFKS5pbmRleCgiYXJ0aWNsZUlkIikuZ2V0QWxsKGFydGljbGVJZCkpKSBhcyBTdG9yZWRBdWRpb1JlY29yZFtdOwogICAgfSwKICB9Owp9CgpsZXQgc2hhcmVkOiBBcnRpY2xlQXVkaW9TdG9yZSB8IG51bGwgPSBudWxsOwpleHBvcnQgY29uc3QgYXJ0aWNsZUF1ZGlvU3RvcmUgPSAoKTogQXJ0aWNsZUF1ZGlvU3RvcmUgPT4KICAoc2hhcmVkID8/PSB0eXBlb2YgaW5kZXhlZERCICE9PSAidW5kZWZpbmVkIiA/IGluZGV4ZWREYkFydGljbGVBdWRpb1N0b3JlKCkgOiBtZW1vcnlBcnRpY2xlQXVkaW9TdG9yZSgpKTsKCi8qKiBXaGF0IGlzIGNhY2hlZCBmb3Igb25lIGFydGljbGUgKyBlbmdpbmUsIGluIGVpdGhlciBzdG9yYWdlIGZvcm1hdC4gKi8KZXhwb3J0IHR5cGUgQ2FjaGVkQXVkaW8gPQogIHwgeyBraW5kOiAibGVnYWN5IjsgcmVjb3JkOiBBcnRpY2xlQXVkaW9SZWNvcmQ7IGJsb2I6IEJsb2I7IGZyZXNoOiBib29sZWFuIH0KICB8IHsga2luZDogImNodW5rcyI7IG1hbmlmZXN0OiBDaHVua2VkQXVkaW9NYW5pZmVzdDsgcmVhZHlJbmRleGVzOiBudW1iZXJbXTsgZnJlc2g6IGJvb2xlYW4gfTsKCi8qKgogKiBMb29rIHVwIHRoZSBjYWNoZWQgYXVkaW8gZm9yIGFuIGFydGljbGUgYW5kIGVuZ2luZS4gTGVnYWN5IHYxIHJlY29yZHMgY29tZQogKiBiYWNrIGFzIG9uZSByZWFkeSBibG9iOyB2MiByZWNvcmRzIGFzIHRoZWlyIG1hbmlmZXN0IHBsdXMgdGhlIGNodW5rIGluZGV4ZXMKICogYWxyZWFkeSBvbiB0aGUgZGV2aWNlIChhIHBhcnRpYWwgZ2VuZXJhdGlvbiBpcyByZXN1bWFibGUgZnJvbSBleGFjdGx5CiAqIHRob3NlIGluZGV4ZXMpLiBgZnJlc2hgIGNvbXBhcmVzIHRoZSBzdG9yZWQgaGFzaCBhZ2FpbnN0IHRoZSBhcnRpY2xlJ3MKICogY3VycmVudCBzcG9rZW4gdGV4dC4KICovCmFzeW5jIGZ1bmN0aW9uIGNhY2hlZEZyb21SZWNvcmQoCiAgcmVjOiBTdG9yZWRBdWRpb1JlY29yZCwgYXJ0aWNsZUlkOiBzdHJpbmcsIHRpdGxlOiBzdHJpbmcsIGJvZHk6IHN0cmluZywKICBzdG9yZTogQXJ0aWNsZUF1ZGlvU3RvcmUsCik6IFByb21pc2U8Q2FjaGVkQXVkaW8gfCBudWxsPiB7CiAgaWYgKGlzQ2h1bmtlZE1hbmlmZXN0KHJlYykpIHsKICAgIHJldHVybiB7CiAgICAgIGtpbmQ6ICJjaHVua3MiLAogICAgICBtYW5pZmVzdDogcmVjLAogICAgICByZWFkeUluZGV4ZXM6IGF3YWl0IGxpc3RSZWFkeUNodW5rcyhhcnRpY2xlSWQsIHJlYy5lbmdpbmUsIHJlYy52b2ljZUtleSwgc3RvcmUpLAogICAgICBmcmVzaDogaXNNYW5pZmVzdEZyZXNoKHJlYywgdGl0bGUsIGJvZHkpLAogICAgfTsKICB9CiAgaWYgKGlzQXVkaW9DaHVuayhyZWMpKSByZXR1cm4gbnVsbDsgLy8gYSBjaHVuayBrZXkgd2FzIHBhc3NlZCwgbm90IGEgYmFzZSBrZXkKICByZXR1cm4geyBraW5kOiAibGVnYWN5IiwgcmVjb3JkOiByZWMsIGJsb2I6IHJlYy5ibG9iLCBmcmVzaDogaXNBdWRpb0ZyZXNoKHJlYywgdGl0bGUsIGJvZHkpIH07Cn0KCmV4cG9ydCBhc3luYyBmdW5jdGlvbiBnZXRDYWNoZWRBdWRpbygKICBhcnRpY2xlSWQ6IHN0cmluZywgZW5naW5lOiBUdHNFbmdpbmUsIHZvaWNlS2V5OiBzdHJpbmcsIHRpdGxlOiBzdHJpbmcsIGJvZHk6IHN0cmluZywKICBzdG9yZTogQXJ0aWNsZUF1ZGlvU3RvcmUgPSBhcnRpY2xlQXVkaW9TdG9yZSgpLAopOiBQcm9taXNlPENhY2hlZEF1ZGlvIHwgbnVsbD4gewogIGNvbnN0IHJlYyA9IGF3YWl0IHN0b3JlLmdldChhdWRpb0tleShhcnRpY2xlSWQsIGVuZ2luZSwgdm9pY2VLZXkpKTsKICBpZiAoIXJlYykgcmV0dXJuIG51bGw7CiAgcmV0dXJuIGNhY2hlZEZyb21SZWNvcmQocmVjLCBhcnRpY2xlSWQsIHRpdGxlLCBib2R5LCBzdG9yZSk7Cn0KCi8qKgogKiBGaW5kIHdoYXRldmVyIGF1ZGlvIGlzIGNhY2hlZCBmb3IgYW4gYXJ0aWNsZSArIGVuZ2luZSwgYWNyb3NzIG1vZGVsczoKICogdGhlIGN1cnJlbnQgbW9kZWwncyBlbnRyeSBmaXJzdCwgdGhlbiB0aGUgbmV3ZXN0IGNodW5rZWQgZ2VuZXJhdGlvbiwKICogdGhlbiB0aGUgbmV3ZXN0IGxlZ2FjeSByZWNvcmQuIFRoZSByZXR1cm5lZCBtYW5pZmVzdC9yZWNvcmQgY2FycmllcyBpdHMKICogb3duIHZvaWNlS2V5IChhbmQgd2l0aCBpdCwgaXRzIG1vZGVsKSDigJQgY2FsbGVycyBwbGF5IGFuZCBzaGFyZSBpdCBhcy1pcywKICogYW5kIHJlc3VtZSBpdCBvbmx5IHdpdGggdGhhdCBzYW1lIG1vZGVsLgogKi8KZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGZpbmRDYWNoZWRBdWRpbygKICBhcnRpY2xlSWQ6IHN0cmluZywgZW5naW5lOiBUdHNFbmdpbmUsIHRpdGxlOiBzdHJpbmcsIGJvZHk6IHN0cmluZywKICBzdG9yZTogQXJ0aWNsZUF1ZGlvU3RvcmUgPSBhcnRpY2xlQXVkaW9TdG9yZSgpLAopOiBQcm9taXNlPENhY2hlZEF1ZGlvIHwgbnVsbD4gewogIGNvbnN0IGFsbCA9IChhd2FpdCBzdG9yZS5saXN0Rm9yQXJ0aWNsZShhcnRpY2xlSWQpKS5maWx0ZXIoKHIpID0+IHIuZW5naW5lID09PSBlbmdpbmUpOwogIGNvbnN0IG1hbmlmZXN0cyA9IGFsbC5maWx0ZXIoaXNDaHVua2VkTWFuaWZlc3QpCiAgICAuc29ydCgoYSwgYikgPT4gYi5jcmVhdGVkQXQgLSBhLmNyZWF0ZWRBdCk7CiAgY29uc3QgY2hvc2VuTWFuaWZlc3QgPSBtYW5pZmVzdHMuZmluZCgobSkgPT4gbS52b2ljZUtleSA9PT0gQ1VSUkVOVF9UVFNfVk9JQ0VfS0VZKSA/PyBtYW5pZmVzdHNbMF07CiAgaWYgKGNob3Nlbk1hbmlmZXN0KSByZXR1cm4gY2FjaGVkRnJvbVJlY29yZChjaG9zZW5NYW5pZmVzdCwgYXJ0aWNsZUlkLCB0aXRsZSwgYm9keSwgc3RvcmUpOwogIGNvbnN0IGxlZ2FjeSA9IGFsbC5maWx0ZXIoaXNMZWdhY3lBdWRpbykuc29ydCgoYSwgYikgPT4gYi5jcmVhdGVkQXQgLSBhLmNyZWF0ZWRBdClbMF07CiAgaWYgKGxlZ2FjeSkgcmV0dXJuIGNhY2hlZEZyb21SZWNvcmQobGVnYWN5LCBhcnRpY2xlSWQsIHRpdGxlLCBib2R5LCBzdG9yZSk7CiAgcmV0dXJuIG51bGw7Cn0KCi8qKiBTb3J0ZWQgaW5kZXhlcyBvZiB0aGUgY2h1bmtzIG9mIG9uZSBnZW5lcmF0aW9uIHRoYXQgYXJlIG9uIHRoaXMgZGV2aWNlLiAqLwpleHBvcnQgYXN5bmMgZnVuY3Rpb24gbGlzdFJlYWR5Q2h1bmtzKAogIGFydGljbGVJZDogc3RyaW5nLCBlbmdpbmU6IFR0c0VuZ2luZSwgdm9pY2VLZXk6IHN0cmluZywKICBzdG9yZTogQXJ0aWNsZUF1ZGlvU3RvcmUgPSBhcnRpY2xlQXVkaW9TdG9yZSgpLAopOiBQcm9taXNlPG51bWJlcltdPiB7CiAgY29uc3QgYWxsID0gYXdhaXQgc3RvcmUubGlzdEZvckFydGljbGUoYXJ0aWNsZUlkKTsKICByZXR1cm4gYWxsCiAgICAuZmlsdGVyKChyKTogciBpcyBBdWRpb0NodW5rUmVjb3JkID0+IGlzQXVkaW9DaHVuayhyKSAmJiByLmVuZ2luZSA9PT0gZW5naW5lICYmIHIudm9pY2VLZXkgPT09IHZvaWNlS2V5KQogICAgLm1hcCgocikgPT4gci5pbmRleCkKICAgIC5zb3J0KChhLCBiKSA9PiBhIC0gYik7Cn0KCi8qKiBXcml0ZSAob3IgcmVwbGFjZSkgdGhlIHYyIG1hbmlmZXN0IGZvciBhIGdlbmVyYXRpb24gb2YgY2h1bmtDb3VudCBjaHVua3MuICovCmV4cG9ydCBhc3luYyBmdW5jdGlvbiBzYXZlQXVkaW9NYW5pZmVzdCgKICBpbnB1dDogewogICAgYXJ0aWNsZUlkOiBzdHJpbmc7IGVuZ2luZTogVHRzRW5naW5lOyB2b2ljZUtleTogc3RyaW5nOyB0aXRsZTogc3RyaW5nOyBib2R5OiBzdHJpbmc7CiAgICBjaHVua0NvdW50OiBudW1iZXI7IHNhbXBsZVJhdGU/OiBudW1iZXI7IG1vZGVsSWQ/OiBzdHJpbmc7CiAgfSwKICBzdG9yZTogQXJ0aWNsZUF1ZGlvU3RvcmUgPSBhcnRpY2xlQXVkaW9TdG9yZSgpLAopOiBQcm9taXNlPENodW5rZWRBdWRpb01hbmlmZXN0PiB7CiAgY29uc3QgbWFuaWZlc3Q6IENodW5rZWRBdWRpb01hbmlmZXN0ID0gewogICAga2V5OiBhdWRpb0tleShpbnB1dC5hcnRpY2xlSWQsIGlucHV0LmVuZ2luZSwgaW5wdXQudm9pY2VLZXkpLAogICAgYXJ0aWNsZUlkOiBpbnB1dC5hcnRpY2xlSWQsCiAgICBlbmdpbmU6IGlucHV0LmVuZ2luZSwKICAgIHZvaWNlS2V5OiBpbnB1dC52b2ljZUtleSwKICAgIG1vZGVsSWQ6IGlucHV0Lm1vZGVsSWQgPz8gbW9kZWxGb3JWb2ljZUtleShpbnB1dC52b2ljZUtleSksCiAgICB0ZXh0SGFzaDogYXJ0aWNsZVRleHRIYXNoKGlucHV0LnRpdGxlLCBpbnB1dC5ib2R5KSwKICAgIHZlcnNpb246IDIsCiAgICBmb3JtYXQ6ICJwY20tY2h1bmtzIiwKICAgIHNhbXBsZVJhdGU6IGlucHV0LnNhbXBsZVJhdGUgPz8gR0VNSU5JX1RUU19TQU1QTEVfUkFURSwKICAgIGNodW5rQ291bnQ6IGlucHV0LmNodW5rQ291bnQsCiAgICBjcmVhdGVkQXQ6IERhdGUubm93KCksCiAgfTsKICBhd2FpdCBzdG9yZS5wdXQobWFuaWZlc3QpOwogIHJldHVybiBtYW5pZmVzdDsKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGdldEF1ZGlvTWFuaWZlc3QoCiAgYXJ0aWNsZUlkOiBzdHJpbmcsIGVuZ2luZTogVHRzRW5naW5lLCB2b2ljZUtleTogc3RyaW5nLAogIHN0b3JlOiBBcnRpY2xlQXVkaW9TdG9yZSA9IGFydGljbGVBdWRpb1N0b3JlKCksCik6IFByb21pc2U8Q2h1bmtlZEF1ZGlvTWFuaWZlc3QgfCBudWxsPiB7CiAgY29uc3QgcmVjID0gYXdhaXQgc3RvcmUuZ2V0KGF1ZGlvS2V5KGFydGljbGVJZCwgZW5naW5lLCB2b2ljZUtleSkpOwogIHJldHVybiByZWMgJiYgaXNDaHVua2VkTWFuaWZlc3QocmVjKSA/IHJlYyA6IG51bGw7Cn0KCi8qKiBTYXZlIG9uZSBjaHVuaydzIHJhdyBQQ00gYXMgc29vbiBhcyBpdCBoYXMgYmVlbiBzeW50aGVzaXplZC4gKi8KZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIHNhdmVBdWRpb0NodW5rKAogIGlucHV0OiB7IGFydGljbGVJZDogc3RyaW5nOyBlbmdpbmU6IFR0c0VuZ2luZTsgdm9pY2VLZXk6IHN0cmluZzsgaW5kZXg6IG51bWJlcjsgcGNtOiBCbG9iIH0sCiAgc3RvcmU6IEFydGljbGVBdWRpb1N0b3JlID0gYXJ0aWNsZUF1ZGlvU3RvcmUoKSwKKTogUHJvbWlzZTx2b2lkPiB7CiAgY29uc3QgYmFzZSA9IGF1ZGlvS2V5KGlucHV0LmFydGljbGVJZCwgaW5wdXQuZW5naW5lLCBpbnB1dC52b2ljZUtleSk7CiAgYXdhaXQgc3RvcmUucHV0KHsKICAgIGtleTogY2h1bmtLZXkoYmFzZSwgaW5wdXQuaW5kZXgpLAogICAgYXJ0aWNsZUlkOiBpbnB1dC5hcnRpY2xlSWQsCiAgICBlbmdpbmU6IGlucHV0LmVuZ2luZSwKICAgIHZvaWNlS2V5OiBpbnB1dC52b2ljZUtleSwKICAgIGluZGV4OiBpbnB1dC5pbmRleCwKICAgIG1pbWU6IFBDTV9DSFVOS19NSU1FLAogICAgYmxvYjogaW5wdXQucGNtLAogICAgY3JlYXRlZEF0OiBEYXRlLm5vdygpLAogIH0pOwp9CgovKiogT25lIGNodW5rJ3MgcmF3IFBDTSBibG9iLCBvciBudWxsIHdoZW4gdGhhdCBjaHVuayB3YXMgbmV2ZXIgZ2VuZXJhdGVkLiAqLwpleHBvcnQgYXN5bmMgZnVuY3Rpb24gZ2V0QXVkaW9DaHVuaygKICBhcnRpY2xlSWQ6IHN0cmluZywgZW5naW5lOiBUdHNFbmdpbmUsIHZvaWNlS2V5OiBzdHJpbmcsIGluZGV4OiBudW1iZXIsCiAgc3RvcmU6IEFydGljbGVBdWRpb1N0b3JlID0gYXJ0aWNsZUF1ZGlvU3RvcmUoKSwKKTogUHJvbWlzZTxCbG9iIHwgbnVsbD4gewogIGNvbnN0IHJlYyA9IGF3YWl0IHN0b3JlLmdldChjaHVua0tleShhdWRpb0tleShhcnRpY2xlSWQsIGVuZ2luZSwgdm9pY2VLZXkpLCBpbmRleCkpOwogIHJldHVybiByZWMgJiYgaXNBdWRpb0NodW5rKHJlYykgPyByZWMuYmxvYiA6IG51bGw7Cn0KCmV4cG9ydCBhc3luYyBmdW5jdGlvbiBzYXZlQXJ0aWNsZUF1ZGlvKAogIGlucHV0OiB7IGFydGljbGVJZDogc3RyaW5nOyBlbmdpbmU6IFR0c0VuZ2luZTsgdm9pY2VLZXk6IHN0cmluZzsgdGl0bGU6IHN0cmluZzsgYm9keTogc3RyaW5nOyBibG9iOiBCbG9iIH0sCiAgc3RvcmU6IEFydGljbGVBdWRpb1N0b3JlID0gYXJ0aWNsZUF1ZGlvU3RvcmUoKSwKKTogUHJvbWlzZTxBcnRpY2xlQXVkaW9SZWNvcmQ+IHsKICBjb25zdCByZWM6IEFydGljbGVBdWRpb1JlY29yZCA9IHsKICAgIGtleTogYXVkaW9LZXkoaW5wdXQuYXJ0aWNsZUlkLCBpbnB1dC5lbmdpbmUsIGlucHV0LnZvaWNlS2V5KSwKICAgIGFydGljbGVJZDogaW5wdXQuYXJ0aWNsZUlkLAogICAgZW5naW5lOiBpbnB1dC5lbmdpbmUsCiAgICB2b2ljZUtleTogaW5wdXQudm9pY2VLZXksCiAgICB0ZXh0SGFzaDogYXJ0aWNsZVRleHRIYXNoKGlucHV0LnRpdGxlLCBpbnB1dC5ib2R5KSwKICAgIG1pbWU6IGlucHV0LmJsb2IudHlwZSB8fCAiYXVkaW8vd2F2IiwKICAgIGJsb2I6IGlucHV0LmJsb2IsCiAgICBjcmVhdGVkQXQ6IERhdGUubm93KCksCiAgfTsKICBhd2FpdCBzdG9yZS5wdXQocmVjKTsKICByZXR1cm4gcmVjOwp9CgovKioKICogRGVsZXRlIG9uZSBlbmdpbmUncyBhdWRpbyBmb3IgYW4gYXJ0aWNsZSwgb3IgYWxsIG9mIGl0IHdoZW4gZW5naW5lIGlzCiAqIG9taXR0ZWQuIEZvciBhIHNwZWNpZmljIGVuZ2luZSArIHZvaWNlIHRoaXMgcmVtb3ZlcyB0aGUgbWFuaWZlc3QgKG9yIHRoZQogKiBsZWdhY3kgcmVjb3JkKSBBTkQgZXZlcnkgY2h1bmsgcmVjb3JkIGJlbG9uZ2luZyB0byBpdC4KICovCmV4cG9ydCBhc3luYyBmdW5jdGlvbiBkZWxldGVBcnRpY2xlQXVkaW8oCiAgYXJ0aWNsZUlkOiBzdHJpbmcsIGVuZ2luZT86IFR0c0VuZ2luZSwgdm9pY2VLZXk/OiBzdHJpbmcsCiAgc3RvcmU6IEFydGljbGVBdWRpb1N0b3JlID0gYXJ0aWNsZUF1ZGlvU3RvcmUoKSwKKTogUHJvbWlzZTx2b2lkPiB7CiAgY29uc3QgYWxsID0gYXdhaXQgc3RvcmUubGlzdEZvckFydGljbGUoYXJ0aWNsZUlkKTsKICBjb25zdCBkb29tZWQgPSBhbGwuZmlsdGVyKChyKSA9PiB7CiAgICBpZiAoZW5naW5lICYmIHZvaWNlS2V5KSB7CiAgICAgIGNvbnN0IGJhc2UgPSBhdWRpb0tleShhcnRpY2xlSWQsIGVuZ2luZSwgdm9pY2VLZXkpOwogICAgICByZXR1cm4gci5rZXkgPT09IGJhc2UgfHwgci5rZXkuc3RhcnRzV2l0aChgJHtiYXNlfSNgKTsKICAgIH0KICAgIHJldHVybiAhZW5naW5lIHx8IHIuZW5naW5lID09PSBlbmdpbmU7CiAgfSk7CiAgYXdhaXQgUHJvbWlzZS5hbGwoZG9vbWVkLm1hcCgocikgPT4gc3RvcmUucmVtb3ZlKHIua2V5KSkpOwp9Cg==
+// Generated article audio, kept on this device (IndexedDB) so an article
+// that was turned into speech once plays instantly next time — and can be
+// shared as a file. A cached record counts as fresh only while the article's
+// spoken text still hashes to the value it was generated from; editing the
+// article makes the old audio stale, never silently wrong.
+//
+// Two storage formats share one store:
+// - v1 (legacy, written by the first listen release): one record per article
+//   holding a single combined WAV blob in `blob`.
+// - v2 (current): a manifest record plus one record per synthesized chunk
+//   holding raw PCM, so chunks can be cached as they are generated, played
+//   progressively, and completed later; sharing concatenates them back into
+//   one WAV. New generations always write v2; v1 records stay playable and
+//   shareable until replaced.
+
+import {
+  CURRENT_TTS_VOICE_KEY, GEMINI_TTS_SAMPLE_RATE, modelForVoiceKey, toSpeechText, type TtsEngine,
+} from "./tts";
+
+export type ArticleAudioRecord = {
+  /** Composite key: `${articleId}:${engine}:${voiceKey}`. */
+  key: string;
+  articleId: string;
+  engine: TtsEngine;
+  voiceKey: string;
+  textHash: string;
+  mime: string;
+  blob: Blob;
+  createdAt: number;
+};
+
+/** v2 manifest: describes a chunked generation; the audio lives in chunk records. */
+export type ChunkedAudioManifest = {
+  /** Same composite key as a legacy record: `${articleId}:${engine}:${voiceKey}`. */
+  key: string;
+  articleId: string;
+  engine: TtsEngine;
+  voiceKey: string;
+  /** The TTS model that produced (or is producing) this generation. The
+   * voiceKey embeds it for new keys; manifests written before the model
+   * upgrade have no modelId field at runtime — modelForVoiceKey derives it
+   * from their bare voice key instead. A generation is only ever resumed or
+   * completed by the model recorded here. */
+  modelId: string;
+  textHash: string;
+  version: 2;
+  format: "pcm-chunks";
+  sampleRate: number;
+  chunkCount: number;
+  createdAt: number;
+};
+
+/** One generated chunk of raw PCM, keyed `${audioKey}#${index}`. */
+export type AudioChunkRecord = {
+  key: string;
+  articleId: string;
+  engine: TtsEngine;
+  voiceKey: string;
+  index: number;
+  mime: string;
+  blob: Blob;
+  createdAt: number;
+};
+
+export type StoredAudioRecord = ArticleAudioRecord | ChunkedAudioManifest | AudioChunkRecord;
+
+/** Chunk payloads are raw 16-bit PCM, exactly as Gemini TTS returns them. */
+export const PCM_CHUNK_MIME = "audio/L16";
+
+export const chunkKey = (baseKey: string, index: number): string => `${baseKey}#${index}`;
+
+export const isChunkedManifest = (rec: StoredAudioRecord): rec is ChunkedAudioManifest =>
+  (rec as ChunkedAudioManifest).version === 2 && (rec as ChunkedAudioManifest).format === "pcm-chunks";
+
+export const isAudioChunk = (rec: StoredAudioRecord): rec is AudioChunkRecord =>
+  typeof (rec as AudioChunkRecord).index === "number" && "blob" in rec;
+
+export const isLegacyAudio = (rec: StoredAudioRecord): rec is ArticleAudioRecord =>
+  !isChunkedManifest(rec) && !isAudioChunk(rec);
+
+/** FNV-1a 32-bit hash of the text, as 8 hex chars. */
+export function textHash(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+export const articleTextHash = (title: string, body: string): string => textHash(toSpeechText(title, body));
+
+export const audioKey = (articleId: string, engine: TtsEngine, voiceKey: string): string =>
+  `${articleId}:${engine}:${voiceKey}`;
+
+export const isAudioFresh = (rec: ArticleAudioRecord, title: string, body: string): boolean =>
+  rec.textHash === articleTextHash(title, body);
+
+export const isManifestFresh = (manifest: ChunkedAudioManifest, title: string, body: string): boolean =>
+  manifest.textHash === articleTextHash(title, body);
+
+const EXTENSIONS: Record<string, string> = {
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/mpeg": "mp3",
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/mp4": "m4a",
+};
+
+/** A share/download-safe file name from the article title. */
+export function audioFileName(title: string, mime: string): string {
+  const clean = title
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60)
+    .trim();
+  return `${clean || "مقال"}.${EXTENSIONS[mime] ?? "audio"}`;
+}
+
+export interface ArticleAudioStore {
+  get(key: string): Promise<StoredAudioRecord | null>;
+  put(rec: StoredAudioRecord): Promise<void>;
+  remove(key: string): Promise<void>;
+  listForArticle(articleId: string): Promise<StoredAudioRecord[]>;
+}
+
+/** In-memory store (tests, or browsers without IndexedDB). */
+export function memoryArticleAudioStore(): ArticleAudioStore {
+  const map = new Map<string, StoredAudioRecord>();
+  return {
+    async get(key) { return map.get(key) ?? null; },
+    async put(rec) { map.set(rec.key, rec); },
+    async remove(key) { map.delete(key); },
+    async listForArticle(articleId) { return [...map.values()].filter((r) => r.articleId === articleId); },
+  };
+}
+
+const DB = "thought-loom-audio";
+const STORE = "article-audio";
+const req = <T,>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open(DB, 1);
+    r.onupgradeneeded = () => {
+      const store = r.result.createObjectStore(STORE, { keyPath: "key" });
+      store.createIndex("articleId", "articleId");
+    };
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+export function indexedDbArticleAudioStore(): ArticleAudioStore {
+  let dbp: Promise<IDBDatabase> | null = null;
+  const db = () => (dbp ??= openDb());
+  const tx = async (mode: IDBTransactionMode) => (await db()).transaction(STORE, mode);
+  const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+  return {
+    async get(key) {
+      const t = await tx("readonly");
+      return ((await req(t.objectStore(STORE).get(key))) as StoredAudioRecord | undefined) ?? null;
+    },
+    async put(rec) { const t = await tx("readwrite"); t.objectStore(STORE).put(rec); await done(t); },
+    async remove(key) { const t = await tx("readwrite"); t.objectStore(STORE).delete(key); await done(t); },
+    async listForArticle(articleId) {
+      const t = await tx("readonly");
+      return (await req(t.objectStore(STORE).index("articleId").getAll(articleId))) as StoredAudioRecord[];
+    },
+  };
+}
+
+let shared: ArticleAudioStore | null = null;
+export const articleAudioStore = (): ArticleAudioStore =>
+  (shared ??= typeof indexedDB !== "undefined" ? indexedDbArticleAudioStore() : memoryArticleAudioStore());
+
+/** What is cached for one article + engine, in either storage format. */
+export type CachedAudio =
+  | { kind: "legacy"; record: ArticleAudioRecord; blob: Blob; fresh: boolean }
+  | { kind: "chunks"; manifest: ChunkedAudioManifest; readyIndexes: number[]; fresh: boolean };
+
+/**
+ * Look up the cached audio for an article and engine. Legacy v1 records come
+ * back as one ready blob; v2 records as their manifest plus the chunk indexes
+ * already on the device (a partial generation is resumable from exactly
+ * those indexes). `fresh` compares the stored hash against the article's
+ * current spoken text.
+ */
+async function cachedFromRecord(
+  rec: StoredAudioRecord, articleId: string, title: string, body: string,
+  store: ArticleAudioStore,
+): Promise<CachedAudio | null> {
+  if (isChunkedManifest(rec)) {
+    return {
+      kind: "chunks",
+      manifest: rec,
+      readyIndexes: await listReadyChunks(articleId, rec.engine, rec.voiceKey, store),
+      fresh: isManifestFresh(rec, title, body),
+    };
+  }
+  if (isAudioChunk(rec)) return null; // a chunk key was passed, not a base key
+  return { kind: "legacy", record: rec, blob: rec.blob, fresh: isAudioFresh(rec, title, body) };
+}
+
+export async function getCachedAudio(
+  articleId: string, engine: TtsEngine, voiceKey: string, title: string, body: string,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<CachedAudio | null> {
+  const rec = await store.get(audioKey(articleId, engine, voiceKey));
+  if (!rec) return null;
+  return cachedFromRecord(rec, articleId, title, body, store);
+}
+
+/**
+ * Find whatever audio is cached for an article + engine, across models:
+ * the current model's entry first, then the newest chunked generation,
+ * then the newest legacy record. The returned manifest/record carries its
+ * own voiceKey (and with it, its model) — callers play and share it as-is,
+ * and resume it only with that same model.
+ */
+export async function findCachedAudio(
+  articleId: string, engine: TtsEngine, title: string, body: string,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<CachedAudio | null> {
+  const all = (await store.listForArticle(articleId)).filter((r) => r.engine === engine);
+  const manifests = all.filter(isChunkedManifest)
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const chosenManifest = manifests.find((m) => m.voiceKey === CURRENT_TTS_VOICE_KEY) ?? manifests[0];
+  if (chosenManifest) return cachedFromRecord(chosenManifest, articleId, title, body, store);
+  const legacy = all.filter(isLegacyAudio).sort((a, b) => b.createdAt - a.createdAt)[0];
+  if (legacy) return cachedFromRecord(legacy, articleId, title, body, store);
+  return null;
+}
+
+/** Sorted indexes of the chunks of one generation that are on this device. */
+export async function listReadyChunks(
+  articleId: string, engine: TtsEngine, voiceKey: string,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<number[]> {
+  const all = await store.listForArticle(articleId);
+  return all
+    .filter((r): r is AudioChunkRecord => isAudioChunk(r) && r.engine === engine && r.voiceKey === voiceKey)
+    .map((r) => r.index)
+    .sort((a, b) => a - b);
+}
+
+/** Write (or replace) the v2 manifest for a generation of chunkCount chunks. */
+export async function saveAudioManifest(
+  input: {
+    articleId: string; engine: TtsEngine; voiceKey: string; title: string; body: string;
+    chunkCount: number; sampleRate?: number; modelId?: string;
+  },
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<ChunkedAudioManifest> {
+  const manifest: ChunkedAudioManifest = {
+    key: audioKey(input.articleId, input.engine, input.voiceKey),
+    articleId: input.articleId,
+    engine: input.engine,
+    voiceKey: input.voiceKey,
+    modelId: input.modelId ?? modelForVoiceKey(input.voiceKey),
+    textHash: articleTextHash(input.title, input.body),
+    version: 2,
+    format: "pcm-chunks",
+    sampleRate: input.sampleRate ?? GEMINI_TTS_SAMPLE_RATE,
+    chunkCount: input.chunkCount,
+    createdAt: Date.now(),
+  };
+  await store.put(manifest);
+  return manifest;
+}
+
+export async function getAudioManifest(
+  articleId: string, engine: TtsEngine, voiceKey: string,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<ChunkedAudioManifest | null> {
+  const rec = await store.get(audioKey(articleId, engine, voiceKey));
+  return rec && isChunkedManifest(rec) ? rec : null;
+}
+
+/** Save one chunk's raw PCM as soon as it has been synthesized. */
+export async function saveAudioChunk(
+  input: { articleId: string; engine: TtsEngine; voiceKey: string; index: number; pcm: Blob },
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<void> {
+  const base = audioKey(input.articleId, input.engine, input.voiceKey);
+  await store.put({
+    key: chunkKey(base, input.index),
+    articleId: input.articleId,
+    engine: input.engine,
+    voiceKey: input.voiceKey,
+    index: input.index,
+    mime: PCM_CHUNK_MIME,
+    blob: input.pcm,
+    createdAt: Date.now(),
+  });
+}
+
+/** One chunk's raw PCM blob, or null when that chunk was never generated. */
+export async function getAudioChunk(
+  articleId: string, engine: TtsEngine, voiceKey: string, index: number,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<Blob | null> {
+  const rec = await store.get(chunkKey(audioKey(articleId, engine, voiceKey), index));
+  return rec && isAudioChunk(rec) ? rec.blob : null;
+}
+
+export async function saveArticleAudio(
+  input: { articleId: string; engine: TtsEngine; voiceKey: string; title: string; body: string; blob: Blob },
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<ArticleAudioRecord> {
+  const rec: ArticleAudioRecord = {
+    key: audioKey(input.articleId, input.engine, input.voiceKey),
+    articleId: input.articleId,
+    engine: input.engine,
+    voiceKey: input.voiceKey,
+    textHash: articleTextHash(input.title, input.body),
+    mime: input.blob.type || "audio/wav",
+    blob: input.blob,
+    createdAt: Date.now(),
+  };
+  await store.put(rec);
+  return rec;
+}
+
+/**
+ * Delete one engine's audio for an article, or all of it when engine is
+ * omitted. For a specific engine + voice this removes the manifest (or the
+ * legacy record) AND every chunk record belonging to it.
+ */
+export async function deleteArticleAudio(
+  articleId: string, engine?: TtsEngine, voiceKey?: string,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<void> {
+  const all = await store.listForArticle(articleId);
+  const doomed = all.filter((r) => {
+    if (engine && voiceKey) {
+      const base = audioKey(articleId, engine, voiceKey);
+      return r.key === base || r.key.startsWith(`${base}#`);
+    }
+    return !engine || r.engine === engine;
+  });
+  await Promise.all(doomed.map((r) => store.remove(r.key)));
+}
