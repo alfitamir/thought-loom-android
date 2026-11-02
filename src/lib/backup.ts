@@ -26,6 +26,9 @@ export function parseBackup(raw: string): Idea[] {
     if (typeof i.updatedAt === "number") idea.updatedAt = i.updatedAt;
     if (typeof i.aiPolishedAt === "number") idea.aiPolishedAt = i.aiPolishedAt;
     if (Array.isArray(i.mergedFrom)) idea.mergedFrom = i.mergedFrom.filter((m: unknown): m is string => typeof m === "string");
+    // A hand-pinned topic must survive a restore, or the lock would silently vanish.
+    if (typeof i.topic === "string" && i.topic.trim()) idea.topic = i.topic;
+    if (i.topicManual === true && idea.topic) idea.topicManual = true;
     return [idea];
   });
   if (list.length && !ideas.length) throw new Error("لم نجد أفكارًا صالحة في هذا الملف.");
