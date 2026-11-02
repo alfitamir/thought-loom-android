@@ -26,4 +26,14 @@ describe("Google Drive backup merge", () => {
   it("reads an older backup saved as a plain list of ideas", () => {
     expect(parseDriveFile(JSON.stringify([idea("a")])).ideas.map((i) => i.id)).toEqual(["a"]);
   });
+  it("round-trips a hand-pinned topic through the Drive file", () => {
+    const pinned: Idea = { ...idea("a"), topic: "موضوعي", topicManual: true };
+    const back = parseDriveFile(buildDriveFile({ ideas: [pinned], deleted: [] }));
+    expect(back.ideas[0]).toMatchObject({ topic: "موضوعي", topicManual: true });
+  });
+  it("keeps a hand-pinned topic when the Drive edition of the text is newer", () => {
+    const local: Idea = { ...idea("a", 2), topic: "موضوعي", topicManual: true };
+    const merged = mergeDriveState({ ideas: [idea("a", 5, "drive")], deleted: [] }, [local], [], []);
+    expect(merged.ideas[0]).toMatchObject({ articleBody: "drive", topic: "موضوعي", topicManual: true });
+  });
 });
