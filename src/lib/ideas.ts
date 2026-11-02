@@ -9,6 +9,10 @@ export type Idea = {
   aiPolishedAt?: number;
   /** Ids of the articles this one was merged from; they are never suggested for merging again. */
   mergedFrom?: string[];
+  /** Topic the user pinned by hand; while `topicManual` is set it overrides every derived topic. */
+  topic?: string;
+  /** True when `topic` was set manually — classification must never overwrite a hand-set topic. */
+  topicManual?: boolean;
 };
 
 export const TOPICS: Record<string, string[]> = {
@@ -102,8 +106,16 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
   for (const idea of remote) {
     if (tombstones.has(idea.id)) continue;
     const existing = merged.get(idea.id);
-    if (!existing || (idea.updatedAt ?? 0) > (existing.updatedAt ?? 0)) merged.set(idea.id, idea);
-    else if (existing.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) merged.set(idea.id, { ...existing, aiPolishedAt: idea.aiPolishedAt });
+    if (!existing) { merged.set(idea.id, idea); continue; }
+    let winner = (idea.updatedAt ?? 0) > (existing.updatedAt ?? 0) ? idea : existing;
+    const loser = winner === idea ? existing : idea;
+    const localWon = winner === existing;
+    // A hand-pinned topic is metadata a text edition must not silently erase: it rides
+    // onto the winning edition unless that edition carries a pin of its own.
+    if (!winner.topicManual && loser.topicManual && loser.topic) winner = { ...winner, topic: loser.topic, topicManual: true };
+    // As before: a local winner that was never polished adopts the remote polish stamp.
+    if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
+    merged.set(idea.id, winner);
   }
   return [...merged.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
@@ -160,6 +172,53 @@ export const deleteIdea = (id: string) => {
   writeList(DRIVE_DEL_KEY, [...loadDriveDeleted(), id]);
   writeList(DRIVE_REVIVED_KEY, loadDriveRevived().filter((d) => d !== id));
 };
+
+/** The topic an article is filed under: the user's hand-set topic while pinned, otherwise the keyword classification of its body. */
+export function articleTopic(idea: Idea): string {
+  if (idea.topicManual && idea.topic?.trim()) return idea.topic;
+  return classify(getArticle(idea).body);
+}
+
+/**
+ * Pin an article to a topic by hand. This is metadata, not a text edit, so `updatedAt`
+ * is left alone (the AI label versioned by it stays valid and keeps its tags).
+ * Choosing the topic the article already sits under is a no-op — it does not set the pin.
+ */
+export function setArticleTopic(id: string, topic: string): Idea | undefined {
+  const next = topic.trim();
+  if (!next) return;
+  const all = loadIdeas();
+  const current = all.find((idea) => idea.id === id);
+  if (!current) return;
+  if (articleTopic(current) === next) return current;
+  const updated: Idea = { ...current, topic: next, topicManual: true };
+  replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
+  return updated;
+}
+
+/** Hand the article back to automatic classification: the pin is removed, the topic is derived again. */
+export function clearArticleTopic(id: string): Idea | undefined {
+  const all = loadIdeas();
+  const current = all.find((idea) => idea.id === id);
+  if (!current || !current.topicManual) return current;
+  const updated: Idea = { ...current };
+  delete updated.topic;
+  delete updated.topicManual;
+  replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
+  return updated;
+}
+
+/** Every topic currently in use, with its article count, busiest first — the manual picker's list. */
+export function topicOptions(ideas: Idea[]): { topic: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const idea of ideas) {
+    const t = articleTopic(idea);
+    counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([topic, count]) => ({ topic, count }))
+    .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic, "ar"));
+}
 
 export const needsPolish = (idea: Idea) => idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0);
 
