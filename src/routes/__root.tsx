@@ -80,14 +80,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "أفكاري" },
-      { name: "theme-color", content: "#6b3f1f" },
+      { name: "theme-color", content: "#1F243D" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/manifest.json" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Reem+Kufi:wght@500;700&family=Tajawal:wght@400;500;700&display=swap" },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/icons/icon.svg", type: "image/svg+xml" },
     ],
     scripts: [
       { children: "if('serviceWorker' in navigator && location.hostname!=='localhost' && !location.hostname.includes('id-preview')){navigator.serviceWorker.register('/sw.js').catch(()=>{})}" },
