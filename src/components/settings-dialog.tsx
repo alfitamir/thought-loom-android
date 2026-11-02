@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CloudUpload, Download, KeyRound, Trash2, Upload } from "lucide-react";
+import { CloudUpload, Database, Download, KeyRound, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getGeminiKey, setGeminiKey, testGeminiKey } from "@/lib/gemini";
@@ -81,31 +81,42 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
       <DialogTitle className="text-start font-display">الإعدادات</DialogTitle>
       <section className="space-y-3">
-        <h3 className="font-display text-lg">مفتاح Gemini الخاص بك</h3>
+        <div className="flex items-center gap-2">
+          <KeyRound className="size-5 text-primary" />
+          <h3 className="font-display text-lg">مفتاح Gemini الخاص بك</h3>
+          <span className={`ms-auto text-xs ${saved ? "text-primary" : "text-muted-foreground"}`}>{saved ? "مُضاف" : "غير مُضاف"}</span>
+        </div>
         <p className="text-sm text-muted-foreground">مع المفتاح يعمل الضبط والدمج عبر حسابك في Gemini دون استهلاك رصيد التطبيق. يُحفظ على هذا الهاتف فقط.</p>
         {saved && <p className="text-sm text-primary">✓ يوجد مفتاح محفوظ على هذا الهاتف</p>}
         <input type="password" aria-label="مفتاح Gemini" placeholder={saved ? "ضع مفتاحًا جديدًا لاستبداله" : "الصق المفتاح هنا"} value={draft} onChange={(e) => setDraft(e.target.value)}
           dir="ltr" autoComplete="off" className="w-full rounded-md border border-input bg-card px-3 py-2 outline-none focus:ring-2 focus:ring-ring" />
         <div className="flex flex-wrap gap-2">
-          <Button onClick={saveKey} disabled={!draft.trim() || testing}><KeyRound />حفظ المفتاح</Button>
-          {saved && <Button variant="ghost" className="text-destructive" onClick={removeKey}><Trash2 />حذف المفتاح</Button>}
+          <Button className="[&_svg]:size-5" onClick={saveKey} disabled={!draft.trim() || testing}><KeyRound />حفظ المفتاح</Button>
+          {saved && <Button variant="ghost" className="text-destructive [&_svg]:size-5" onClick={removeKey}><Trash2 />حذف المفتاح</Button>}
         </div>
         <p className="text-xs text-muted-foreground">تحصل على المفتاح من aistudio.google.com/apikey</p>
         {keyMsg && <p role="status" className="break-words text-sm text-muted-foreground">{keyMsg}</p>}
       </section>
       <section className="space-y-3 border-t border-border pt-4">
-        <h3 className="font-display text-lg">Google Drive</h3>
+        <div className="flex items-center gap-2">
+          <CloudUpload className="size-5 text-primary" />
+          <h3 className="font-display text-lg">Google Drive</h3>
+          <span className={`ms-auto text-xs ${driveAt ? "text-primary" : "text-muted-foreground"}`}>{driveAt ? "متصل" : "غير متصل"}</span>
+        </div>
         <p className="text-sm text-muted-foreground">تُحفظ أفكارك ومقالاتك تلقائيًا في ملف «afkari-sync.json» على Google Drive كلما اتصلت بالإنترنت وأنت مسجّل الدخول، وتُستعاد منه على أي هاتف.</p>
         <p className="text-sm text-muted-foreground">{driveAt ? `آخر مزامنة: ${new Date(driveAt).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}` : "لم تتم المزامنة بعد على هذا الهاتف."}</p>
-        <Button variant="outline" onClick={syncDriveNow} disabled={driveBusy}><CloudUpload />مزامنة الآن</Button>
+        <Button variant="outline" className="[&_svg]:size-5" onClick={syncDriveNow} disabled={driveBusy}><CloudUpload />مزامنة الآن</Button>
         {driveMsg && <p role="status" className="break-words text-sm text-muted-foreground">{driveMsg}</p>}
       </section>
       <section className="space-y-3 border-t border-border pt-4">
-        <h3 className="font-display text-lg">النسخة الاحتياطية</h3>
+        <div className="flex items-center gap-2">
+          <Database className="size-5 text-primary" />
+          <h3 className="font-display text-lg">النسخة الاحتياطية</h3>
+        </div>
         <p className="text-sm text-muted-foreground">ملف واحد فيه كل أفكارك ومقالاتك. احفظه في Google Drive واستعده على أي هاتف.</p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={exportBackup}><Download />تصدير نسخة</Button>
-          <Button variant="outline" onClick={() => fileRef.current?.click()}><Upload />استعادة نسخة</Button>
+          <Button variant="outline" className="[&_svg]:size-5" onClick={exportBackup}><Download />تصدير نسخة</Button>
+          <Button variant="outline" className="[&_svg]:size-5" onClick={() => fileRef.current?.click()}><Upload />استعادة نسخة</Button>
           <input ref={fileRef} type="file" accept=".json,application/json,text/plain" hidden aria-label="ملف النسخة الاحتياطية" onChange={(e) => importBackup(e.target.files?.[0])} />
         </div>
         {backupMsg && <p role="status" className="break-words text-sm text-muted-foreground">{backupMsg}</p>}
