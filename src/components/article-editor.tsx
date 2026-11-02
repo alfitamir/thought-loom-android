@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, Copy, Download, Facebook, HelpCircle, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, WandSparkles, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, HelpCircle, ListPlus, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EvidenceDialog } from "@/components/evidence-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
@@ -25,8 +26,11 @@ const readingTimeLabel = (text: string) => {
   return `قراءة ${mins} دقيقة`;
 };
 
-export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQuery, matchStartIndex, currentMatchIndex }: {
+export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQuery, matchStartIndex, currentMatchIndex, hasAudio }: {
   idea: Idea; topic?: string; online: boolean; onChange: () => void; onDelete: () => void;
+  /** True when this device holds generated audio for the article (the library
+   *  computes the set once per load); shows the «صوت» badge by the topic chip. */
+  hasAudio?: boolean;
   /** Active library search: highlight occurrences in view mode. matchStartIndex is this
    *  article's first global match index (title matches come before body matches). */
   searchQuery?: string | undefined; matchStartIndex?: number | undefined; currentMatchIndex?: number | null | undefined;
@@ -169,9 +173,10 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       <h2 className="break-words font-display text-xl text-primary">{hlQuery
         ? <HighlightedText text={article.title} query={hlQuery} startIndex={matchStartIndex} currentIndex={currentMatchIndex} />
         : article.title}</h2>
-      {topic && (
+      {(topic || hasAudio) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground">{topic}</span>
+          {topic && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground">{topic}</span>}
+          {hasAudio && <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground"><Volume2 className="size-3.5" />صوت</span>}
         </div>
       )}
       <p className="mb-1 mt-1 text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString("ar")} · {readingTimeLabel(article.body)}</p>
@@ -190,19 +195,23 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         : article.body}</p>
       <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
       <div className="mt-4">
-        <p className="mb-2 text-xs font-medium text-muted-foreground">أدوات ذكية</p>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onClick={improve} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><Sparkles className="size-4" />تحسين</button>
-          <button type="button" aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onClick={() => setEvidenceOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><BookOpen className="size-4 text-emerald-600" />شواهد</button>
-          <button type="button" aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onClick={openEnrichment} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><WandSparkles className="size-4 text-amber-500" />إثراء</button>
-          <button type="button" aria-label="منشور فيسبوك" title={online ? "اقتراح منشور فيسبوك من هذا المقال" : "المنشور يحتاج الإنترنت"} disabled={!online || fbBusy} onClick={openFacebook} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><Facebook className="size-4 text-[#1877F2]" />منشور فيسبوك</button>
-        </div>
+        <DropdownMenu dir="rtl">
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-label="أدوات ذكية" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Sparkles className="size-5" />أدوات ذكية<ChevronDown className="size-4" /></button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-52">
+            <DropdownMenuItem aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onSelect={improve} className="[&>svg]:size-5"><Sparkles />تحسين</DropdownMenuItem>
+            <DropdownMenuItem aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onSelect={() => setEvidenceOpen(true)} className="[&>svg]:size-5"><BookOpen className="text-emerald-600" />شواهد</DropdownMenuItem>
+            <DropdownMenuItem aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onSelect={openEnrichment} className="[&>svg]:size-5"><ListPlus className="text-amber-500" />إثراء</DropdownMenuItem>
+            <DropdownMenuItem aria-label="منشور فيسبوك" title={online ? "اقتراح منشور فيسبوك من هذا المقال" : "المنشور يحتاج الإنترنت"} disabled={!online || fbBusy} onSelect={openFacebook} className="[&>svg]:size-5"><Facebook className="text-[#1877F2]" />منشور فيسبوك</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="icon" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
-        <Button variant="ghost" size="icon" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
-        <Button variant="ghost" size="icon" aria-label="استمع للمقال" title="استمع للمقال" onClick={() => setListenOpen(true)}><Volume2 /></Button>
-        <Button variant="ghost" size="icon" className="text-destructive" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
+        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
+        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="استمع للمقال" title="استمع للمقال" onClick={() => setListenOpen(true)}><Volume2 /></Button>
+        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
+        <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
     </>}
     {message && <p role="status" className="mt-3 break-words text-sm text-muted-foreground">{message}</p>}
@@ -218,7 +227,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     <Dialog open={enrichOpen} onOpenChange={setEnrichOpen}>
       <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
         <DialogTitle className="text-start font-display flex items-center gap-2">
-          <WandSparkles className="size-5 text-amber-500" />
+          <ListPlus className="size-5 text-amber-500" />
           <span>تطوير وإثراء المقال بذكاء</span>
         </DialogTitle>
         <p className="text-xs text-muted-foreground">
