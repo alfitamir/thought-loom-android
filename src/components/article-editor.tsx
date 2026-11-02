@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, Copy, Facebook, HelpCircle, Pencil, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, WandSparkles, X } from "lucide-react";
+import { BookOpen, Check, Copy, Download, Facebook, HelpCircle, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, WandSparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceDialog } from "@/components/evidence-dialog";
@@ -10,6 +10,9 @@ import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
+import { getGeminiKey } from "@/lib/gemini";
+import { GEMINI_TTS_VOICE, speakWithDevice, synthesizeGemini, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
+import { audioFileName, deleteArticleAudio, getCachedAudio, isAudioFresh, saveArticleAudio, type ArticleAudioRecord } from "@/lib/article-audio";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -53,6 +56,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   const [fbVariation, setFbVariation] = useState(0);
   const [fbError, setFbError] = useState("");
   const [fbStatus, setFbStatus] = useState("");
+  const [listenOpen, setListenOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const version = useRef(idea.updatedAt ?? 0);
   useEffect(() => () => abort.current?.abort(), []);
@@ -197,10 +201,12 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="icon" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
         <Button variant="ghost" size="icon" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
+        <Button variant="ghost" size="icon" aria-label="استمع للمقال" title="استمع للمقال" onClick={() => setListenOpen(true)}><Volume2 /></Button>
         <Button variant="ghost" size="icon" className="text-destructive" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
     </>}
     {message && <p role="status" className="mt-3 break-words text-sm text-muted-foreground">{message}</p>}
+    <ListenDialog open={listenOpen} onOpenChange={setListenOpen} articleId={idea.id} title={article.title} body={article.body} />
     <EvidenceDialog open={evidenceOpen} onOpenChange={setEvidenceOpen} title={article.title} body={article.body} online={online}
       onInsert={(snippet) => {
         const latest = loadIdeas().find((i) => i.id === idea.id);
@@ -388,4 +394,257 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       </DialogContent>
     </Dialog>
   </article>;
+}
+
+const SPEECH_RATES = [0.75, 1, 1.25, 1.5];
+
+/**
+ * Listen to an article. Two engines: the device voice (heard live, no file —
+ * so nothing to share) and Gemini TTS with the author's personal key, which
+ * produces a real WAV file that is cached on this phone and shared like the
+ * article text itself.
+ */
+function ListenDialog({ open, onOpenChange, articleId, title, body }: {
+  open: boolean; onOpenChange: (open: boolean) => void; articleId: string; title: string; body: string;
+}) {
+  const [engine, setEngine] = useState<TtsEngine>("device");
+  const [hasKey, setHasKey] = useState(false);
+  const [rate, setRate] = useState(1);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  // Device playback
+  const [speaking, setSpeaking] = useState(false);
+  const [chunkLabel, setChunkLabel] = useState("");
+  const speechRef = useRef<DeviceSpeech | null>(null);
+  // Gemini file mode
+  const [cacheState, setCacheState] = useState<"checking" | "none" | "ready">("checking");
+  const [cached, setCached] = useState<ArticleAudioRecord | null>(null);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState<[number, number]>([0, 0]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const genAbort = useRef<AbortController | null>(null);
+  const urlRef = useRef("");
+
+  const text = toSpeechText(title, body);
+  const stale = cached ? !isAudioFresh(cached, title, body) : false;
+
+  const replaceUrl = (url: string) => {
+    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+    urlRef.current = url;
+    setAudioUrl(url);
+  };
+
+  const loadCache = async () => {
+    setCacheState("checking");
+    const rec = await getCachedAudio(articleId, "gemini", GEMINI_TTS_VOICE).catch(() => null);
+    setCached(rec);
+    if (rec) { replaceUrl(URL.createObjectURL(rec.blob)); setCacheState("ready"); }
+    else { replaceUrl(""); setCacheState("none"); }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const key = getGeminiKey();
+    setHasKey(!!key);
+    setEngine(key ? "gemini" : "device");
+    setError(""); setStatus("");
+    void loadCache();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open ]);
+
+  const stopDevice = () => {
+    speechRef.current?.stop();
+    speechRef.current = null;
+    setSpeaking(false);
+    setChunkLabel("");
+  };
+
+  useEffect(() => () => { speechRef.current?.stop(); genAbort.current?.abort(); }, []);
+
+  const close = (next: boolean) => {
+    if (!next) {
+      stopDevice();
+      genAbort.current?.abort();
+      replaceUrl("");
+    }
+    onOpenChange(next);
+  };
+
+  const startDevice = (r = rate) => {
+    setError("");
+    try {
+      speechRef.current?.stop();
+      const speech = speakWithDevice(text, {
+        rate: r,
+        onChunk: (i, total) => setChunkLabel(`جزء ${i + 1} من ${total}`),
+      });
+      speechRef.current = speech;
+      setSpeaking(true);
+      void speech.done.finally(() => {
+        if (speechRef.current === speech) { speechRef.current = null; setSpeaking(false); setChunkLabel(""); }
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "صوت الجهاز غير متاح على هذا الجهاز.");
+    }
+  };
+
+  const generate = async () => {
+    setError(""); setStatus("");
+    if (!navigator.onLine) { setError("توليد الصوت يحتاج اتصالًا بالإنترنت."); return; }
+    const key = getGeminiKey();
+    if (!key) { setError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت."); return; }
+    const controller = new AbortController();
+    genAbort.current = controller;
+    setGenerating(true); setGenProgress([0, 0]);
+    try {
+      const blob = await synthesizeGemini(text, key, {
+        signal: controller.signal,
+        onProgress: (d, t) => setGenProgress([d, t]),
+      });
+      const rec = await saveArticleAudio({ articleId, engine: "gemini", voiceKey: GEMINI_TTS_VOICE, title, body, blob });
+      setCached(rec);
+      replaceUrl(URL.createObjectURL(blob));
+      setCacheState("ready");
+      setStatus("حُفظ الصوت على هذا الهاتف ✓");
+    } catch (e) {
+      if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "تعذّر توليد الصوت الآن.");
+    } finally { setGenerating(false); genAbort.current = null; }
+  };
+
+  const canShareFiles = () => {
+    try { return !!navigator.canShare?.({ files: [new File([], "a.wav", { type: "audio/wav" })] }); }
+    catch { return false; }
+  };
+
+  const shareAudio = async () => {
+    if (!cached) return;
+    setStatus("");
+    const file = new File([cached.blob], audioFileName(title, cached.mime), { type: cached.mime });
+    if (canShareFiles()) {
+      try { await navigator.share({ files: [file], title }); return; }
+      catch (e) { if (e instanceof Error && e.name === "AbortError") return; }
+    }
+    const url = URL.createObjectURL(cached.blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = file.name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus("نُزّل ملف الصوت ✓");
+  };
+
+  const removeSaved = async () => {
+    await deleteArticleAudio(articleId, "gemini", GEMINI_TTS_VOICE).catch(() => {});
+    setCached(null);
+    replaceUrl("");
+    setCacheState("none");
+    setStatus("حُذف الصوت المحفوظ.");
+  };
+
+  const pickEngine = (next: TtsEngine) => {
+    if (next !== engine && speaking) stopDevice();
+    setEngine(next);
+    setError("");
+  };
+
+  const rateSelect = (onRate: (r: number) => void) => (
+    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+      السرعة
+      <select aria-label="سرعة القراءة" value={rate} onChange={(e) => onRate(Number(e.target.value))}
+        className="rounded-md border border-input bg-card px-2 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring">
+        {SPEECH_RATES.map((r) => <option key={r} value={r}>{r}×</option>)}
+      </select>
+    </label>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
+        <DialogTitle className="text-start font-display flex items-center gap-2">
+          <Volume2 className="size-5 text-primary" />
+          <span>استمع للمقال</span>
+        </DialogTitle>
+        <p className="truncate text-xs text-muted-foreground" title={title}>{title}</p>
+
+        <div className="flex rounded-lg border border-border p-1 bg-muted/30">
+          <button type="button" onClick={() => pickEngine("device")}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${engine === "device" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+            صوت الجهاز
+          </button>
+          <button type="button" onClick={() => pickEngine("gemini")}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${engine === "gemini" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+            صوت Gemini
+          </button>
+        </div>
+
+        {engine === "device" && (
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              يقرأ هاتفك المقال بصوته مباشرة. صوت الجهاز يُسمَع في الحال ولا يُحفَظ كملف، لذلك لا يمكن مشاركته — للمشاركة استخدم صوت Gemini.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => startDevice()} disabled={speaking}><Play />تشغيل</Button>
+              <Button variant="outline" onClick={stopDevice} disabled={!speaking}><Square />إيقاف</Button>
+              {rateSelect((r) => { setRate(r); if (speaking) startDevice(r); })}
+            </div>
+            {speaking && chunkLabel && <p role="status" className="text-sm text-muted-foreground">جارٍ القراءة… {chunkLabel}</p>}
+          </div>
+        )}
+
+        {engine === "gemini" && (
+          <div className="space-y-3">
+            {!hasKey ? (
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد صوت لهذا المقال — نفس مفتاح الضبط والدمج. الصوت المولّد ملف حقيقي: يُحفَظ على هاتفك ويُشارَك مثل المقال تمامًا.
+              </p>
+            ) : generating ? (
+              <div className="py-6 text-center space-y-3">
+                <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <p className="text-sm text-muted-foreground">
+                  {genProgress[1] > 0 ? `جارٍ توليد الصوت… جزء ${genProgress[0]} من ${genProgress[1]}` : "جارٍ توليد الصوت…"}
+                </p>
+                <Button variant="outline" onClick={() => genAbort.current?.abort()}><Square />إيقاف التوليد</Button>
+              </div>
+            ) : cacheState === "checking" ? (
+              <div className="py-6 text-center space-y-3">
+                <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <p className="text-sm text-muted-foreground">جارٍ التحقق من الصوت المحفوظ…</p>
+              </div>
+            ) : cacheState === "ready" && cached ? (
+              <div className="space-y-3">
+                {stale && (
+                  <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                    النص تغيّر منذ توليد هذا الصوت — ما تسمعه الآن هو النسخة السابقة. أعد التوليد لسماع النص الحالي.
+                  </p>
+                )}
+                <audio ref={audioRef} src={audioUrl} controls className="w-full"
+                  onLoadedMetadata={() => { if (audioRef.current) audioRef.current.playbackRate = rate; }} />
+                <div className="flex flex-wrap items-center gap-2">
+                  {rateSelect((r) => { setRate(r); if (audioRef.current) audioRef.current.playbackRate = r; })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={shareAudio}>{canShareFiles() ? <><Share2 />مشاركة الصوت</> : <><Download />تنزيل الصوت</>}</Button>
+                  <Button variant="outline" onClick={generate}><RefreshCw />إعادة التوليد</Button>
+                  <Button variant="ghost" className="text-destructive" onClick={removeSaved}><Trash2 />حذف الصوت المحفوظ</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  لا يوجد صوت محفوظ لهذا المقال على هذا الهاتف بعد. ولّد الصوت مرة واحدة وسيُحفَظ هنا للاستماع والمشاركة في أي وقت.
+                </p>
+                <Button onClick={generate}><Volume2 />توليد الصوت</Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {status && <p role="status" className="text-sm text-muted-foreground">{status}</p>}
+
+        <div className="flex justify-end pt-2">
+          <Button variant="ghost" onClick={() => close(false)}>إغلاق</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
