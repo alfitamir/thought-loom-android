@@ -1,1 +1,232 @@
-aW1wb3J0IHsgZGVzY3JpYmUsIGV4cGVjdCwgaXQgfSBmcm9tICJ2aXRlc3QiOwppbXBvcnQgewogIGFydGljbGVUZXh0SGFzaCwgYXVkaW9GaWxlTmFtZSwgYXVkaW9LZXksIGRlbGV0ZUFydGljbGVBdWRpbywgZmluZENhY2hlZEF1ZGlvLCBnZXRBdWRpb0NodW5rLAogIGdldENhY2hlZEF1ZGlvLCBpc0F1ZGlvRnJlc2gsIGxpc3RSZWFkeUNodW5rcywgbWVtb3J5QXJ0aWNsZUF1ZGlvU3RvcmUsIHNhdmVBcnRpY2xlQXVkaW8sCiAgc2F2ZUF1ZGlvQ2h1bmssIHNhdmVBdWRpb01hbmlmZXN0LCB0ZXh0SGFzaCwKICB0eXBlIEF1ZGlvQ2h1bmtSZWNvcmQsIHR5cGUgQ2h1bmtlZEF1ZGlvTWFuaWZlc3QsCn0gZnJvbSAiLi9hcnRpY2xlLWF1ZGlvIjsKaW1wb3J0IHsgYmxvYlRvQnl0ZXMsIGNvbmNhdFBjbSwgcGNtVG9XYXYsIHRvU3BlZWNoVGV4dCB9IGZyb20gIi4vdHRzIjsKCmRlc2NyaWJlKCJ0ZXh0SGFzaCIsICgpID0+IHsKICBpdCgiaXMgc3RhYmxlLCA4IGhleCBjaGFycywgYW5kIGNoYW5nZXMgd2l0aCB0aGUgdGV4dCIsICgpID0+IHsKICAgIGV4cGVjdCh0ZXh0SGFzaCgi2YXYsdit2KjZi9inIikpLnRvTWF0Y2goL15bMC05YS1mXXs4fSQvKTsKICAgIGV4cGVjdCh0ZXh0SGFzaCgi2YXYsdit2KjZi9inIikpLnRvQmUodGV4dEhhc2goItmF2LHYrdio2YvYpyIpKTsKICAgIGV4cGVjdCh0ZXh0SGFzaCgi2YXYsdit2KjZi9inIikpLm5vdC50b0JlKHRleHRIYXNoKCLZhdix2K3YqNmL2KchIikpOwogICAgZXhwZWN0KHRleHRIYXNoKCIiKSkubm90LnRvQmUodGV4dEhhc2goItinIikpOwogIH0pOwoKICBpdCgiaGFzaGVzIGV4YWN0bHkgdGhlIHNwb2tlbiB0ZXh0IG9mIHRoZSBhcnRpY2xlIiwgKCkgPT4gewogICAgZXhwZWN0KGFydGljbGVUZXh0SGFzaCgi2LnZhtmI2KfZhiIsICLZhti1INin2YTZhdmC2KfZhCIpKS50b0JlKHRleHRIYXNoKHRvU3BlZWNoVGV4dCgi2LnZhtmI2KfZhiIsICLZhti1INin2YTZhdmC2KfZhCIpKSk7CiAgfSk7Cn0pOwoKZGVzY3JpYmUoImF1ZGlvS2V5ICsgYXVkaW9GaWxlTmFtZSIsICgpID0+IHsKICBpdCgiYnVpbGRzIGNvbXBvc2l0ZSBjYWNoZSBrZXlzIiwgKCkgPT4gewogICAgZXhwZWN0KGF1ZGlvS2V5KCJpZDEiLCAiZ2VtaW5pIiwgIkNoYXJvbiIpKS50b0JlKCJpZDE6Z2VtaW5pOkNoYXJvbiIpOwogIH0pOwoKICBpdCgia2VlcHMgQXJhYmljIHRpdGxlcyBhbmQgbWFwcyBtaW1lIHRvIGV4dGVuc2lvbiIsICgpID0+IHsKICAgIGV4cGVjdChhdWRpb0ZpbGVOYW1lKCLYsdit2YTYqtmKINil2YTZiSDZhdmD2KkiLCAiYXVkaW8vd2F2IikpLnRvQmUoItix2K3ZhNiq2Yog2KXZhNmJINmF2YPYqS53YXYiKTsKICAgIGV4cGVjdChhdWRpb0ZpbGVOYW1lKCLZhdmC2KfZhCIsICJhdWRpby9tcGVnIikpLnRvQmUoItmF2YLYp9mELm1wMyIpOwogICAgZXhwZWN0KGF1ZGlvRmlsZU5hbWUoItmF2YLYp9mEIiwgImF1ZGlvL3gtdW5rbm93biIpKS50b0JlKCLZhdmC2KfZhC5hdWRpbyIpOwogIH0pOwoKICBpdCgic2FuaXRpemVzIHBhdGgtaG9zdGlsZSBjaGFyYWN0ZXJzIGFuZCBmYWxscyBiYWNrIGZvciBlbXB0eSB0aXRsZXMiLCAoKSA9PiB7CiAgICBleHBlY3QoYXVkaW9GaWxlTmFtZSgnYS9iOmM/ImQiPGU+fGYnLCAiYXVkaW8vd2F2IikpLnRvQmUoImEgYiBjIGQgZSBmLndhdiIpOwogICAgZXhwZWN0KGF1ZGlvRmlsZU5hbWUoIiAgICIsICJhdWRpby93YXYiKSkudG9CZSgi2YXZgtin2YQud2F2Iik7CiAgICBleHBlY3QoYXVkaW9GaWxlTmFtZSgiIiwgImF1ZGlvL3dhdiIpKS50b0JlKCLZhdmC2KfZhC53YXYiKTsKICAgIGNvbnN0IGxvbmcgPSBhdWRpb0ZpbGVOYW1lKCLYtyIucmVwZWF0KDEwMCksICJhdWRpby93YXYiKTsKICAgIGV4cGVjdChsb25nLmVuZHNXaXRoKCIud2F2IikpLnRvQmUodHJ1ZSk7CiAgICBleHBlY3QobG9uZy5sZW5ndGgpLnRvQmVMZXNzVGhhbk9yRXF1YWwoNjQpOwogIH0pOwp9KTsKCmRlc2NyaWJlKCJjYWNoZWQgYXJ0aWNsZSBhdWRpbyAobWVtb3J5IHN0b3JlKSIsICgpID0+IHsKICBjb25zdCBibG9iID0gKCkgPT4gbmV3IEJsb2IoW25ldyBVaW50OEFycmF5KFsxLCAyLCAzXSldLCB7IHR5cGU6ICJhdWRpby93YXYiIH0pOwoKICAvLyBBZGFwdGVkIGZvciB0aGUgZGlzY3JpbWluYXRlZCBnZXRDYWNoZWRBdWRpbzogYSB2MSByZWNvcmQgc2F2ZWQgdGhyb3VnaAogIC8vIHNhdmVBcnRpY2xlQXVkaW8gbm93IGNvbWVzIGJhY2sgYXMgeyBraW5kOiAibGVnYWN5IiwgcmVjb3JkLCBmcmVzaCB9LgogIGl0KCJzYXZlcywgZmluZHMgZnJlc2gsIGFuZCByZXBvcnRzIHN0YWxlbmVzcyBhZnRlciB0aGUgdGV4dCBjaGFuZ2VzIiwgYXN5bmMgKCkgPT4gewogICAgY29uc3Qgc3RvcmUgPSBtZW1vcnlBcnRpY2xlQXVkaW9TdG9yZSgpOwogICAgY29uc3QgcmVjID0gYXdhaXQgc2F2ZUFydGljbGVBdWRpbygKICAgICAgeyBhcnRpY2xlSWQ6ICJhMSIsIGVuZ2luZTogImdlbWluaSIsIHZvaWNlS2V5OiAiQ2hhcm9uIiwgdGl0bGU6ICLYudmG2YjYp9mGIiwgYm9keTogItmG2LUg2KfZhNmF2YLYp9mEIiwgYmxvYjogYmxvYigpIH0sIHN0b3JlKTsKICAgIGV4cGVjdChyZWMua2V5KS50b0JlKCJhMTpnZW1pbmk6Q2hhcm9uIik7CiAgICBleHBlY3QocmVjLm1pbWUpLnRvQmUoImF1ZGlvL3dhdiIpOwogICAgY29uc3QgY2FjaGVkID0gYXdhaXQgZ2V0Q2FjaGVkQXVkaW8oImExIiwgImdlbWluaSIsICJDaGFyb24iLCAi2LnZhtmI2KfZhiIsICLZhti1INin2YTZhdmC2KfZhCIsIHN0b3JlKTsKICAgIGV4cGVjdChjYWNoZWQ/LmtpbmQpLnRvQmUoImxlZ2FjeSIpOwogICAgZXhwZWN0KGNhY2hlZD8uZnJlc2gpLnRvQmUodHJ1ZSk7CiAgICBpZiAoY2FjaGVkPy5raW5kID09PSAibGVnYWN5IikgewogICAgICBleHBlY3QoY2FjaGVkLnJlY29yZC50ZXh0SGFzaCkudG9CZShyZWMudGV4dEhhc2gpOwogICAgICBleHBlY3QoY2FjaGVkLmJsb2IpLnRvQmUocmVjLmJsb2IpOwogICAgfQogICAgZXhwZWN0KGlzQXVkaW9GcmVzaChyZWMsICLYudmG2YjYp9mGIiwgItmG2LUg2KfZhNmF2YLYp9mEIikpLnRvQmUodHJ1ZSk7CiAgICBleHBlY3QoaXNBdWRpb0ZyZXNoKHJlYywgIti52YbZiNin2YYiLCAi2YbYtSDYp9mE2YXZgtin2YQg2KjYudivINin2YTYqti52K/ZitmEIikpLnRvQmUoZmFsc2UpOwogICAgY29uc3Qgc3RhbGUgPSBhd2FpdCBnZXRDYWNoZWRBdWRpbygiYTEiLCAiZ2VtaW5pIiwgIkNoYXJvbiIsICLYudmG2YjYp9mGIiwgItmG2LUg2KfZhNmF2YLYp9mEINio2LnYryDYp9mE2KrYudiv2YrZhCIsIHN0b3JlKTsKICAgIGV4cGVjdChzdGFsZT8ua2luZCkudG9CZSgibGVnYWN5Iik7CiAgICBleHBlY3Qoc3RhbGU/LmZyZXNoKS50b0JlKGZhbHNlKTsKICAgIGV4cGVjdChhd2FpdCBnZXRDYWNoZWRBdWRpbygiYTEiLCAiZGV2aWNlIiwgIkNoYXJvbiIsICLYudmG2YjYp9mGIiwgItmG2LUg2KfZhNmF2YLYp9mEIiwgc3RvcmUpKS50b0JlTnVsbCgpOwogIH0pOwoKICBpdCgiZGVsZXRlcyBvbmUgZW5naW5lJ3MgYXVkaW8sIG9yIGFsbCBvZiBhbiBhcnRpY2xlJ3MgYXVkaW8iLCBhc3luYyAoKSA9PiB7CiAgICBjb25zdCBzdG9yZSA9IG1lbW9yeUFydGljbGVBdWRpb1N0b3JlKCk7CiAgICBhd2FpdCBzYXZlQXJ0aWNsZUF1ZGlvKHsgYXJ0aWNsZUlkOiAiYTIiLCBlbmdpbmU6ICJnZW1pbmkiLCB2b2ljZUtleTogIkNoYXJvbiIsIHRpdGxlOiAi2KoiLCBib2R5OiAi2KgiLCBibG9iOiBibG9iKCkgfSwgc3RvcmUpOwogICAgYXdhaXQgc2F2ZUFydGljbGVBdWRpbyh7IGFydGljbGVJZDogImEyIiwgZW5naW5lOiAiZGV2aWNlIiwgdm9pY2VLZXk6ICJsb2NhbCIsIHRpdGxlOiAi2KoiLCBib2R5OiAi2KgiLCBibG9iOiBibG9iKCkgfSwgc3RvcmUpOwogICAgYXdhaXQgc2F2ZUFydGljbGVBdWRpbyh7IGFydGljbGVJZDogImEzIiwgZW5naW5lOiAiZ2VtaW5pIiwgdm9pY2VLZXk6ICJDaGFyb24iLCB0aXRsZTogItiqIiwgYm9keTogItioIiwgYmxvYjogYmxvYigpIH0sIHN0b3JlKTsKICAgIGF3YWl0IGRlbGV0ZUFydGljbGVBdWRpbygiYTIiLCAiZ2VtaW5pIiwgIkNoYXJvbiIsIHN0b3JlKTsKICAgIGV4cGVjdChhd2FpdCBnZXRDYWNoZWRBdWRpbygiYTIiLCAiZ2VtaW5pIiwgIkNoYXJvbiIsICLYqiIsICLYqCIsIHN0b3JlKSkudG9CZU51bGwoKTsKICAgIGV4cGVjdChhd2FpdCBnZXRDYWNoZWRBdWRpbygiYTIiLCAiZGV2aWNlIiwgImxvY2FsIiwgItiqIiwgItioIiwgc3RvcmUpKS5ub3QudG9CZU51bGwoKTsKICAgIGF3YWl0IGRlbGV0ZUFydGljbGVBdWRpbygiYTIiLCB1bmRlZmluZWQsIHVuZGVmaW5lZCwgc3RvcmUpOwogICAgZXhwZWN0KGF3YWl0IGdldENhY2hlZEF1ZGlvKCJhMiIsICJkZXZpY2UiLCAibG9jYWwiLCAi2KoiLCAi2KgiLCBzdG9yZSkpLnRvQmVOdWxsKCk7CiAgICBleHBlY3QoYXdhaXQgZ2V0Q2FjaGVkQXVkaW8oImEzIiwgImdlbWluaSIsICJDaGFyb24iLCAi2KoiLCAi2KgiLCBzdG9yZSkpLm5vdC50b0JlTnVsbCgpOwogIH0pOwp9KTsKCmRlc2NyaWJlKCJjaHVua2VkIGFydGljbGUgYXVkaW8gKHYyLCBtZW1vcnkgc3RvcmUpIiwgKCkgPT4gewogIGNvbnN0IHBjbUJsb2IgPSAoYnl0ZXM6IG51bWJlcltdKSA9PiBuZXcgQmxvYihbbmV3IFVpbnQ4QXJyYXkoYnl0ZXMpXSwgeyB0eXBlOiAiYXVkaW8vTDE2IiB9KTsKICBjb25zdCBzYXZlTWFuaWZlc3QgPSAoc3RvcmU6IFJldHVyblR5cGU8dHlwZW9mIG1lbW9yeUFydGljbGVBdWRpb1N0b3JlPiwgaWQ6IHN0cmluZywgY2h1bmtDb3VudCA9IDMpID0+CiAgICBzYXZlQXVkaW9NYW5pZmVzdCgKICAgICAgeyBhcnRpY2xlSWQ6IGlkLCBlbmdpbmU6ICJnZW1pbmkiLCB2b2ljZUtleTogIkNoYXJvbiIsIHRpdGxlOiAi2LnZhtmI2KfZhiIsIGJvZHk6ICLZhti1IiwgY2h1bmtDb3VudCB9LCBzdG9yZSk7CiAgY29uc3Qgc2F2ZUNodW5rID0gKHN0b3JlOiBSZXR1cm5UeXBlPHR5cGVvZiBtZW1vcnlBcnRpY2xlQXVkaW9TdG9yZT4sIGlkOiBzdHJpbmcsIGluZGV4OiBudW1iZXIsIGJ5dGVzOiBudW1iZXJbXSkgPT4KICAgIHNhdmVBdWRpb0NodW5rKHsgYXJ0aWNsZUlkOiBpZCwgZW5naW5lOiAiZ2VtaW5pIiwgdm9pY2VLZXk6ICJDaGFyb24iLCBpbmRleCwgcGNtOiBwY21CbG9iKGJ5dGVzKSB9LCBzdG9yZSk7CgogIGl0KCJyb3VuZC10cmlwcyBhIG1hbmlmZXN0IHBsdXMgaXRzIGNodW5rcyBhbmQgbGlzdHMgb25seSB0aGUgcmVhZHkgaW5kZXhlcyIsIGFzeW5jICgpID0+IHsKICAgIGNvbnN0IHN0b3JlID0gbWVtb3J5QXJ0aWNsZUF1ZGlvU3RvcmUoKTsKICAgIGNvbnN0IG1mID0gYXdhaXQgc2F2ZU1hbmlmZXN0KHN0b3JlLCAiYzEiKTsKICAgIGV4cGVjdChtZi52ZXJzaW9uKS50b0JlKDIpOwogICAgZXhwZWN0KG1mLmZvcm1hdCkudG9CZSgicGNtLWNodW5rcyIpOwogICAgZXhwZWN0KG1mLmNodW5rQ291bnQpLnRvQmUoMyk7CiAgICBleHBlY3QobWYua2V5KS50b0JlKCJjMTpnZW1pbmk6Q2hhcm9uIik7CiAgICBhd2FpdCBzYXZlQ2h1bmsoc3RvcmUsICJjMSIsIDIsIFs1LCA2XSk7CiAgICBhd2FpdCBzYXZlQ2h1bmsoc3RvcmUsICJjMSIsIDAsIFsxLCAyLCAzXSk7CiAgICBleHBlY3QoYXdhaXQgbGlzdFJlYWR5Q2h1bmtzKCJjMSIsICJnZW1pbmkiLCAiQ2hhcm9uIiwgc3RvcmUpKS50b0VxdWFsKFswLCAyXSk7CiAgICBjb25zdCBjYWNoZWQgPSBhd2FpdCBnZXRDYWNoZWRBdWRpbygiYzEiLCAiZ2VtaW5pIiwgIkNoYXJvbiIsICLYudmG2YjYp9mGIiwgItmG2LUiLCBzdG9yZSk7CiAgICBleHBlY3QoY2FjaGVkPy5raW5kKS50b0JlKCJjaHVua3MiKTsKICAgIGlmIChjYWNoZWQ/LmtpbmQgPT09ICJjaHVua3MiKSB7CiAgICAgIGV4cGVjdChjYWNoZWQucmVhZHlJbmRleGVzKS50b0VxdWFsKFswLCAyXSk7CiAgICAgIGV4cGVjdChjYWNoZWQubWFuaWZlc3QuY2h1bmtDb3VudCkudG9CZSgzKTsKICAgICAgZXhwZWN0KGNhY2hlZC5mcmVzaCkudG9CZSh0cnVlKTsKICAgIH0KICAgIGNvbnN0IGNodW5rMCA9IGF3YWl0IGdldEF1ZGlvQ2h1bmsoImMxIiwgImdlbWluaSIsICJDaGFyb24iLCAwLCBzdG9yZSk7CiAgICBleHBlY3QoY2h1bmswICYmIFsuLi5hd2FpdCBibG9iVG9CeXRlcyhjaHVuazApXSkudG9FcXVhbChbMSwgMiwgM10pOwogICAgZXhwZWN0KGF3YWl0IGdldEF1ZGlvQ2h1bmsoImMxIiwgImdlbWluaSIsICJDaGFyb24iLCAxLCBzdG9yZSkpLnRvQmVOdWxsKCk7CiAgfSk7CgogIGl0KCJyZXBvcnRzIGEgY2h1bmtlZCBnZW5lcmF0aW9uIHN0YWxlIGFmdGVyIHRoZSB0ZXh0IGNoYW5nZXMiLCBhc3luYyAoKSA9PiB7CiAgICBjb25zdCBzdG9yZSA9IG1lbW9yeUFydGljbGVBdWRpb1N0b3JlKCk7CiAgICBhd2FpdCBzYXZlTWFuaWZlc3Qoc3RvcmUsICJjMiIsIDIpOwogICAgYXdhaXQgc2F2ZUNodW5rKHN0b3JlLCAiYzIiLCAwLCBbMV0pOwogICAgY29uc3QgY2FjaGVkID0gYXdhaXQgZ2V0Q2FjaGVkQXVkaW8oImMyIiwgImdlbWluaSIsICJDaGFyb24iLCAi2LnZhtmI2KfZhiIsICLZhti1INmF2K7YqtmE2YEg2KrZhdin2YXZi9inIiwgc3RvcmUpOwogICAgZXhwZWN0KGNhY2hlZD8ua2luZCkudG9CZSgiY2h1bmtzIik7CiAgICBleHBlY3QoY2FjaGVkPy5mcmVzaCkudG9CZShmYWxzZSk7CiAgfSk7CgogIGl0KCJkZWxldGUgcmVtb3ZlcyB0aGUgbWFuaWZlc3QgYW5kIGV2ZXJ5IGNodW5rLCBsZWF2aW5nIG90aGVyIGFydGljbGVzIGFsb25lIiwgYXN5bmMgKCkgPT4gewogICAgY29uc3Qgc3RvcmUgPSBtZW1vcnlBcnRpY2xlQXVkaW9TdG9yZSgpOwogICAgYXdhaXQgc2F2ZU1hbmlmZXN0KHN0b3JlLCAiYzMiLCAyKTsKICAgIGF3YWl0IHNhdmVDaHVuayhzdG9yZSwgImMzIiwgMCwgWzFdKTsKICAgIGF3YWl0IHNhdmVDaHVuayhzdG9yZSwgImMzIiwgMSwgWzJdKTsKICAgIGF3YWl0IHNhdmVNYW5pZmVzdChzdG9yZSwgImM0IiwgMSk7CiAgICBhd2FpdCBzYXZlQ2h1bmsoc3RvcmUsICJjNCIsIDAsIFs5XSk7CiAgICBhd2FpdCBkZWxldGVBcnRpY2xlQXVkaW8oImMzIiwgImdlbWluaSIsICJDaGFyb24iLCBzdG9yZSk7CiAgICBleHBlY3QoYXdhaXQgZ2V0Q2FjaGVkQXVkaW8oImMzIiwgImdlbWluaSIsICJDaGFyb24iLCAi2LnZhtmI2KfZhiIsICLZhti1Iiwgc3RvcmUpKS50b0JlTnVsbCgpOwogICAgZXhwZWN0KGF3YWl0IGxpc3RSZWFkeUNodW5rcygiYzMiLCAiZ2VtaW5pIiwgIkNoYXJvbiIsIHN0b3JlKSkudG9FcXVhbChbXSk7CiAgICBleHBlY3QoYXdhaXQgZ2V0QXVkaW9DaHVuaygiYzMiLCAiZ2VtaW5pIiwgIkNoYXJvbiIsIDAsIHN0b3JlKSkudG9CZU51bGwoKTsKICAgIGV4cGVjdChhd2FpdCBsaXN0UmVhZHlDaHVua3MoImM0IiwgImdlbWluaSIsICJDaGFyb24iLCBzdG9yZSkpLnRvRXF1YWwoWzBdKTsKICB9KTsKCiAgaXQoImV4cG9ydHMgdGhlIHN0b3JlZCBjaHVua3MgYXMgb25lIFdBViB3aXRoIHRoZSBjb21iaW5lZCBkYXRhIGxlbmd0aCIsIGFzeW5jICgpID0+IHsKICAgIGNvbnN0IHN0b3JlID0gbWVtb3J5QXJ0aWNsZUF1ZGlvU3RvcmUoKTsKICAgIGF3YWl0IHNhdmVNYW5pZmVzdChzdG9yZSwgImM1IiwgMik7CiAgICBhd2FpdCBzYXZlQ2h1bmsoc3RvcmUsICJjNSIsIDAsIFsxLCAyXSk7CiAgICBhd2FpdCBzYXZlQ2h1bmsoc3RvcmUsICJjNSIsIDEsIFszLCA0LCA1XSk7CiAgICBjb25zdCBwYXJ0czogVWludDhBcnJheVtdID0gW107CiAgICBmb3IgKGNvbnN0IGkgb2YgYXdhaXQgbGlzdFJlYWR5Q2h1bmtzKCJjNSIsICJnZW1pbmkiLCAiQ2hhcm9uIiwgc3RvcmUpKSB7CiAgICAgIGNvbnN0IGIgPSBhd2FpdCBnZXRBdWRpb0NodW5rKCJjNSIsICJnZW1pbmkiLCAiQ2hhcm9uIiwgaSwgc3RvcmUpOwogICAgICBwYXJ0cy5wdXNoKGF3YWl0IGJsb2JUb0J5dGVzKGIhKSk7CiAgICB9CiAgICBjb25zdCB3YXYgPSBwY21Ub1dhdihjb25jYXRQY20ocGFydHMpKTsKICAgIGV4cGVjdCh3YXYubGVuZ3RoKS50b0JlKDQ0ICsgNSk7CiAgICBjb25zdCB2ID0gbmV3IERhdGFWaWV3KHdhdi5idWZmZXIsIHdhdi5ieXRlT2Zmc2V0LCB3YXYuYnl0ZUxlbmd0aCk7CiAgICBleHBlY3Qodi5nZXRVaW50MzIoNDAsIHRydWUpKS50b0JlKDUpOwogICAgZXhwZWN0KFsuLi53YXYuc2xpY2UoNDQpXSkudG9FcXVhbChbMSwgMiwgMywgNCwgNV0pOwogIH0pOwp9KTsKCmRlc2NyaWJlKCJmaW5kQ2FjaGVkQXVkaW8gYWNyb3NzIFRUUyBtb2RlbHMiLCAoKSA9PiB7CiAgY29uc3QgcGNtQmxvYiA9IChieXRlczogbnVtYmVyW10pID0+IG5ldyBCbG9iKFtuZXcgVWludDhBcnJheShieXRlcyldLCB7IHR5cGU6ICJhdWRpby9MMTYiIH0pOwogIGNvbnN0IExJVEUgPSAiZ2VtaW5pLTMuOC1mbGFzaC1saXRlLXR0czpDaGFyb24iOyAvLyB0aGUgY3VycmVudCBwcmltYXJ5IGtleQogIGNvbnN0IEZMQVNIID0gImdlbWluaS0zLjgtZmxhc2gtdHRzOkNoYXJvbiI7CgogIGl0KCJmaW5kcyBhIGdlbmVyYXRpb24gc3RvcmVkIHVuZGVyIGEgbm9uLWN1cnJlbnQgbW9kZWwncyBrZXksIG1vZGVsIHJlY29yZGVkIG9uIHRoZSBtYW5pZmVzdCIsIGFzeW5jICgpID0+IHsKICAgIGNvbnN0IHN0b3JlID0gbWVtb3J5QXJ0aWNsZUF1ZGlvU3RvcmUoKTsKICAgIGNvbnN0IG1mID0gYXdhaXQgc2F2ZUF1ZGlvTWFuaWZlc3QoCiAgICAgIHsgYXJ0aWNsZUlkOiAibTEiLCBlbmdpbmU6ICJnZW1pbmkiLCB2b2ljZUtleTogRkxBU0gsIHRpdGxlOiAi2LnZhtmI2KfZhiIsIGJvZHk6ICLZhti1IiwgY2h1bmtDb3VudDogMiB9LCBzdG9yZSk7CiAgICBleHBlY3QobWYubW9kZWxJZCkudG9CZSgiZ2VtaW5pLTMuOC1mbGFzaC10dHMiKTsKICAgIGF3YWl0IHNhdmVBdWRpb0NodW5rKHsgYXJ0aWNsZUlkOiAibTEiLCBlbmdpbmU6ICJnZW1pbmkiLCB2b2ljZUtleTogRkxBU0gsIGluZGV4OiAwLCBwY206IHBjbUJsb2IoWzFdKSB9LCBzdG9yZSk7CiAgICBjb25zdCBmb3VuZCA9IGF3YWl0IGZpbmRDYWNoZWRBdWRpbygibTEiLCAiZ2VtaW5pIiwgIti52YbZiNin2YYiLCAi2YbYtSIsIHN0b3JlKTsKICAgIGV4cGVjdChmb3VuZD8ua2luZCkudG9CZSgiY2h1bmtzIik7CiAgICBpZiAoZm91bmQ/LmtpbmQgPT09ICJjaHVua3MiKSB7CiAgICAgIGV4cGVjdChmb3VuZC5tYW5pZmVzdC52b2ljZUtleSkudG9CZShGTEFTSCk7CiAgICAgIGV4cGVjdChmb3VuZC5tYW5pZmVzdC5tb2RlbElkKS50b0JlKCJnZW1pbmktMy44LWZsYXNoLXR0cyIpOwogICAgICBleHBlY3QoZm91bmQucmVhZHlJbmRleGVzKS50b0VxdWFsKFswXSk7CiAgICAgIGV4cGVjdChmb3VuZC5mcmVzaCkudG9CZSh0cnVlKTsKICAgIH0KICAgIC8vIEFuIGV4YWN0LWtleSBsb29rdXAgdW5kZXIgYSBkaWZmZXJlbnQgbW9kZWwgZmluZHMgbm90aGluZzogbm8gbWl4aW5nLgogICAgZXhwZWN0KGF3YWl0IGdldENhY2hlZEF1ZGlvKCJtMSIsICJnZW1pbmkiLCBMSVRFLCAi2LnZhtmI2KfZhiIsICLZhti1Iiwgc3RvcmUpKS50b0JlTnVsbCgpOwogICAgZXhwZWN0KGF3YWl0IGxpc3RSZWFkeUNodW5rcygibTEiLCAiZ2VtaW5pIiwgTElURSwgc3RvcmUpKS50b0VxdWFsKFtdKTsKICB9KTsKCiAgaXQoIm5ldmVyIG1peGVzIGNodW5rcyBhY3Jvc3MgbW9kZWxzLCBhbmQgcHJlZmVycyB0aGUgY3VycmVudCBtb2RlbCdzIGVudHJ5IG92ZXIgYSBuZXdlciBvbmUiLCBhc3luYyAoKSA9PiB7CiAgICBjb25zdCBzdG9yZSA9IG1lbW9yeUFydGljbGVBdWRpb1N0b3JlKCk7CiAgICBjb25zdCBtYW5pZmVzdFJlYyA9IChpZDogc3RyaW5nLCB2b2ljZUtleTogc3RyaW5nLCBjcmVhdGVkQXQ6IG51bWJlcik6IENodW5rZWRBdWRpb01hbmlmZXN0ID0+ICh7CiAgICAgIGtleTogYXVkaW9LZXkoaWQsICJnZW1pbmkiLCB2b2ljZUtleSksCiAgICAgIGFydGljbGVJZDogaWQsIGVuZ2luZTogImdlbWluaSIsIHZvaWNlS2V5LAogICAgICBtb2RlbElkOiB2b2ljZUtleS5zcGxpdCgiOiIpWzBdISwKICAgICAgdGV4dEhhc2g6IGFydGljbGVUZXh0SGFzaCgi2LnZhtmI2KfZhiIsICLZhti1IiksCiAgICAgIHZlcnNpb246IDIsIGZvcm1hdDogInBjbS1jaHVua3MiLCBzYW1wbGVSYXRlOiAyNDAwMCwgY2h1bmtDb3VudDogMywgY3JlYXRlZEF0LAogICAgfSk7CiAgICBjb25zdCBjaHVua1JlYyA9IChpZDogc3RyaW5nLCB2b2ljZUtleTogc3RyaW5nLCBpbmRleDogbnVtYmVyLCBjcmVhdGVkQXQ6IG51bWJlcik6IEF1ZGlvQ2h1bmtSZWNvcmQgPT4gKHsKICAgICAga2V5OiBgJHthdWRpb0tleShpZCwgImdlbWluaSIsIHZvaWNlS2V5KX0jJHtpbmRleH1gLAogICAgICBhcnRpY2xlSWQ6IGlkLCBlbmdpbmU6ICJnZW1pbmkiLCB2b2ljZUtleSwgaW5kZXgsCiAgICAgIG1pbWU6ICJhdWRpby9MMTYiLCBibG9iOiBwY21CbG9iKFtpbmRleF0pLCBjcmVhdGVkQXQsCiAgICB9KTsKCiAgICAvLyBUaGUgY3VycmVudCAoTGl0ZSkgZ2VuZXJhdGlvbiBpcyB0aGUgT0xERVIgb25lIGFuZCBoYXMgb25seSBjaHVuayAwOwogICAgLy8gYSBuZXdlciBGbGFzaCBnZW5lcmF0aW9uIG9mIHRoZSBzYW1lIGFydGljbGUgaGFzIGNodW5rcyAwIGFuZCAxLiBUaGUKICAgIC8vIGN1cnJlbnQgbW9kZWwncyBlbnRyeSBtdXN0IHN0aWxsIHdpbiwgd2l0aCBvbmx5IGl0cyBvd24gY2h1bmtzLgogICAgYXdhaXQgc3RvcmUucHV0KG1hbmlmZXN0UmVjKCJtMiIsIExJVEUsIDUwMCkpOwogICAgYXdhaXQgc3RvcmUucHV0KGNodW5rUmVjKCJtMiIsIExJVEUsIDAsIDUwMSkpOwogICAgYXdhaXQgc3RvcmUucHV0KG1hbmlmZXN0UmVjKCJtMiIsIEZMQVNILCAzMDAwKSk7CiAgICBhd2FpdCBzdG9yZS5wdXQoY2h1bmtSZWMoIm0yIiwgRkxBU0gsIDAsIDMwMDEpKTsKICAgIGF3YWl0IHN0b3JlLnB1dChjaHVua1JlYygibTIiLCBGTEFTSCwgMSwgMzAwMikpOwogICAgY29uc3QgZm91bmQgPSBhd2FpdCBmaW5kQ2FjaGVkQXVkaW8oIm0yIiwgImdlbWluaSIsICLYudmG2YjYp9mGIiwgItmG2LUiLCBzdG9yZSk7CiAgICBleHBlY3QoZm91bmQ/LmtpbmQpLnRvQmUoImNodW5rcyIpOwogICAgaWYgKGZvdW5kPy5raW5kID09PSAiY2h1bmtzIikgewogICAgICBleHBlY3QoZm91bmQubWFuaWZlc3Qudm9pY2VLZXkpLnRvQmUoTElURSk7CiAgICAgIC8vIEZsYXNoJ3MgY2h1bmsgMSBtdXN0IE5PVCBsZWFrIGludG8gdGhlIExpdGUgZ2VuZXJhdGlvbi4KICAgICAgZXhwZWN0KGZvdW5kLnJlYWR5SW5kZXhlcykudG9FcXVhbChbMF0pOwogICAgfQoKICAgIC8vIFdpdGhvdXQgYSBjdXJyZW50LW1vZGVsIGVudHJ5LCB0aGUgTkVXRVNUIG90aGVyLW1vZGVsIGVudHJ5IHdpbnMuCiAgICBhd2FpdCBzdG9yZS5wdXQobWFuaWZlc3RSZWMoIm0zIiwgRkxBU0gsIDMwMDApKTsKICAgIGF3YWl0IHN0b3JlLnB1dChjaHVua1JlYygibTMiLCBGTEFTSCwgMCwgMzAwMSkpOwogICAgYXdhaXQgc3RvcmUucHV0KG1hbmlmZXN0UmVjKCJtMyIsICJnZW1pbmktMi41LWZsYXNoLXByZXZpZXctdHRzOkNoYXJvbiIsIDIwMDApKTsKICAgIGNvbnN0IGZvdW5kT2xkID0gYXdhaXQgZmluZENhY2hlZEF1ZGlvKCJtMyIsICJnZW1pbmkiLCAi2LnZhtmI2KfZhiIsICLZhti1Iiwgc3RvcmUpOwogICAgZXhwZWN0KGZvdW5kT2xkPy5raW5kKS50b0JlKCJjaHVua3MiKTsKICAgIGlmIChmb3VuZE9sZD8ua2luZCA9PT0gImNodW5rcyIpIHsKICAgICAgZXhwZWN0KGZvdW5kT2xkLm1hbmlmZXN0LnZvaWNlS2V5KS50b0JlKEZMQVNIKTsKICAgICAgZXhwZWN0KGZvdW5kT2xkLm1hbmlmZXN0Lm1vZGVsSWQpLnRvQmUoImdlbWluaS0zLjgtZmxhc2gtdHRzIik7CiAgICAgIGV4cGVjdChmb3VuZE9sZC5yZWFkeUluZGV4ZXMpLnRvRXF1YWwoWzBdKTsKICAgIH0KICB9KTsKCiAgaXQoInN0aWxsIHN1cmZhY2VzIGEgbGVnYWN5IHNpbmdsZS1maWxlIHJlY29yZCBhbmQgcmVwb3J0cyBub3RoaW5nIGZvciB1bmNhY2hlZCBhcnRpY2xlcyIsIGFzeW5jICgpID0+IHsKICAgIGNvbnN0IHN0b3JlID0gbWVtb3J5QXJ0aWNsZUF1ZGlvU3RvcmUoKTsKICAgIGF3YWl0IHNhdmVBcnRpY2xlQXVkaW8oCiAgICAgIHsgYXJ0aWNsZUlkOiAibTQiLCBlbmdpbmU6ICJnZW1pbmkiLCB2b2ljZUtleTogIkNoYXJvbiIsIHRpdGxlOiAi2LnZhtmI2KfZhiIsIGJvZHk6ICLZhti1IiwgYmxvYjogcGNtQmxvYihbOV0pIH0sIHN0b3JlKTsKICAgIGNvbnN0IGZvdW5kID0gYXdhaXQgZmluZENhY2hlZEF1ZGlvKCJtNCIsICJnZW1pbmkiLCAi2LnZhtmI2KfZhiIsICLZhti1Iiwgc3RvcmUpOwogICAgZXhwZWN0KGZvdW5kPy5raW5kKS50b0JlKCJsZWdhY3kiKTsKICAgIGV4cGVjdChmb3VuZD8uZnJlc2gpLnRvQmUodHJ1ZSk7CiAgICBleHBlY3QoYXdhaXQgZmluZENhY2hlZEF1ZGlvKCJtNSIsICJnZW1pbmkiLCAi2LnZhtmI2KfZhiIsICLZhti1Iiwgc3RvcmUpKS50b0JlTnVsbCgpOwogIH0pOwp9KTsK
+import { describe, expect, it } from "vitest";
+import {
+  articleTextHash, audioFileName, audioKey, deleteArticleAudio, findCachedAudio, getAudioChunk,
+  getCachedAudio, isAudioFresh, listReadyChunks, memoryArticleAudioStore, saveArticleAudio,
+  saveAudioChunk, saveAudioManifest, textHash,
+  type AudioChunkRecord, type ChunkedAudioManifest,
+} from "./article-audio";
+import { blobToBytes, concatPcm, pcmToWav, toSpeechText } from "./tts";
+
+describe("textHash", () => {
+  it("is stable, 8 hex chars, and changes with the text", () => {
+    expect(textHash("مرحبًا")).toMatch(/^[0-9a-f]{8}$/);
+    expect(textHash("مرحبًا")).toBe(textHash("مرحبًا"));
+    expect(textHash("مرحبًا")).not.toBe(textHash("مرحبًا!"));
+    expect(textHash("")).not.toBe(textHash("ا"));
+  });
+
+  it("hashes exactly the spoken text of the article", () => {
+    expect(articleTextHash("عنوان", "نص المقال")).toBe(textHash(toSpeechText("عنوان", "نص المقال")));
+  });
+});
+
+describe("audioKey + audioFileName", () => {
+  it("builds composite cache keys", () => {
+    expect(audioKey("id1", "gemini", "Charon")).toBe("id1:gemini:Charon");
+  });
+
+  it("keeps Arabic titles and maps mime to extension", () => {
+    expect(audioFileName("رحلتي إلى مكة", "audio/wav")).toBe("رحلتي إلى مكة.wav");
+    expect(audioFileName("مقال", "audio/mpeg")).toBe("مقال.mp3");
+    expect(audioFileName("مقال", "audio/x-unknown")).toBe("مقال.audio");
+  });
+
+  it("sanitizes path-hostile characters and falls back for empty titles", () => {
+    expect(audioFileName('a/b:c?"d"<e>|f', "audio/wav")).toBe("a b c d e f.wav");
+    expect(audioFileName("   ", "audio/wav")).toBe("مقال.wav");
+    expect(audioFileName("", "audio/wav")).toBe("مقال.wav");
+    const long = audioFileName("ط".repeat(100), "audio/wav");
+    expect(long.endsWith(".wav")).toBe(true);
+    expect(long.length).toBeLessThanOrEqual(64);
+  });
+});
+
+describe("cached article audio (memory store)", () => {
+  const blob = () => new Blob([new Uint8Array([1, 2, 3])], { type: "audio/wav" });
+
+  // Adapted for the discriminated getCachedAudio: a v1 record saved through
+  // saveArticleAudio now comes back as { kind: "legacy", record, fresh }.
+  it("saves, finds fresh, and reports staleness after the text changes", async () => {
+    const store = memoryArticleAudioStore();
+    const rec = await saveArticleAudio(
+      { articleId: "a1", engine: "gemini", voiceKey: "Charon", title: "عنوان", body: "نص المقال", blob: blob() }, store);
+    expect(rec.key).toBe("a1:gemini:Charon");
+    expect(rec.mime).toBe("audio/wav");
+    const cached = await getCachedAudio("a1", "gemini", "Charon", "عنوان", "نص المقال", store);
+    expect(cached?.kind).toBe("legacy");
+    expect(cached?.fresh).toBe(true);
+    if (cached?.kind === "legacy") {
+      expect(cached.record.textHash).toBe(rec.textHash);
+      expect(cached.blob).toBe(rec.blob);
+    }
+    expect(isAudioFresh(rec, "عنوان", "نص المقال")).toBe(true);
+    expect(isAudioFresh(rec, "عنوان", "نص المقال بعد التعديل")).toBe(false);
+    const stale = await getCachedAudio("a1", "gemini", "Charon", "عنوان", "نص المقال بعد التعديل", store);
+    expect(stale?.kind).toBe("legacy");
+    expect(stale?.fresh).toBe(false);
+    expect(await getCachedAudio("a1", "device", "Charon", "عنوان", "نص المقال", store)).toBeNull();
+  });
+
+  it("deletes one engine's audio, or all of an article's audio", async () => {
+    const store = memoryArticleAudioStore();
+    await saveArticleAudio({ articleId: "a2", engine: "gemini", voiceKey: "Charon", title: "ت", body: "ب", blob: blob() }, store);
+    await saveArticleAudio({ articleId: "a2", engine: "device", voiceKey: "local", title: "ت", body: "ب", blob: blob() }, store);
+    await saveArticleAudio({ articleId: "a3", engine: "gemini", voiceKey: "Charon", title: "ت", body: "ب", blob: blob() }, store);
+    await deleteArticleAudio("a2", "gemini", "Charon", store);
+    expect(await getCachedAudio("a2", "gemini", "Charon", "ت", "ب", store)).toBeNull();
+    expect(await getCachedAudio("a2", "device", "local", "ت", "ب", store)).not.toBeNull();
+    await deleteArticleAudio("a2", undefined, undefined, store);
+    expect(await getCachedAudio("a2", "device", "local", "ت", "ب", store)).toBeNull();
+    expect(await getCachedAudio("a3", "gemini", "Charon", "ت", "ب", store)).not.toBeNull();
+  });
+});
+
+describe("chunked article audio (v2, memory store)", () => {
+  const pcmBlob = (bytes: number[]) => new Blob([new Uint8Array(bytes)], { type: "audio/L16" });
+  const saveManifest = (store: ReturnType<typeof memoryArticleAudioStore>, id: string, chunkCount = 3) =>
+    saveAudioManifest(
+      { articleId: id, engine: "gemini", voiceKey: "Charon", title: "عنوان", body: "نص", chunkCount }, store);
+  const saveChunk = (store: ReturnType<typeof memoryArticleAudioStore>, id: string, index: number, bytes: number[]) =>
+    saveAudioChunk({ articleId: id, engine: "gemini", voiceKey: "Charon", index, pcm: pcmBlob(bytes) }, store);
+
+  it("round-trips a manifest plus its chunks and lists only the ready indexes", async () => {
+    const store = memoryArticleAudioStore();
+    const mf = await saveManifest(store, "c1");
+    expect(mf.version).toBe(2);
+    expect(mf.format).toBe("pcm-chunks");
+    expect(mf.chunkCount).toBe(3);
+    expect(mf.key).toBe("c1:gemini:Charon");
+    await saveChunk(store, "c1", 2, [5, 6]);
+    await saveChunk(store, "c1", 0, [1, 2, 3]);
+    expect(await listReadyChunks("c1", "gemini", "Charon", store)).toEqual([0, 2]);
+    const cached = await getCachedAudio("c1", "gemini", "Charon", "عنوان", "نص", store);
+    expect(cached?.kind).toBe("chunks");
+    if (cached?.kind === "chunks") {
+      expect(cached.readyIndexes).toEqual([0, 2]);
+      expect(cached.manifest.chunkCount).toBe(3);
+      expect(cached.fresh).toBe(true);
+    }
+    const chunk0 = await getAudioChunk("c1", "gemini", "Charon", 0, store);
+    expect(chunk0 && [...await blobToBytes(chunk0)]).toEqual([1, 2, 3]);
+    expect(await getAudioChunk("c1", "gemini", "Charon", 1, store)).toBeNull();
+  });
+
+  it("reports a chunked generation stale after the text changes", async () => {
+    const store = memoryArticleAudioStore();
+    await saveManifest(store, "c2", 2);
+    await saveChunk(store, "c2", 0, [1]);
+    const cached = await getCachedAudio("c2", "gemini", "Charon", "عنوان", "نص مختلف تمامًا", store);
+    expect(cached?.kind).toBe("chunks");
+    expect(cached?.fresh).toBe(false);
+  });
+
+  it("delete removes the manifest and every chunk, leaving other articles alone", async () => {
+    const store = memoryArticleAudioStore();
+    await saveManifest(store, "c3", 2);
+    await saveChunk(store, "c3", 0, [1]);
+    await saveChunk(store, "c3", 1, [2]);
+    await saveManifest(store, "c4", 1);
+    await saveChunk(store, "c4", 0, [9]);
+    await deleteArticleAudio("c3", "gemini", "Charon", store);
+    expect(await getCachedAudio("c3", "gemini", "Charon", "عنوان", "نص", store)).toBeNull();
+    expect(await listReadyChunks("c3", "gemini", "Charon", store)).toEqual([]);
+    expect(await getAudioChunk("c3", "gemini", "Charon", 0, store)).toBeNull();
+    expect(await listReadyChunks("c4", "gemini", "Charon", store)).toEqual([0]);
+  });
+
+  it("exports the stored chunks as one WAV with the combined data length", async () => {
+    const store = memoryArticleAudioStore();
+    await saveManifest(store, "c5", 2);
+    await saveChunk(store, "c5", 0, [1, 2]);
+    await saveChunk(store, "c5", 1, [3, 4, 5]);
+    const parts: Uint8Array[] = [];
+    for (const i of await listReadyChunks("c5", "gemini", "Charon", store)) {
+      const b = await getAudioChunk("c5", "gemini", "Charon", i, store);
+      parts.push(await blobToBytes(b!));
+    }
+    const wav = pcmToWav(concatPcm(parts));
+    expect(wav.length).toBe(44 + 5);
+    const v = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+    expect(v.getUint32(40, true)).toBe(5);
+    expect([...wav.slice(44)]).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("findCachedAudio across TTS models", () => {
+  const pcmBlob = (bytes: number[]) => new Blob([new Uint8Array(bytes)], { type: "audio/L16" });
+  const LITE = "gemini-3.8-flash-lite-tts:Charon"; // the current primary key
+  const FLASH = "gemini-3.8-flash-tts:Charon";
+
+  it("finds a generation stored under a non-current model's key, model recorded on the manifest", async () => {
+    const store = memoryArticleAudioStore();
+    const mf = await saveAudioManifest(
+      { articleId: "m1", engine: "gemini", voiceKey: FLASH, title: "عنوان", body: "نص", chunkCount: 2 }, store);
+    expect(mf.modelId).toBe("gemini-3.8-flash-tts");
+    await saveAudioChunk({ articleId: "m1", engine: "gemini", voiceKey: FLASH, index: 0, pcm: pcmBlob([1]) }, store);
+    const found = await findCachedAudio("m1", "gemini", "عنوان", "نص", store);
+    expect(found?.kind).toBe("chunks");
+    if (found?.kind === "chunks") {
+      expect(found.manifest.voiceKey).toBe(FLASH);
+      expect(found.manifest.modelId).toBe("gemini-3.8-flash-tts");
+      expect(found.readyIndexes).toEqual([0]);
+      expect(found.fresh).toBe(true);
+    }
+    // An exact-key lookup under a different model finds nothing: no mixing.
+    expect(await getCachedAudio("m1", "gemini", LITE, "عنوان", "نص", store)).toBeNull();
+    expect(await listReadyChunks("m1", "gemini", LITE, store)).toEqual([]);
+  });
+
+  it("never mixes chunks across models, and prefers the current model's entry over a newer one", async () => {
+    const store = memoryArticleAudioStore();
+    const manifestRec = (id: string, voiceKey: string, createdAt: number): ChunkedAudioManifest => ({
+      key: audioKey(id, "gemini", voiceKey),
+      articleId: id, engine: "gemini", voiceKey,
+      modelId: voiceKey.split(":")[0]!,
+      textHash: articleTextHash("عنوان", "نص"),
+      version: 2, format: "pcm-chunks", sampleRate: 24000, chunkCount: 3, createdAt,
+    });
+    const chunkRec = (id: string, voiceKey: string, index: number, createdAt: number): AudioChunkRecord => ({
+      key: `${audioKey(id, "gemini", voiceKey)}#${index}`,
+      articleId: id, engine: "gemini", voiceKey, index,
+      mime: "audio/L16", blob: pcmBlob([index]), createdAt,
+    });
+
+    // The current (Lite) generation is the OLDER one and has only chunk 0;
+    // a newer Flash generation of the same article has chunks 0 and 1. The
+    // current model's entry must still win, with only its own chunks.
+    await store.put(manifestRec("m2", LITE, 500));
+    await store.put(chunkRec("m2", LITE, 0, 501));
+    await store.put(manifestRec("m2", FLASH, 3000));
+    await store.put(chunkRec("m2", FLASH, 0, 3001));
+    await store.put(chunkRec("m2", FLASH, 1, 3002));
+    const found = await findCachedAudio("m2", "gemini", "عنوان", "نص", store);
+    expect(found?.kind).toBe("chunks");
+    if (found?.kind === "chunks") {
+      expect(found.manifest.voiceKey).toBe(LITE);
+      // Flash's chunk 1 must NOT leak into the Lite generation.
+      expect(found.readyIndexes).toEqual([0]);
+    }
+
+    // Without a current-model entry, the NEWEST other-model entry wins.
+    await store.put(manifestRec("m3", FLASH, 3000));
+    await store.put(chunkRec("m3", FLASH, 0, 3001));
+    await store.put(manifestRec("m3", "gemini-2.5-flash-preview-tts:Charon", 2000));
+    const foundOld = await findCachedAudio("m3", "gemini", "عنوان", "نص", store);
+    expect(foundOld?.kind).toBe("chunks");
+    if (foundOld?.kind === "chunks") {
+      expect(foundOld.manifest.voiceKey).toBe(FLASH);
+      expect(foundOld.manifest.modelId).toBe("gemini-3.8-flash-tts");
+      expect(foundOld.readyIndexes).toEqual([0]);
+    }
+  });
+
+  it("still surfaces a legacy single-file record and reports nothing for uncached articles", async () => {
+    const store = memoryArticleAudioStore();
+    await saveArticleAudio(
+      { articleId: "m4", engine: "gemini", voiceKey: "Charon", title: "عنوان", body: "نص", blob: pcmBlob([9]) }, store);
+    const found = await findCachedAudio("m4", "gemini", "عنوان", "نص", store);
+    expect(found?.kind).toBe("legacy");
+    expect(found?.fresh).toBe(true);
+    expect(await findCachedAudio("m5", "gemini", "عنوان", "نص", store)).toBeNull();
+  });
+});
