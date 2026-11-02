@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   articleTextHash, audioFileName, audioKey, deleteArticleAudio, findCachedAudio, getAudioChunk,
-  getCachedAudio, isAudioFresh, listReadyChunks, memoryArticleAudioStore, saveArticleAudio,
+  getCachedAudio, isAudioFresh, listArticleIdsWithAudio, listReadyChunks, memoryArticleAudioStore, saveArticleAudio,
   saveAudioChunk, saveAudioManifest, textHash,
   type AudioChunkRecord, type ChunkedAudioManifest,
 } from "./article-audio";
@@ -149,6 +149,41 @@ describe("chunked article audio (v2, memory store)", () => {
     const v = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
     expect(v.getUint32(40, true)).toBe(5);
     expect([...wav.slice(44)]).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("listArticleIdsWithAudio (library audio badge)", () => {
+  const pcmBlob = (bytes: number[]) => new Blob([new Uint8Array(bytes)], { type: "audio/L16" });
+
+  it("collects articles with a chunked manifest or a legacy record, in one pass", async () => {
+    const store = memoryArticleAudioStore();
+    // Chunked generation (manifest + one chunk).
+    await saveAudioManifest(
+      { articleId: "w1", engine: "gemini", voiceKey: "Charon", title: "عنوان", body: "نص", chunkCount: 2 }, store);
+    await saveAudioChunk({ articleId: "w1", engine: "gemini", voiceKey: "Charon", index: 0, pcm: pcmBlob([1]) }, store);
+    // Legacy single-file record.
+    await saveArticleAudio(
+      { articleId: "w2", engine: "gemini", voiceKey: "Charon", title: "عنوان", body: "نص", blob: pcmBlob([9]) }, store);
+    // An article with no audio at all contributes nothing.
+    expect(await listArticleIdsWithAudio(store)).toEqual(new Set(["w1", "w2"]));
+  });
+
+  it("ignores lone chunks without a manifest and non-gemini records", async () => {
+    const store = memoryArticleAudioStore();
+    await saveAudioChunk({ articleId: "w3", engine: "gemini", voiceKey: "Charon", index: 0, pcm: pcmBlob([1]) }, store);
+    await saveArticleAudio(
+      { articleId: "w4", engine: "device", voiceKey: "local", title: "ت", body: "ب", blob: pcmBlob([2]) }, store);
+    expect(await listArticleIdsWithAudio(store)).toEqual(new Set());
+  });
+
+  it("still lists an article after its generation goes stale, and drops it after deletion", async () => {
+    const store = memoryArticleAudioStore();
+    await saveAudioManifest(
+      { articleId: "w5", engine: "gemini", voiceKey: "Charon", title: "عنوان", body: "نص", chunkCount: 1 }, store);
+    // Staleness is about the article text, not presence: the badge stays.
+    expect(await listArticleIdsWithAudio(store)).toEqual(new Set(["w5"]));
+    await deleteArticleAudio("w5", "gemini", "Charon", store);
+    expect(await listArticleIdsWithAudio(store)).toEqual(new Set());
   });
 });
 
