@@ -120,3 +120,28 @@ export async function improveFull(
   }
   return { title, body: parts.join("\n\n") };
 }
+
+/**
+ * Clean a full article (chunked) the strict way: remove dictation noise and fix
+ * spelling/punctuation ONLY — no wording, order or style changes. The payload
+ * deliberately omits `original` and `samples` (unlike improveFull): with no
+ * style material in the request and the bare `clean` instructions server-side,
+ * nothing can steer the model toward restyling the author's words.
+ */
+export async function cleanFull(
+  article: { title: string; body: string }, engine: Engine,
+  signal: AbortSignal, onText: (text: string) => void,
+): Promise<{ title: string; body: string }> {
+  const chunks = splitChunks(article.body);
+  let title = article.title; const parts: string[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const payload = { title: article.title, body: chunks[i] };
+    const show = (t: string) => onText([...parts, t].join("\n\n"));
+    const text = await runAi(engine, "clean", JSON.stringify(payload), signal, show);
+    const out = parseImprovedArticle(text);
+    if (!isComplete(chunks[i] ?? "", out.body)) throw new Error(INCOMPLETE);
+    if (i === 0) title = out.title;
+    parts.push(out.body);
+  }
+  return { title, body: parts.join("\n\n") };
+}
