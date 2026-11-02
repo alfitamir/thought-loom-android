@@ -6,12 +6,11 @@ import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolis
 import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { ArticleEditor } from "@/components/article-editor";
-import { SettingsDialog } from "@/components/settings-dialog";
 import { MergeBanner } from "@/components/merge-banner";
 import { AskDialog } from "@/components/ask-dialog";
 import { InsightsDialog } from "@/components/insights-dialog";
 import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
-import { ArrowRight, ChevronDown, Lightbulb, MessageCircleQuestion, Search, Settings, Sparkles, Square, Tags, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Feather, Lightbulb, MessageCircleQuestion, Search, Sparkles, Square, Tags, X } from "lucide-react";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -36,7 +35,6 @@ function Library() {
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
   const [bulkMsg, setBulkMsg] = useState("");
   const bulkAbort = useRef<AbortController | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [labels, setLabels] = useState(loadLabels);
@@ -102,7 +100,7 @@ function Library() {
   ideas.filter((i) => matchesArticle(i, query)).forEach((i) => (groups[classify(getArticle(i).body)] ??= []).push(i));
 
   return (
-    <main dir="rtl" className="paper min-h-screen px-5 py-6"><div className="mx-auto max-w-3xl">
+    <main dir="rtl" className="paper min-h-screen px-5 pb-24 pt-6"><div className="mx-auto max-w-3xl">
       <header className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-3xl text-foreground">مقالاتي{ideas.length > 0 && <span className="text-xl text-muted-foreground"> ({ideas.length})</span>}</h1>
         <div className="flex gap-2">
@@ -110,7 +108,6 @@ function Library() {
             ? <Button variant="ghost" size="icon" aria-label="إيقاف الضبط" title="إيقاف الضبط" onClick={() => bulkAbort.current?.abort()}><Square /></Button>
             : <Button variant="ghost" size="icon" aria-label="ضبط كل المقالات" title="ضبط كل المقالات" onClick={polishAll}><Sparkles /></Button>)}
           <Button variant="ghost" size="icon" aria-label="بحث في المقالات" title="بحث في المقالات" onClick={() => { setSearchOpen(!searchOpen); setQuery(""); }}><Search /></Button>
-          <Button variant="ghost" size="icon" aria-label="الإعدادات" title="الإعدادات" onClick={() => setSettingsOpen(true)}><Settings /></Button>
           <Button asChild variant="ghost" size="icon"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
         </div>
       </header>
@@ -126,7 +123,6 @@ function Library() {
       </div>}
       {labelError && <p role="alert" className="mb-4 text-sm text-destructive">{labelError}</p>}
       <MergeBanner ideas={ideas} online={online} onChange={refresh} />
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <AskDialog open={askOpen} onOpenChange={setAskOpen} ideas={ideas} online={online} onPick={pick} />
       <InsightsDialog open={insightsOpen} onOpenChange={setInsightsOpen} ideas={ideas} online={online} onChange={refresh} onPick={pick} />
       {searchOpen && <div className="mb-6 flex items-center gap-2 border-b border-border pb-3">
@@ -134,8 +130,14 @@ function Library() {
         <input autoFocus type="search" aria-label="كلمة البحث" placeholder="ابحث بكلمة…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-lg outline-none" />
         <Button variant="ghost" size="icon" aria-label="إغلاق البحث" onClick={() => { setSearchOpen(false); setQuery(""); }}><X /></Button>
       </div>}
-      {ideas.length === 0 && <p className="mt-20 text-center text-muted-foreground">لا توجد أفكار بعد.</p>}
-      {ideas.length > 0 && Object.keys(groups).length === 0 && <p className="mt-16 text-center text-muted-foreground">لا توجد مقالات تحتوي على هذه الكلمة.</p>}
+      {ideas.length === 0 && !query.trim() && (
+        <div className="mt-20 flex flex-col items-center gap-4 text-center">
+          <span className="flex size-16 items-center justify-center rounded-full bg-secondary text-primary"><Feather className="size-8" /></span>
+          <p className="max-w-sm font-article text-xl leading-relaxed text-foreground">لسه مفيش مقالات هنا… كل مقال عظيم بدأ بفكرة واحدة اتقالت في لحظة.</p>
+          <Button asChild className="rounded-full px-5"><Link to="/">سجّل فكرتك الأولى</Link></Button>
+        </div>
+      )}
+      {Object.keys(groups).length === 0 && (ideas.length > 0 || !!query.trim()) && <p className="mt-16 text-center text-muted-foreground">لا نتائج — لا توجد مقالات تحتوي على هذه الكلمة.</p>}
       <div className="space-y-3">
         {Object.entries(groups).map(([topic, list]) => (
           <section key={topic}>
@@ -156,7 +158,7 @@ function Library() {
                         ))}
                       </div>
                     )}
-                    <ArticleEditor idea={i} online={online} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }} />
+                    <ArticleEditor idea={i} topic={topic} online={online} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }} />
                   </div>;
                 })}
               </div>
