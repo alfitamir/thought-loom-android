@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as ApiArticlesImproveRouteImport } from './routes/api/articles/improve'
 import { Route as ApiDriveSyncRouteImport } from './routes/api/drive/sync'
+import { Route as ApiVoiceTranscribeRouteImport } from './routes/api/voice/transcribe'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const ApiDriveSyncRoute = ApiDriveSyncRouteImport.update({
   path: '/api/drive/sync',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVoiceTranscribeRoute = ApiVoiceTranscribeRouteImport.update({
+  id: '/api/voice/transcribe',
+  path: '/api/voice/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
+  '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
+  '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,25 @@ export interface FileRoutesById {
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
+  '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/auth' | '/library' | '/api/articles/improve' | '/api/drive/sync'
+    | '/'
+    | '/auth'
+    | '/library'
+    | '/api/articles/improve'
+    | '/api/drive/sync'
+    | '/api/voice/transcribe'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/library' | '/api/articles/improve' | '/api/drive/sync'
+  to:
+    | '/'
+    | '/auth'
+    | '/library'
+    | '/api/articles/improve'
+    | '/api/drive/sync'
+    | '/api/voice/transcribe'
   id:
     | '__root__'
     | '/'
@@ -76,6 +96,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/api/articles/improve'
     | '/api/drive/sync'
+    | '/api/voice/transcribe'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -84,6 +105,7 @@ export interface RootRouteChildren {
   LibraryRoute: typeof LibraryRoute
   ApiArticlesImproveRoute: typeof ApiArticlesImproveRoute
   ApiDriveSyncRoute: typeof ApiDriveSyncRoute
+  ApiVoiceTranscribeRoute: typeof ApiVoiceTranscribeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -123,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDriveSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/voice/transcribe': {
+      id: '/api/voice/transcribe'
+      path: '/api/voice/transcribe'
+      fullPath: '/api/voice/transcribe'
+      preLoaderRoute: typeof ApiVoiceTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -132,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   LibraryRoute: LibraryRoute,
   ApiArticlesImproveRoute: ApiArticlesImproveRoute,
   ApiDriveSyncRoute: ApiDriveSyncRoute,
+  ApiVoiceTranscribeRoute: ApiVoiceTranscribeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -35,12 +35,31 @@ export type Database = {
         }
         Relationships: []
       }
+      idea_deletions: {
+        Row: {
+          deleted_at: string
+          idea_id: string
+          user_id: string
+        }
+        Insert: {
+          deleted_at?: string
+          idea_id: string
+          user_id: string
+        }
+        Update: {
+          deleted_at?: string
+          idea_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ideas: {
         Row: {
           article_body: string | null
           article_title: string | null
           created_at: number
           id: string
+          merged_from: string[] | null
           synced_at: string
           text: string
           updated_at: number
@@ -51,6 +70,7 @@ export type Database = {
           article_title?: string | null
           created_at: number
           id: string
+          merged_from?: string[] | null
           synced_at?: string
           text: string
           updated_at?: number
@@ -61,6 +81,7 @@ export type Database = {
           article_title?: string | null
           created_at?: number
           id?: string
+          merged_from?: string[] | null
           synced_at?: string
           text?: string
           updated_at?: number

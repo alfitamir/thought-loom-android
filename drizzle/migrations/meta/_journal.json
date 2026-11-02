@@ -15,6 +15,13 @@
       "when": 1792228942114,
       "tag": "0001_article_edits_and_ai_access",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793579687441,
+      "tag": "0002_idea_deletions_and_merged_from",
+      "breakpoints": true
     }
   ]
 }

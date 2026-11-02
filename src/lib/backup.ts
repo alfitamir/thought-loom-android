@@ -19,6 +19,7 @@ export function parseBackup(raw: string): Idea[] {
     if (typeof i.articleBody === "string") idea.articleBody = i.articleBody;
     if (typeof i.updatedAt === "number") idea.updatedAt = i.updatedAt;
     if (typeof i.aiPolishedAt === "number") idea.aiPolishedAt = i.aiPolishedAt;
+    if (Array.isArray(i.mergedFrom)) idea.mergedFrom = i.mergedFrom.filter((m: unknown): m is string => typeof m === "string");
     return [idea];
   });
 }

@@ -7,6 +7,8 @@ export type Idea = {
   updatedAt?: number;
   /** Set to updatedAt when the article was last AI-proofread; skip while equal. */
   aiPolishedAt?: number;
+  /** Ids of the articles this one was merged from; they are never suggested for merging again. */
+  mergedFrom?: string[];
 };
 
 export const TOPICS: Record<string, string[]> = {
@@ -127,9 +129,16 @@ const readList = (key: string): string[] => {
 const writeList = (key: string, ids: string[]) => localStorage.setItem(key, JSON.stringify([...new Set(ids)]));
 export const loadDriveDeleted = () => readList(DRIVE_DEL_KEY);
 export const loadDriveRevived = () => readList(DRIVE_REVIVED_KEY);
+/** Deleted elsewhere (cloud record): the Drive file must learn about it too. */
+export const markDriveDeleted = (ids: string[]) => writeList(DRIVE_DEL_KEY, [...loadDriveDeleted(), ...ids]);
+// Restored ideas whose cloud deletion record must be lifted on the next cloud sync.
+const CLOUD_REVIVED_KEY = "afkari.cloudRevived";
+export const loadCloudRevived = () => readList(CLOUD_REVIVED_KEY);
+export const clearCloudRevived = (ids: string[]) => writeList(CLOUD_REVIVED_KEY, loadCloudRevived().filter((d) => !ids.includes(d)));
 /** A restore brings ideas back everywhere, including ones deleted on another device. */
 export const markRevived = (ids: string[]) => {
   writeList(DRIVE_REVIVED_KEY, [...loadDriveRevived(), ...ids]);
+  writeList(CLOUD_REVIVED_KEY, [...loadCloudRevived(), ...ids]);
   writeList(DRIVE_DEL_KEY, loadDriveDeleted().filter((d) => !ids.includes(d)));
 };
 export const clearDriveMarks = (deleted: string[], revived: string[]) => {
@@ -155,9 +164,10 @@ export const deleteIdea = (id: string) => {
 export const needsPolish = (idea: Idea) => idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0);
 
 /** Save a ready article (e.g. a merge) as a new idea; `text` keeps the combined originals. */
-export const saveArticleIdea = (text: string, title: string, body: string): Idea => {
+export const saveArticleIdea = (text: string, title: string, body: string, mergedFrom?: string[]): Idea => {
   const now = Date.now();
   const idea: Idea = { id: crypto.randomUUID(), text, createdAt: now, articleTitle: title.trim(), articleBody: body.trim(), updatedAt: now, aiPolishedAt: now };
+  if (mergedFrom?.length) idea.mergedFrom = [...new Set(mergedFrom)];
   replaceIdeas([idea, ...loadIdeas()]);
   return idea;
 };

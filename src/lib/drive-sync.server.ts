@@ -16,6 +16,7 @@ const idea = z.object({
   articleBody: z.string().max(400000).optional(),
   updatedAt: z.number().optional(),
   aiPolishedAt: z.number().optional(),
+  mergedFrom: z.array(z.string().max(100)).max(1000).optional(),
 });
 const inputSchema = z.object({
   ideas: z.array(idea).max(10000),
