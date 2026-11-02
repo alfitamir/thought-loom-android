@@ -124,6 +124,7 @@ export interface ArticleAudioStore {
   put(rec: StoredAudioRecord): Promise<void>;
   remove(key: string): Promise<void>;
   listForArticle(articleId: string): Promise<StoredAudioRecord[]>;
+  listAll(): Promise<StoredAudioRecord[]>;
 }
 
 /** In-memory store (tests, or browsers without IndexedDB). */
@@ -134,6 +135,7 @@ export function memoryArticleAudioStore(): ArticleAudioStore {
     async put(rec) { map.set(rec.key, rec); },
     async remove(key) { map.delete(key); },
     async listForArticle(articleId) { return [...map.values()].filter((r) => r.articleId === articleId); },
+    async listAll() { return [...map.values()]; },
   };
 }
 
@@ -168,6 +170,10 @@ export function indexedDbArticleAudioStore(): ArticleAudioStore {
     async listForArticle(articleId) {
       const t = await tx("readonly");
       return (await req(t.objectStore(STORE).index("articleId").getAll(articleId))) as StoredAudioRecord[];
+    },
+    async listAll() {
+      const t = await tx("readonly");
+      return (await req(t.objectStore(STORE).getAll())) as StoredAudioRecord[];
     },
   };
 }
@@ -232,6 +238,23 @@ export async function findCachedAudio(
   const legacy = all.filter(isLegacyAudio).sort((a, b) => b.createdAt - a.createdAt)[0];
   if (legacy) return cachedFromRecord(legacy, articleId, title, body, store);
   return null;
+}
+
+/**
+ * Ids of every article that has generated Gemini audio on this device, in
+ * ONE pass over the store — the library uses it to badge article cards
+ * without a per-card lookup. Presence only: a chunked manifest (even a
+ * partial generation) or a legacy single-file record counts, fresh or
+ * stale; lone chunk records without a manifest do not.
+ */
+export async function listArticleIdsWithAudio(
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+  for (const rec of await store.listAll()) {
+    if (rec.engine === "gemini" && (isChunkedManifest(rec) || isLegacyAudio(rec))) ids.add(rec.articleId);
+  }
+  return ids;
 }
 
 /** Sorted indexes of the chunks of one generation that are on this device. */
