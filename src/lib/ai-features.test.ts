@@ -10,7 +10,7 @@ vi.mock("./gemini", async (orig) => ({ ...(await orig<typeof import("./gemini")>
 // /api/articles/improve; transcription goes to /api/voice/transcribe (SSE).
 vi.mock("./ai-engine", () => ({ resolveEngine: async () => ({ kind: "cloud", token: "T" }) }));
 
-import { askIdeas, classifyBatch, excerptFor, getEvidence, getInsights, retrieveRelevant, transcribeAudio } from "./ai-features";
+import { askIdeas, classifyBatch, excerptFor, getArticleEnrichment, getEvidence, getInsights, retrieveRelevant, transcribeAudio } from "./ai-features";
 import { clearEvidenceCache } from "./evidence";
 
 const idea = (id: string, title: string, body: string, createdAt = 1): Idea => ({ id, text: body, createdAt, articleTitle: title, articleBody: body, updatedAt: createdAt });
@@ -161,5 +161,59 @@ describe("getEvidence (end to end)", () => {
   it("explains when the model found nothing suitable", async () => {
     route([]);
     await expect(getEvidence(article)).rejects.toThrow("لم يقترح");
+  });
+});
+
+describe("getArticleEnrichment", () => {
+  const art = { title: "المقال", body: "نص المقال الفكري الطويل عن الدولة والمجتمع والمنظومة الحضارية." };
+  const model = {
+    additions: [" زاوية أولى ", 42, "زاوية ثانية"],
+    quotes: [
+      { quote: " «اقتباس» ", author: " مالك بن نبي ", context: " يخدم الفكرة " },
+      { quote: "  ", author: "مجهول", context: "" },
+      "junk",
+    ],
+    questions: [" سؤال كاشف؟ ", ""],
+  };
+  const expected = {
+    additions: ["زاوية أولى", "زاوية ثانية"],
+    quotes: [{ quote: "«اقتباس»", author: "مالك بن نبي", context: "يخدم الفكرة" }],
+    questions: ["سؤال كاشف؟"],
+  };
+
+  it("uses the server route with the enrich task when no personal key is saved", async () => {
+    replyModel(model);
+    const out = await getArticleEnrichment(art);
+    expect(fetchMock.mock.calls[0]![0]).toBe("/api/articles/improve");
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.task).toBe("enrich");
+    expect(body.payload).toContain(art.title);
+    expect(body.payload).toContain(art.body);
+    expect(out).toEqual(expected); // model output sanitized (bad entries dropped, strings trimmed)
+  });
+
+  it("uses the user's own Gemini key directly when provided, sanitizing the same way", async () => {
+    geminiStream.mockResolvedValue(JSON.stringify(model));
+    const out = await getArticleEnrichment(art, { key: "K" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(geminiStream.mock.calls[0]![0]).toBe("K");
+    expect(out).toEqual(expected);
+  });
+
+  it("explains malformed model JSON instead of crashing", async () => {
+    geminiStream.mockResolvedValue("{not json");
+    await expect(getArticleEnrichment(art, { key: "K" })).rejects.toThrow("غير مكتمل");
+  });
+
+  it("refuses an empty article before any request (Afkari's backend guard)", async () => {
+    await expect(getArticleEnrichment({ title: "t", body: "   " })).rejects.toThrow("نص المقال مطلوب");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(geminiStream).not.toHaveBeenCalled();
+  });
+
+  it("refuses bodies over Afkari's 50k cap before any request", async () => {
+    await expect(getArticleEnrichment({ title: "t", body: "ن".repeat(50_001) })).rejects.toThrow("أطول من الحد");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(geminiStream).not.toHaveBeenCalled();
   });
 });

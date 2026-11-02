@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, Pencil, Share2, Sparkles, Square, Trash2, X } from "lucide-react";
+import { BookOpen, Check, HelpCircle, Lightbulb, Pencil, PlusCircle, Quote, Share2, ShieldAlert, Sparkles, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceDialog } from "@/components/evidence-dialog";
+import { getArticleEnrichment, type ArticleEnrichment } from "@/lib/ai-features";
 import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
@@ -21,6 +22,11 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
   const [preview, setPreview] = useState("");
   const [suggestion, setSuggestion] = useState<{ title: string; body: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Enrichment (Additions, Quotes, and Questions) state
+  const [enrichOpen, setEnrichOpen] = useState(false);
+  const [enrichBusy, setEnrichBusy] = useState(false);
+  const [enrichment, setEnrichment] = useState<ArticleEnrichment | null>(null);
+  const [enrichTab, setEnrichTab] = useState<"additions" | "quotes" | "questions">("quotes");
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const version = useRef(idea.updatedAt ?? 0);
@@ -64,6 +70,30 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
     } finally { setBusy(false); abort.current = null; }
   };
 
+  const openEnrichment = async () => {
+    setMessage("");
+    if (!navigator.onLine) { setMessage("اقتراح الإضافات يحتاج اتصالًا بالإنترنت."); return; }
+    setEnrichOpen(true);
+    if (enrichment) return;
+    setEnrichBusy(true);
+    try {
+      const data = await getArticleEnrichment(article);
+      setEnrichment(data);
+    } catch (err: any) {
+      setMessage(err?.message || "تعذّر جلب مقترحات الإثراء.");
+      setEnrichOpen(false);
+    } finally {
+      setEnrichBusy(false);
+    }
+  };
+
+  const insertTextIntoArticle = (textToAppend: string, notice: string) => {
+    const updatedBody = `${article.body.trim()}\n\n${textToAppend.trim()}`;
+    save(article.title, updatedBody);
+    setMessage(notice);
+    setEnrichOpen(false);
+  };
+
   return <article className="border-b border-border py-6 last:border-0">
     {editing ? <div className="space-y-3">
       <input aria-label="عنوان المقال" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
@@ -81,6 +111,7 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
         <Button variant="ghost" size="icon" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
         <Button variant="ghost" size="icon" aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onClick={improve}><Sparkles /></Button>
         <Button variant="ghost" size="icon" aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onClick={() => setEvidenceOpen(true)}><BookOpen className="text-emerald-600" /></Button>
+        <Button variant="ghost" size="icon" aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onClick={openEnrichment}><Lightbulb className="text-amber-500" /></Button>
         <Button variant="ghost" size="icon" className="text-destructive" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
     </>}
@@ -92,6 +123,130 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
         const updated = updateArticle(idea.id, current.title, `${current.body}\n\n${snippet}`);
         if (updated) { onChange(); void pushIdea(updated).catch(() => {}); setMessage("أُدرج الشاهد في نهاية المقال ✓"); }
       }} />
+    {/* Intellectual Enrichment Dialog: Additions, Quotes, and Questions */}
+    <Dialog open={enrichOpen} onOpenChange={setEnrichOpen}>
+      <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
+        <DialogTitle className="text-start font-display flex items-center gap-2">
+          <Lightbulb className="size-5 text-amber-500" />
+          <span>تطوير وإثراء المقال بذكاء</span>
+        </DialogTitle>
+        <p className="text-xs text-muted-foreground">
+          اقتراحات فكرية واقتباسات وأسئلة مستلهمة من فكر الكاتب ومراجعه الحضارية (مالك بن نبي، المسيري، ابن خلدون، ابن تيمية) لتعميق أطروحة المقال:
+        </p>
+
+        {enrichBusy ? (
+          <div className="py-8 text-center space-y-3">
+            <div className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-sm text-muted-foreground">جارٍ استخراج الزوايا الفكرية والاقتباسات والأسئلة الكاشفة عبر Gemini…</p>
+          </div>
+        ) : enrichment ? (
+          <div className="space-y-4">
+            <div className="flex rounded-lg border border-border p-1 bg-muted/30">
+              <button
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${enrichTab === "quotes" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setEnrichTab("quotes")}
+              >
+                <Quote className="size-3.5" />
+                <span>اقتباسات ومراجع ({enrichment.quotes?.length || 0})</span>
+              </button>
+              <button
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${enrichTab === "additions" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setEnrichTab("additions")}
+              >
+                <PlusCircle className="size-3.5" />
+                <span>زوايا فكرية ({enrichment.additions?.length || 0})</span>
+              </button>
+              <button
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${enrichTab === "questions" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setEnrichTab("questions")}
+              >
+                <HelpCircle className="size-3.5" />
+                <span>أسئلة كاشفة ({enrichment.questions?.length || 0})</span>
+              </button>
+            </div>
+
+            {enrichTab === "quotes" && (
+              <div className="space-y-3">
+                <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                  هذه الاقتباسات مولّدة بالذكاء الاصطناعي وغير موثّقة من المصادر — تحقق منها قبل الاستشهاد بها.
+                </p>
+                {enrichment.quotes?.length ? enrichment.quotes.map((q, idx) => (
+                  <div key={idx} className="rounded-xl border border-border bg-card p-3.5 space-y-2">
+                    <p className="font-article text-lg leading-relaxed text-foreground">
+                      «{q.quote}»
+                    </p>
+                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground pt-1 border-t border-border/50">
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="font-semibold text-primary">{q.author}</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400"><ShieldAlert className="size-3.5" />غير موثّق</span>
+                      </span>
+                      <span className="truncate max-w-[220px]" title={q.context}>{q.context}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs h-8 mt-2 justify-center gap-1.5"
+                      onClick={() => insertTextIntoArticle(`وكما قال ${q.author}: «${q.quote}».`, "أُدرج الاقتباس في المقال وحُفظ بنجاح ✓")}
+                    >
+                      <PlusCircle className="size-3.5 text-primary" />
+                      <span>إدراج الاقتباس في نهاية المقال</span>
+                    </Button>
+                  </div>
+                )) : (
+                  <p className="text-xs text-muted-foreground py-4 text-center">لا توجد اقتباسات محددة لهذا المقال.</p>
+                )}
+              </div>
+            )}
+
+            {enrichTab === "additions" && (
+              <div className="space-y-3">
+                {enrichment.additions?.length ? enrichment.additions.map((add, idx) => (
+                  <div key={idx} className="rounded-xl border border-border bg-card p-3.5 space-y-2.5">
+                    <p className="text-sm leading-relaxed text-foreground">{add}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs h-8 justify-center gap-1.5"
+                      onClick={() => insertTextIntoArticle(add, "أُضيفت الفكرة للمقال وحُفظت بنجاح ✓")}
+                    >
+                      <PlusCircle className="size-3.5 text-primary" />
+                      <span>إدراج هذه الزاوية في المقال</span>
+                    </Button>
+                  </div>
+                )) : (
+                  <p className="text-xs text-muted-foreground py-4 text-center">لا توجد إضافات حالياً.</p>
+                )}
+              </div>
+            )}
+
+            {enrichTab === "questions" && (
+              <div className="space-y-3">
+                {enrichment.questions?.length ? enrichment.questions.map((quest, idx) => (
+                  <div key={idx} className="rounded-xl border border-border bg-card p-3.5 space-y-2.5">
+                    <p className="text-sm font-medium leading-relaxed text-foreground">؟ {quest}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs h-8 justify-center gap-1.5"
+                      onClick={() => insertTextIntoArticle(quest, "أُدرج السؤال في خاتمة المقال وحُفظ بنجاح ✓")}
+                    >
+                      <PlusCircle className="size-3.5 text-primary" />
+                      <span>إدراج كسؤال خاتمة كاشف</span>
+                    </Button>
+                  </div>
+                )) : (
+                  <p className="text-xs text-muted-foreground py-4 text-center">لا توجد أسئلة حالياً.</p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        <div className="flex justify-end pt-2">
+          <Button variant="ghost" onClick={() => setEnrichOpen(false)}>إغلاق</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
     <Dialog open={previewOpen} onOpenChange={(open) => { if (!open) abort.current?.abort(); setPreviewOpen(open); }}>
       <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
         <DialogTitle className="text-start font-display">مراجعة التحسين</DialogTitle>

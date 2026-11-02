@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLASSIFY_INSTRUCTIONS, TOPIC_LIST, sanitizeAsk, sanitizeInsights, sanitizeLabels } from "./ai-prompts";
+import { CLASSIFY_INSTRUCTIONS, TOPIC_LIST, sanitizeAdditions, sanitizeAsk, sanitizeInsights, sanitizeLabels } from "./ai-prompts";
 import { OTHER } from "./topics";
 
 describe("sanitizeAsk", () => {
@@ -51,5 +51,42 @@ describe("sanitizeInsights", () => {
   it("throws when nothing usable came back", () => {
     expect(() => sanitizeInsights({ themes: [], prompts: [] }, ids)).toThrow();
     expect(() => sanitizeInsights("junk", ids)).toThrow();
+  });
+});
+
+describe("sanitizeAdditions", () => {
+  it("returns empty arrays for unusable input instead of throwing", () => {
+    const empty = { additions: [], quotes: [], questions: [] };
+    expect(sanitizeAdditions(null)).toEqual(empty);
+    expect(sanitizeAdditions("junk")).toEqual(empty);
+    expect(sanitizeAdditions({ additions: "x", quotes: 3, questions: {} })).toEqual(empty);
+  });
+  it("keeps only well-shaped entries, trimmed and bounded", () => {
+    const out = sanitizeAdditions({
+      additions: ["  زاوية  ", "", 7, "ب".repeat(600)],
+      quotes: [
+        { quote: " قول ", author: " مؤلف ", context: " سياق " },
+        { quote: "   ", author: "x", context: "y" },
+        { author: "بلا نص" },
+        null,
+      ],
+      questions: [" سؤال؟ ", ""],
+    });
+    expect(out.additions[0]).toBe("زاوية");
+    expect(out.additions[1]).toHaveLength(500);
+    expect(out.additions).toHaveLength(2);
+    expect(out.quotes).toEqual([{ quote: "قول", author: "مؤلف", context: "سياق" }]);
+    expect(out.questions).toEqual(["سؤال؟"]);
+  });
+  it("caps the list sizes (10 additions, 8 quotes, 10 questions)", () => {
+    const many = (n: number, f: (i: number) => unknown) => Array.from({ length: n }, (_, i) => f(i));
+    const out = sanitizeAdditions({
+      additions: many(15, (i) => `a${i}`),
+      quotes: many(12, (i) => ({ quote: `q${i}`, author: "a", context: "c" })),
+      questions: many(14, (i) => `s${i}`),
+    });
+    expect(out.additions).toHaveLength(10);
+    expect(out.quotes).toHaveLength(8);
+    expect(out.questions).toHaveLength(10);
   });
 });
