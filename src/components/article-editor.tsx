@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Pencil, Share2, Sparkles, Square, Trash2, X } from "lucide-react";
+import { BookOpen, Check, Pencil, Share2, Sparkles, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { EvidenceDialog } from "@/components/evidence-dialog";
 import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
@@ -20,6 +21,7 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
   const [preview, setPreview] = useState("");
   const [suggestion, setSuggestion] = useState<{ title: string; body: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const version = useRef(idea.updatedAt ?? 0);
   useEffect(() => () => abort.current?.abort(), []);
@@ -78,10 +80,18 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
         <Button variant="ghost" size="icon" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
         <Button variant="ghost" size="icon" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
         <Button variant="ghost" size="icon" aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onClick={improve}><Sparkles /></Button>
+        <Button variant="ghost" size="icon" aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onClick={() => setEvidenceOpen(true)}><BookOpen className="text-emerald-600" /></Button>
         <Button variant="ghost" size="icon" className="text-destructive" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
     </>}
     {message && <p role="status" className="mt-3 break-words text-sm text-muted-foreground">{message}</p>}
+    <EvidenceDialog open={evidenceOpen} onOpenChange={setEvidenceOpen} title={article.title} body={article.body} online={online}
+      onInsert={(snippet) => {
+        const latest = loadIdeas().find((i) => i.id === idea.id);
+        const current = latest ? getArticle(latest) : article;
+        const updated = updateArticle(idea.id, current.title, `${current.body}\n\n${snippet}`);
+        if (updated) { onChange(); void pushIdea(updated).catch(() => {}); setMessage("أُدرج الشاهد في نهاية المقال ✓"); }
+      }} />
     <Dialog open={previewOpen} onOpenChange={(open) => { if (!open) abort.current?.abort(); setPreviewOpen(open); }}>
       <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
         <DialogTitle className="text-start font-display">مراجعة التحسين</DialogTitle>

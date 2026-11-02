@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button";
 import { ArticleEditor } from "@/components/article-editor";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { MergeBanner } from "@/components/merge-banner";
-import { ArrowRight, ChevronDown, Search, Settings, Sparkles, Square, X } from "lucide-react";
+import { AskDialog } from "@/components/ask-dialog";
+import { InsightsDialog } from "@/components/insights-dialog";
+import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
+import { ArrowRight, ChevronDown, Lightbulb, Search, Settings, Sparkles, Square, Tags, X } from "lucide-react";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -34,7 +37,20 @@ function Library() {
   const [bulkMsg, setBulkMsg] = useState("");
   const bulkAbort = useRef<AbortController | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const refresh = () => setIdeas(loadIdeas());
+  const [askOpen, setAskOpen] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
+  const [labels, setLabels] = useState(loadLabels);
+  const [labeling, setLabeling] = useState<{ done: number; total: number } | null>(null);
+  const [labelError, setLabelError] = useState("");
+  const refresh = () => { setIdeas(loadIdeas()); setLabels(loadLabels()); };
+  const stale = unlabeled(ideas).length;
+  const classifyAll = async () => {
+    setLabelError(""); setLabeling({ done: 0, total: stale });
+    try { await labelAll(ideas, { onProgress: (done, total) => setLabeling({ done, total }) }); }
+    catch (e) { setLabelError(e instanceof Error ? e.message : "تعذّر التصنيف."); }
+    finally { setLabeling(null); refresh(); }
+  };
+  const pick = (title: string) => { setQuery(title); setSearchOpen(true); };
   const polishAll = async () => {
     setBulkMsg("");
     const engine = await resolveEngine();
@@ -74,10 +90,11 @@ function Library() {
     window.addEventListener("online", connect);
     window.addEventListener("offline", disconnect);
     window.addEventListener("afkari:ideas-changed", refresh);
+    window.addEventListener("afkari:labels-changed", refresh);
     window.addEventListener("storage", refresh);
     return () => {
       window.removeEventListener("online", connect); window.removeEventListener("offline", disconnect);
-      window.removeEventListener("afkari:ideas-changed", refresh); window.removeEventListener("storage", refresh);
+      window.removeEventListener("afkari:ideas-changed", refresh); window.removeEventListener("afkari:labels-changed", refresh); window.removeEventListener("storage", refresh);
     };
   }, []);
 
@@ -98,8 +115,20 @@ function Library() {
         </div>
       </header>
       {(bulk || bulkMsg) && <p role="status" className="mb-4 text-sm text-muted-foreground">{bulk ? `جارٍ الضبط… تم ${bulk.done} من ${bulk.total}` : bulkMsg}</p>}
+      {ideas.length > 0 && <div className="mb-4 flex flex-wrap gap-2">
+        <button onClick={() => setAskOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"><Sparkles className="size-4" />اسأل أفكاري</button>
+        <button onClick={() => setInsightsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Lightbulb className="size-4" />رؤى</button>
+        {stale > 0 && (
+          <button onClick={() => void classifyAll()} disabled={!online || !!labeling} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50">
+            <Tags className="size-4" />{labeling ? `جارٍ التصنيف ${labeling.done}/${labeling.total}…` : `صنّف بالذكاء الاصطناعي (${stale})`}
+          </button>
+        )}
+      </div>}
+      {labelError && <p role="alert" className="mb-4 text-sm text-destructive">{labelError}</p>}
       <MergeBanner ideas={ideas} online={online} onChange={refresh} />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <AskDialog open={askOpen} onOpenChange={setAskOpen} ideas={ideas} online={online} onPick={pick} />
+      <InsightsDialog open={insightsOpen} onOpenChange={setInsightsOpen} ideas={ideas} online={online} onChange={refresh} onPick={pick} />
       {searchOpen && <div className="mb-6 flex items-center gap-2 border-b border-border pb-3">
         <Search className="size-5 shrink-0 text-muted-foreground" />
         <input autoFocus type="search" aria-label="كلمة البحث" placeholder="ابحث بكلمة…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-lg outline-none" />
@@ -117,7 +146,19 @@ function Library() {
             </Button>
             {(query.trim() || openTopic === topic) && (
               <div>
-                {list.map((i) => <ArticleEditor key={i.id} idea={i} online={online} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }} />)}
+                {list.map((i) => {
+                  const tags = labelFor(i, labels).tags;
+                  return <div key={i.id}>
+                    {tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-4">
+                        {tags.map((t) => (
+                          <button key={t} onClick={() => pick(t)} className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80">#{t}</button>
+                        ))}
+                      </div>
+                    )}
+                    <ArticleEditor idea={i} online={online} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }} />
+                  </div>;
+                })}
               </div>
             )}
           </section>
