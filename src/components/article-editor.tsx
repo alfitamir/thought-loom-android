@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceDialog } from "@/components/evidence-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
+import { HighlightedText } from "@/components/highlighted-text";
+import { countOccurrences } from "@/lib/search-highlight";
 import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
@@ -20,10 +22,15 @@ const readingTimeLabel = (text: string) => {
   return `قراءة ${mins} دقيقة`;
 };
 
-export function ArticleEditor({ idea, topic, online, onChange, onDelete }: {
+export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQuery, matchStartIndex, currentMatchIndex }: {
   idea: Idea; topic?: string; online: boolean; onChange: () => void; onDelete: () => void;
+  /** Active library search: highlight occurrences in view mode. matchStartIndex is this
+   *  article's first global match index (title matches come before body matches). */
+  searchQuery?: string | undefined; matchStartIndex?: number | undefined; currentMatchIndex?: number | null | undefined;
 }) {
   const article = getArticle(idea);
+  const hlQuery = searchQuery?.trim() ? searchQuery : "";
+  const bodyMatchStart = (matchStartIndex ?? 0) + (hlQuery ? countOccurrences(article.title, hlQuery) : 0);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(article.title);
   const [body, setBody] = useState(article.body);
@@ -155,7 +162,9 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete }: {
         <Button variant="ghost" onClick={() => setEditing(false)}><X />إلغاء</Button>
       </div>
     </div> : <>
-      <h2 className="break-words font-display text-xl text-primary">{article.title}</h2>
+      <h2 className="break-words font-display text-xl text-primary">{hlQuery
+        ? <HighlightedText text={article.title} query={hlQuery} startIndex={matchStartIndex} currentIndex={currentMatchIndex} />
+        : article.title}</h2>
       {topic && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground">{topic}</span>
@@ -165,9 +174,16 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete }: {
       {(() => {
         const flat = article.body.replace(/\s+/g, " ").trim();
         if (!flat) return null;
-        return <p className="mb-4 line-clamp-1 text-sm text-muted-foreground">{flat.length > 90 ? `${flat.slice(0, 90)}…` : flat}</p>;
+        const preview = flat.length > 90 ? `${flat.slice(0, 90)}…` : flat;
+        // Visual highlight only: the preview echoes the body's opening, so its
+        // marks carry no global index and navigation targets the body itself.
+        return <p className="mb-4 line-clamp-1 text-sm text-muted-foreground">{hlQuery
+          ? <HighlightedText text={preview} query={hlQuery} />
+          : preview}</p>;
       })()}
-      <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{article.body}</p>
+      <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{hlQuery
+        ? <HighlightedText text={article.body} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
+        : article.body}</p>
       <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
       <div className="mt-4">
         <p className="mb-2 text-xs font-medium text-muted-foreground">أدوات ذكية</p>
