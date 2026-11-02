@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { improveFull } from "@/lib/article-ai";
+import { cleanFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
 import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolish, updateArticle, type Idea } from "@/lib/ideas";
 import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
@@ -10,7 +10,8 @@ import { MergeBanner } from "@/components/merge-banner";
 import { AskDialog } from "@/components/ask-dialog";
 import { InsightsDialog } from "@/components/insights-dialog";
 import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
-import { ArrowRight, ChevronDown, Feather, Lightbulb, MessageCircleQuestion, Search, Sparkles, Square, Tags, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Feather, Lightbulb, MessageCircleQuestion, Search, Sparkles, Square, Tags, X } from "lucide-react";
+import { countOccurrences } from "@/lib/search-highlight";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -35,6 +36,7 @@ function Library() {
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
   const [bulkMsg, setBulkMsg] = useState("");
   const bulkAbort = useRef<AbortController | null>(null);
+  const [currentMatch, setCurrentMatch] = useState<number | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [labels, setLabels] = useState(loadLabels);
@@ -60,9 +62,8 @@ function Library() {
     try {
       for (const idea of queue) {
         if (controller.signal.aborted || !navigator.onLine) break;
-        const samples = loadIdeas().filter((i) => i.id !== idea.id).slice(0, 3).map((i) => i.text.slice(0, 2000));
         try {
-          const result = await improveFull(getArticle(idea), idea.text, samples, engine, controller.signal, () => {});
+          const result = await cleanFull(getArticle(idea), engine, controller.signal, () => {});
           const latest = loadIdeas().find((i) => i.id === idea.id);
           if (latest && (latest.updatedAt ?? 0) === (idea.updatedAt ?? 0)) {
             const updated = updateArticle(idea.id, result.title, result.body, true);
@@ -99,6 +100,36 @@ function Library() {
   const groups: Record<string, Idea[]> = {};
   ideas.filter((i) => matchesArticle(i, query)).forEach((i) => (groups[classify(getArticle(i).body)] ??= []).push(i));
 
+  // Search-highlight accounting, in the exact order articles render below
+  // (topic groups in order, title occurrences before body occurrences), so a
+  // global match index identifies one rendered <mark data-match-idx="…">.
+  const queryActive = !!query.trim();
+  const matchStarts = new Map<string, number>();
+  let totalMatches = 0;
+  if (queryActive) {
+    for (const list of Object.values(groups)) {
+      for (const i of list) {
+        const a = getArticle(i);
+        matchStarts.set(i.id, totalMatches);
+        totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+      }
+    }
+  }
+  const articlesCount = Object.values(groups).reduce((n, l) => n + l.length, 0);
+  const safeCurrent = currentMatch !== null && totalMatches > 0 ? Math.min(currentMatch, totalMatches - 1) : null;
+  const goToMatch = (delta: number) => {
+    if (!totalMatches) return;
+    setCurrentMatch((prev) => (prev === null ? (delta > 0 ? 0 : totalMatches - 1) : (prev + delta + totalMatches) % totalMatches));
+  };
+  useEffect(() => { setCurrentMatch(null); }, [query]);
+  useEffect(() => {
+    if (safeCurrent === null) return;
+    const raf = requestAnimationFrame(() => {
+      document.querySelector(`mark[data-match-idx="${safeCurrent}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [safeCurrent]);
+
   return (
     <main dir="rtl" className="paper min-h-screen px-5 pb-24 pt-6"><div className="mx-auto max-w-3xl">
       <header className="mb-6 flex items-center justify-between">
@@ -106,7 +137,7 @@ function Library() {
         <div className="flex gap-2">
           {online && ideas.length > 0 && (bulk
             ? <Button variant="ghost" size="icon" aria-label="إيقاف الضبط" title="إيقاف الضبط" onClick={() => bulkAbort.current?.abort()}><Square /></Button>
-            : <Button variant="ghost" size="icon" aria-label="ضبط كل المقالات" title="ضبط كل المقالات" onClick={polishAll}><Sparkles /></Button>)}
+            : <Button variant="ghost" size="icon" aria-label="تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)" title="تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)" onClick={polishAll}><Sparkles /></Button>)}
           <Button variant="ghost" size="icon" aria-label="بحث في المقالات" title="بحث في المقالات" onClick={() => { setSearchOpen(!searchOpen); setQuery(""); }}><Search /></Button>
           <Button asChild variant="ghost" size="icon"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
         </div>
@@ -128,6 +159,13 @@ function Library() {
       {searchOpen && <div className="mb-6 flex items-center gap-2 border-b border-border pb-3">
         <Search className="size-5 shrink-0 text-muted-foreground" />
         <input autoFocus type="search" aria-label="كلمة البحث" placeholder="ابحث بكلمة…" value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-lg outline-none" />
+        {queryActive && totalMatches > 0 && <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">{totalMatches} مرة في {articlesCount} مقالة</span>}
+        {queryActive && totalMatches === 0 && articlesCount > 0 && <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">لا نتائج</span>}
+        {queryActive && safeCurrent !== null && <span className="shrink-0 whitespace-nowrap text-sm font-medium text-foreground">{safeCurrent + 1} من {totalMatches}</span>}
+        {queryActive && <>
+          <Button variant="ghost" size="icon" aria-label="النتيجة السابقة" title="النتيجة السابقة" disabled={!totalMatches} onClick={() => goToMatch(-1)}><ChevronUp /></Button>
+          <Button variant="ghost" size="icon" aria-label="النتيجة التالية" title="النتيجة التالية" disabled={!totalMatches} onClick={() => goToMatch(1)}><ChevronDown /></Button>
+        </>}
         <Button variant="ghost" size="icon" aria-label="إغلاق البحث" onClick={() => { setSearchOpen(false); setQuery(""); }}><X /></Button>
       </div>}
       {ideas.length === 0 && !query.trim() && (
@@ -158,7 +196,8 @@ function Library() {
                         ))}
                       </div>
                     )}
-                    <ArticleEditor idea={i} topic={topic} online={online} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }} />
+                    <ArticleEditor idea={i} topic={topic} online={online} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }}
+                      searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
                   </div>;
                 })}
               </div>

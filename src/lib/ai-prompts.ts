@@ -70,11 +70,14 @@ ${KEEP_ALL}
 ${STYLE_GUIDE}
 ${OUTPUT}`;
 
+export const CLEAN_INSTRUCTIONS = `أنت مصحّح لغوي دقيق. مهمتك فقط: (١) حذف الشوائب — بقايا التعرف الصوتي مثل الأصوات المكررة والحروف الشاردة والرموز العرضية والكلمات المكررة سهوًا أثناء الإملاء والمسافات المكسورة؛ (٢) ضبط الإملاء؛ (٣) ضبط علامات الترقيم والفواصل وتنسيق الفقرات. ممنوع منعًا باتًا: تغيير أي كلمة بكلمة أخرى، أو إعادة صياغة أي جملة، أو تغيير ترتيب الجمل، أو تطبيق أي دليل أسلوب، أو الحذف أو الإضافة أو الاختصار. الناتج هو النص نفسه بأخطائه مصحّحة فقط، وبنفس الطول تقريبًا وضمير المتكلم وكلمات الكاتب كما هي. اترك عنوان المقال كما هو دون أي تغيير.
+${OUTPUT}`;
+
 export const SUGGEST_INSTRUCTIONS = `أنت مساعد يرتب مقالات كاتب واحد. اقرأ قائمة المقالات (معرف، عنوان، مقتطف) واقترح مجموعات من مقالين أو أكثر تتناول القضية نفسها أو فكرة متصلة بها بحيث يكون دمجها في مقال واحد طويل مفيدًا وطبيعيًا. لا تقترح دمج مقالات قضاياها مختلفة، ولا تقترح المجموعات الواردة في avoid. كل مقال يظهر في مجموعة واحدة على الأكثر. لكل مجموعة: ids (المعرفات كما هي)، title (عنوان مقترح مباشر يحدد القضية)، reason (سبب قصير جدًا)، strength (رقم من 1 إلى 5 لقوة الرابط؛ لا تقترح إلا ما قوته 3 فأكثر، ورتّب من الأقوى)، thesis (الأطروحة الجامعة للمقال المدمج في جملة واحدة). إن لم توجد مقالات متقاربة أعد قائمة فارغة. أخرج JSON فقط: مصفوفة كائنات.`;
 
 export const TRANSCRIBE_INSTRUCTIONS = `فرّغ التسجيل الصوتي العربي حرفيًا كما قاله المتكلم، بلهجته وكلماته، مع ترقيم بسيط. لا تلخص ولا تحذف ولا تضف ولا تعلق، واحذف فقط أصوات التردد مثل «اممم». إن لم يكن في التسجيل كلام مفهوم فأخرج الكلمة: [صمت]. أخرج النص فقط.`;
 
-export type AiTask = "improve" | "merge" | "suggest" | "ask" | "classify" | "insights" | "evidence" | "enrich" | "facebook";
+export type AiTask = "improve" | "clean" | "merge" | "suggest" | "ask" | "classify" | "insights" | "evidence" | "enrich" | "facebook";
 // TASK_INSTRUCTIONS is assembled at the end of this file, after the ported Afkari sections define their instructions.
 
 export const SILENCE = "[صمت]";
@@ -415,9 +418,12 @@ export const MERGE_SUGGEST_SCHEMA = {
 
 // Writing tasks carry the author's voice profile via withVoice (see above). Evidence
 // stays bare — it returns verified quoted text, not styled writing — and suggest
-// stays bare because it only proposes groupings and writes no prose.
+// stays bare because it only proposes groupings and writes no prose. Clean stays
+// bare too, and also skips STYLE_GUIDE: it is a proofreader for the library bulk
+// button, limited to removing dictation noise and fixing spelling/punctuation —
+// the author's wording, order and style must pass through untouched.
 export const TASK_INSTRUCTIONS: Record<AiTask, string> = {
-  improve: withVoice(IMPROVE_INSTRUCTIONS), merge: withVoice(MERGE_INSTRUCTIONS), suggest: SUGGEST_INSTRUCTIONS,
+  improve: withVoice(IMPROVE_INSTRUCTIONS), clean: CLEAN_INSTRUCTIONS, merge: withVoice(MERGE_INSTRUCTIONS), suggest: SUGGEST_INSTRUCTIONS,
   ask: withVoice(ASK_INSTRUCTIONS), classify: withVoice(CLASSIFY_INSTRUCTIONS), insights: withVoice(INSIGHTS_INSTRUCTIONS), evidence: EVIDENCE_INSTRUCTIONS,
   enrich: withVoice(ENRICH_INSTRUCTIONS),
   facebook: withVoice(FACEBOOK_INSTRUCTIONS),
