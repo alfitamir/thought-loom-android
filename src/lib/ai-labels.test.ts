@@ -52,4 +52,18 @@ describe("ai labels", () => {
     localStorage.setItem("afkari.aiLabels", "{broken");
     expect(labelFor(idea("a")).ai).toBe(false);
   });
+  it("never classifies an article whose topic was pinned by hand", async () => {
+    const pinned: Idea = { ...idea("p"), topic: "موضوعي", topicManual: true };
+    expect(unlabeled([pinned])).toEqual([]);
+    expect(await labelAll([pinned])).toBe(0);
+    expect(classifyBatch).not.toHaveBeenCalled();
+    expect(loadLabels()).toEqual({});
+  });
+  it("labels the unpinned and skips the pinned in one run, counting only what it did", async () => {
+    classifyBatch.mockResolvedValue({ a: { topic: "الصحة", tags: [] } });
+    const pinned: Idea = { ...idea("p"), topic: "موضوعي", topicManual: true };
+    expect(await labelAll([idea("a"), pinned])).toBe(1);
+    expect(classifyBatch.mock.calls).toHaveLength(1);
+    expect((classifyBatch.mock.calls[0]?.[0] as Idea[]).map((c) => c.id)).toEqual(["a"]);
+  });
 });
