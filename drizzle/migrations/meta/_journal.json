@@ -22,6 +22,13 @@
       "when": 1793579687441,
       "tag": "0002_idea_deletions_and_merged_from",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793653200000,
+      "tag": "0003_manual_topic",
+      "breakpoints": true
     }
   ]
 }
