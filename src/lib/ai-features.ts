@@ -1,7 +1,7 @@
 import {
-  ASK_SCHEMA, CLASSIFY_SCHEMA, EVIDENCE_SCHEMA, INSIGHTS_SCHEMA, TRANSCRIBE_INSTRUCTIONS,
-  sanitizeAsk, sanitizeInsights, sanitizeLabels,
-  type AiTask, type AskAnswer, type AskArticle, type ClassifyItem, type InsightItem, type Insights, type Label,
+  ASK_SCHEMA, CLASSIFY_SCHEMA, ENRICH_SCHEMA, EVIDENCE_SCHEMA, INSIGHTS_SCHEMA, TRANSCRIBE_INSTRUCTIONS,
+  sanitizeAdditions, sanitizeAsk, sanitizeInsights, sanitizeLabels,
+  type AiTask, type ArticleAdditions, type AskAnswer, type AskArticle, type ClassifyItem, type InsightItem, type Insights, type Label,
 } from "./ai-prompts";
 import { verifyAll, type EvidenceResult } from "./evidence";
 import { geminiStream, getGeminiKey } from "./gemini";
@@ -139,6 +139,31 @@ export async function getInsights(ideas: Idea[], o: AIOptions = {}): Promise<Ins
   });
   const raw = await runTask("insights", JSON.stringify(items), INSIGHTS_SCHEMA, o);
   return sanitizeInsights(raw, items.map((i) => i.id));
+}
+
+// ---------- article enrichment (additions, quotes, questions) ----------
+export type ArticleEnrichment = ArticleAdditions;
+
+/**
+ * Ported from Afkari's getArticleEnrichment. Afkari posted the article to its Express
+ * `/api/gemini/suggest-additions` endpoint, which prompted Gemini with the additions
+ * instructions + schema and returned sanitizeAdditions output. Here the same prompt is
+ * built client-side and dispatched through the app engine like the other ported
+ * features (personal key in-browser, else the authenticated server route, whose
+ * TASK_INSTRUCTIONS now carries those same instructions as the `enrich` task); the
+ * result is sanitized with the same sanitizeAdditions. Afkari's backend guards are
+ * kept: an empty body is refused, and bodies over its 50,000-character cap are
+ * refused with its message instead of being sent (the server route's own payload
+ * cap is looser, so the cap is enforced here to keep the same request size).
+ * NOTE: quotes returned here are model-suggested and NOT source-verified — the
+ * editor labels them «غير موثّق»; verified text is only the Evidence path below.
+ */
+export async function getArticleEnrichment(article: { title: string; body: string }, o: AIOptions = {}): Promise<ArticleEnrichment> {
+  if (!article.body.trim()) throw new Error("نص المقال مطلوب");
+  if (article.body.length > 50_000) throw new Error("المقال أطول من الحد المسموح");
+  const payload = `بناءً على المقال التالي للكاتب، اقترح إضافات فكرية واقتباسات ملهمة لتعميق المقال:\nالعنوان: ${article.title.slice(0, 200)}\n\nالنص:\n${article.body}`;
+  const raw = await runTask("enrich", payload, ENRICH_SCHEMA, o);
+  return sanitizeAdditions(raw);
 }
 
 // ---------- evidence from Quran, Sunnah and other writings ----------
