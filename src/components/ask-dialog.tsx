@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Square } from "lucide-react";
+import { MessageCircleQuestion, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { askIdeas } from "@/lib/ai-features";
@@ -39,7 +39,7 @@ export function AskDialog({ open, onOpenChange, ideas, online, onPick }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
-        <DialogTitle className="flex items-center gap-2"><Sparkles className="size-4 text-primary" />اسأل أفكاري</DialogTitle>
+        <DialogTitle className="flex items-center gap-2"><MessageCircleQuestion className="size-4 text-primary" />اسأل أفكاري</DialogTitle>
         <p className="text-sm text-muted-foreground">اسأل عن موقفك أو ما كتبته؛ الجواب يعتمد على مقالاتك وحدها ومعه المقالات التي اعتمد عليها.</p>
         <form onSubmit={(e) => { e.preventDefault(); void ask(); }} className="space-y-2">
           <textarea

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, HelpCircle, Lightbulb, Pencil, PlusCircle, Quote, Share2, ShieldAlert, Sparkles, Square, Trash2, X } from "lucide-react";
+import { BookOpen, Check, HelpCircle, Pencil, PlusCircle, Quote, Share2, ShieldAlert, Sparkles, Square, Trash2, WandSparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceDialog } from "@/components/evidence-dialog";
@@ -8,6 +8,8 @@ import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
+
+const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
 export function ArticleEditor({ idea, online, onChange, onDelete }: {
   idea: Idea; online: boolean; onChange: () => void; onDelete: () => void;
@@ -98,6 +100,7 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
     {editing ? <div className="space-y-3">
       <input aria-label="عنوان المقال" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
       <textarea aria-label="نص المقال" value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="w-full rounded-md border border-input bg-card p-3 font-article text-xl leading-loose outline-none focus:ring-2 focus:ring-ring" />
+      <p className="text-xs text-muted-foreground">عدد الكلمات: {countWords(body)}</p>
       <div className="flex gap-2">
         <Button onClick={() => save(title, body)} disabled={!title.trim() || !body.trim()}><Check />حفظ</Button>
         <Button variant="ghost" onClick={() => setEditing(false)}><X />إلغاء</Button>
@@ -106,12 +109,18 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
       <h2 className="break-words font-display text-xl text-primary">{article.title}</h2>
       <p className="mb-4 mt-1 text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString("ar")}</p>
       <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{article.body}</p>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">أدوات ذكية</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onClick={improve} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><Sparkles className="size-4" />تحسين</button>
+          <button type="button" aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onClick={() => setEvidenceOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><BookOpen className="size-4 text-emerald-600" />شواهد</button>
+          <button type="button" aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onClick={openEnrichment} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"><WandSparkles className="size-4 text-amber-500" />إثراء</button>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="icon" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
         <Button variant="ghost" size="icon" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
-        <Button variant="ghost" size="icon" aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onClick={improve}><Sparkles /></Button>
-        <Button variant="ghost" size="icon" aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onClick={() => setEvidenceOpen(true)}><BookOpen className="text-emerald-600" /></Button>
-        <Button variant="ghost" size="icon" aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onClick={openEnrichment}><Lightbulb className="text-amber-500" /></Button>
         <Button variant="ghost" size="icon" className="text-destructive" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
     </>}
@@ -127,7 +136,7 @@ export function ArticleEditor({ idea, online, onChange, onDelete }: {
     <Dialog open={enrichOpen} onOpenChange={setEnrichOpen}>
       <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
         <DialogTitle className="text-start font-display flex items-center gap-2">
-          <Lightbulb className="size-5 text-amber-500" />
+          <WandSparkles className="size-5 text-amber-500" />
           <span>تطوير وإثراء المقال بذكاء</span>
         </DialogTitle>
         <p className="text-xs text-muted-foreground">

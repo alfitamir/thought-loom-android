@@ -11,7 +11,7 @@ import { MergeBanner } from "@/components/merge-banner";
 import { AskDialog } from "@/components/ask-dialog";
 import { InsightsDialog } from "@/components/insights-dialog";
 import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
-import { ArrowRight, ChevronDown, Lightbulb, Search, Settings, Sparkles, Square, Tags, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Lightbulb, MessageCircleQuestion, Search, Settings, Sparkles, Square, Tags, X } from "lucide-react";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -104,7 +104,7 @@ function Library() {
   return (
     <main dir="rtl" className="paper min-h-screen px-5 py-6"><div className="mx-auto max-w-3xl">
       <header className="mb-6 flex items-center justify-between">
-        <h1 className="font-display text-3xl text-foreground">مقالاتي</h1>
+        <h1 className="font-display text-3xl text-foreground">مقالاتي{ideas.length > 0 && <span className="text-xl text-muted-foreground"> ({ideas.length})</span>}</h1>
         <div className="flex gap-2">
           {online && ideas.length > 0 && (bulk
             ? <Button variant="ghost" size="icon" aria-label="إيقاف الضبط" title="إيقاف الضبط" onClick={() => bulkAbort.current?.abort()}><Square /></Button>
@@ -116,7 +116,7 @@ function Library() {
       </header>
       {(bulk || bulkMsg) && <p role="status" className="mb-4 text-sm text-muted-foreground">{bulk ? `جارٍ الضبط… تم ${bulk.done} من ${bulk.total}` : bulkMsg}</p>}
       {ideas.length > 0 && <div className="mb-4 flex flex-wrap gap-2">
-        <button onClick={() => setAskOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"><Sparkles className="size-4" />اسأل أفكاري</button>
+        <button onClick={() => setAskOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"><MessageCircleQuestion className="size-4" />اسأل أفكاري</button>
         <button onClick={() => setInsightsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Lightbulb className="size-4" />رؤى</button>
         {stale > 0 && (
           <button onClick={() => void classifyAll()} disabled={!online || !!labeling} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50">
