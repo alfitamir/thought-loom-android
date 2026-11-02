@@ -6,6 +6,13 @@ import { pushIdea, syncNow } from "@/lib/sync";
 import { createVoiceRecorder, type VoiceRecorder } from "@/lib/voice-recorder";
 
 export const Route = createFileRoute("/")({
+  // `?record=<nonce>` is the bottom navigation's "open the recorder" signal:
+  // each tap sends a fresh nonce so repeated taps retrigger the effect below.
+  validateSearch: (search: Record<string, unknown>): { record?: number } => {
+    const raw = search["record"];
+    const value = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+    return Number.isFinite(value) && value > 0 ? { record: value } : {};
+  },
   head: () => ({
     meta: [
       { title: "أفكاري — سجّل فكرتك" },
@@ -20,6 +27,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { record } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
@@ -51,6 +60,18 @@ function Index() {
       window.removeEventListener("online", check);
     };
   }, []);
+
+  // Bottom-nav «سجّل فكرة» deep link: open the recorder form (never auto-start
+  // the mic — that still needs the «ابدأ التسجيل» tap), then clear the param
+  // with replace so re-renders and the back button don't reopen it.
+  useEffect(() => {
+    // The router merges raw URL params into the match search, so a hand-typed
+    // junk value can arrive here as a string despite the declared type —
+    // only a positive number (the nonce the bottom nav sends) may open it.
+    if (typeof record !== "number" || !Number.isFinite(record) || record <= 0) return;
+    setOpen(true);
+    navigate({ to: "/", search: {}, replace: true });
+  }, [record, navigate]);
 
   // Recording runs until the user presses stop (see createVoiceRecorder).
   const textRef = useRef("");
