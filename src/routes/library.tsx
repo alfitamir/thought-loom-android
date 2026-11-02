@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { cleanFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
-import { classify, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolish, updateArticle, type Idea } from "@/lib/ideas";
+import { articleTopic, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolish, updateArticle, type Idea } from "@/lib/ideas";
 import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -108,7 +108,7 @@ function Library() {
   }, []);
 
   const groups: Record<string, Idea[]> = {};
-  ideas.filter((i) => matchesArticle(i, query)).forEach((i) => (groups[classify(getArticle(i).body)] ??= []).push(i));
+  ideas.filter((i) => matchesArticle(i, query)).forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
 
   // Search-highlight accounting, in the exact order articles render below
   // (topic groups in order, title occurrences before body occurrences), so a

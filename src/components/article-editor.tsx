@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, HelpCircle, ListPlus, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, HelpCircle, ListPlus, Lock, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -7,7 +7,7 @@ import { EvidenceDialog } from "@/components/evidence-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
 import { countOccurrences } from "@/lib/search-highlight";
-import { getArticle, loadIdeas, updateArticle, type Idea } from "@/lib/ideas";
+import { articleTopic, clearArticleTopic, getArticle, loadIdeas, setArticleTopic, topicOptions, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
@@ -61,6 +61,9 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   const [fbError, setFbError] = useState("");
   const [fbStatus, setFbStatus] = useState("");
   const [listenOpen, setListenOpen] = useState(false);
+  // Manual topic picker state (the new-topic draft lives here, not in the dialog)
+  const [topicOpen, setTopicOpen] = useState(false);
+  const [newTopic, setNewTopic] = useState("");
   const abort = useRef<AbortController | null>(null);
   const version = useRef(idea.updatedAt ?? 0);
   useEffect(() => () => abort.current?.abort(), []);
@@ -71,6 +74,23 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     onChange();
     void pushIdea(updated).catch(() => {});
     setEditing(false); setPreviewOpen(false); setSuggestion(null); setMessage("حُفظ المقال ✓");
+  };
+  const chooseTopic = (name: string) => {
+    const before = topic;
+    const updated = setArticleTopic(idea.id, name);
+    setTopicOpen(false);
+    if (!updated) return;
+    onChange();
+    void pushIdea(updated).catch(() => {});
+    if (articleTopic(updated) !== before) setMessage(`نُقل المقال إلى تصنيف «${articleTopic(updated)}» وضُبط يدويًا ✓`);
+  };
+  const unlockTopic = () => {
+    const updated = clearArticleTopic(idea.id);
+    setTopicOpen(false);
+    if (!updated) return;
+    onChange();
+    void pushIdea(updated).catch(() => {});
+    setMessage("أُلغي الضبط اليدوي؛ سيعود المقال إلى التصنيف التلقائي ✓");
   };
   const share = async () => {
     setMessage("");
@@ -175,7 +195,15 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         : article.title}</h2>
       {(topic || hasAudio) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {topic && <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground">{topic}</span>}
+          {topic && (
+            <button type="button" aria-label={`التصنيف: ${topic} — تغيير التصنيف`} title="تغيير التصنيف"
+              onClick={() => { setNewTopic(""); setTopicOpen(true); }}
+              className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80">
+              التصنيف: {topic}
+              {idea.topicManual && <Lock className="size-3" />}
+              <Pencil className="size-3" />
+            </button>
+          )}
           {hasAudio && <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground"><Volume2 className="size-3.5" />صوت</span>}
         </div>
       )}
@@ -378,6 +406,41 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
           <Button disabled={!fbPost || fbBusy} onClick={copyFacebookPost}><Copy />نسخ المنشور</Button>
           <Button variant="outline" disabled={fbBusy} onClick={() => void loadFacebookPost(fbPost ? fbVariation + 1 : fbVariation)}><RefreshCw />اقتراح آخر</Button>
           <Button variant="ghost" onClick={() => setFbOpen(false)}>إغلاق</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    {/* Manual topic picker: move this article to another classification by hand.
+        A hand-set topic is pinned — AI classification skips the article until the
+        user hands it back with «إلغاء الضبط اليدوي». */}
+    <Dialog open={topicOpen} onOpenChange={setTopicOpen}>
+      <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
+        <DialogTitle className="text-start font-display">تصنيف المقال</DialogTitle>
+        {idea.topicManual && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary px-3 py-2">
+            <span className="inline-flex items-center gap-1.5 text-sm text-secondary-foreground"><Lock className="size-4" />التصنيف مضبوط يدويًا</span>
+            <Button size="sm" variant="ghost" onClick={unlockTopic}>إلغاء الضبط اليدوي</Button>
+          </div>
+        )}
+        <div className="space-y-1.5">
+          {topicOpen && topicOptions(loadIdeas()).map(({ topic: name, count }) => (
+            <button key={name} type="button" onClick={() => chooseTopic(name)}
+              className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-start hover:bg-accent">
+              <span className="text-sm font-medium text-foreground">{name}</span>
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                {count}
+                {name === topic && <Check className="size-4 text-primary" />}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input aria-label="تصنيف جديد" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} placeholder="تصنيف جديد…"
+            onKeyDown={(e) => { if (e.key === "Enter" && newTopic.trim()) chooseTopic(newTopic); }}
+            className="min-w-0 flex-1 rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          <Button disabled={!newTopic.trim()} onClick={() => chooseTopic(newTopic)}>حفظ</Button>
+        </div>
+        <div className="flex justify-end pt-1">
+          <Button variant="ghost" onClick={() => setTopicOpen(false)}>إغلاق</Button>
         </div>
       </DialogContent>
     </Dialog>

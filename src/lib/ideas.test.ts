@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { classify, toArticle, OTHER, getArticle, matchesArticle, saveIdea, updateArticle, loadIdeas, mergeIdeas } from "./ideas";
+import { classify, toArticle, OTHER, getArticle, matchesArticle, saveIdea, updateArticle, loadIdeas, mergeIdeas, articleTopic, setArticleTopic, clearArticleTopic, topicOptions } from "./ideas";
 
 describe("ideas", () => {
   it("classifies by topic keywords", () => {
@@ -51,5 +51,74 @@ describe("local formatting keeps the ending", () => {
   it("keeps a final sentence without punctuation", () => {
     const a = toArticle("الصبر مهم. وفي الآخر لازم نكمل الطريق");
     expect(a.paragraphs.join(" ")).toContain("وفي الآخر لازم نكمل الطريق");
+  });
+});
+
+describe("manual topics", () => {
+  beforeEach(() => localStorage.clear());
+  it("derives the topic from the article body while nothing is pinned", () => {
+    const idea = saveIdea("فكرة عن النجاح في العمل");
+    expect(articleTopic(idea)).toBe("العمل والنجاح");
+  });
+  it("pins a topic by hand and persists it without touching the edition timestamp", () => {
+    const idea = saveIdea("فكرة عن النجاح في العمل");
+    const updated = setArticleTopic(idea.id, "  موضوعي الخاص  ");
+    expect(updated).toMatchObject({ topic: "موضوعي الخاص", topicManual: true });
+    expect(updated?.updatedAt).toBe(idea.updatedAt);
+    const saved = loadIdeas()[0];
+    if (!saved) throw new Error("idea missing");
+    expect(articleTopic(saved)).toBe("موضوعي الخاص");
+  });
+  it("pinning a brand-new topic name files the article under it", () => {
+    const idea = saveIdea("كلام عام بلا موضوع");
+    setArticleTopic(idea.id, "تصنيف لم يوجد من قبل");
+    expect(articleTopic(loadIdeas()[0]!)).toBe("تصنيف لم يوجد من قبل");
+  });
+  it("choosing the topic the article already sits under is a no-op and sets no pin", () => {
+    const idea = saveIdea("فكرة عن النجاح في العمل");
+    const result = setArticleTopic(idea.id, "العمل والنجاح");
+    expect(result?.topicManual).toBeUndefined();
+    expect(loadIdeas()[0]?.topicManual).toBeUndefined();
+  });
+  it("rejects an empty topic name", () => {
+    const idea = saveIdea("فكرة");
+    expect(setArticleTopic(idea.id, "   ")).toBeUndefined();
+    expect(loadIdeas()[0]?.topicManual).toBeUndefined();
+  });
+  it("unlocking removes the pin and the topic is derived again", () => {
+    const idea = saveIdea("فكرة عن النجاح في العمل");
+    setArticleTopic(idea.id, "موضوعي الخاص");
+    const cleared = clearArticleTopic(idea.id);
+    expect(cleared?.topic).toBeUndefined();
+    expect(cleared?.topicManual).toBeUndefined();
+    expect(articleTopic(loadIdeas()[0]!)).toBe("العمل والنجاح");
+    expect(clearArticleTopic(idea.id)?.topicManual).toBeUndefined();
+  });
+  it("lists topics in use with counts, busiest first, pins counted where they file the article", () => {
+    const a = saveIdea("فكرة عن النجاح في العمل");
+    saveIdea("حديث آخر عن النجاح في العمل");
+    saveIdea("كلام عن الصحة والنوم");
+    setArticleTopic(a.id, "الصحة");
+    const options = topicOptions(loadIdeas());
+    expect(options[0]).toEqual({ topic: "الصحة", count: 2 });
+    expect(options).toContainEqual({ topic: "العمل والنجاح", count: 1 });
+  });
+  it("a newer edition without a pin does not erase a hand-pinned topic", () => {
+    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 2, articleBody: "محلي", topic: "موضوعي", topicManual: true };
+    const { topic: _droppedTopic, topicManual: _droppedPin, ...unpinned } = local;
+    const [winner] = mergeIdeas([local], [{ ...unpinned, updatedAt: 3, articleBody: "سحابي" }], []);
+    expect(winner?.articleBody).toBe("سحابي");
+    expect(winner).toMatchObject({ topic: "موضوعي", topicManual: true });
+  });
+  it("an unpinned winner adopts the pin of the other edition", () => {
+    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "محلي" };
+    const [winner] = mergeIdeas([local], [{ ...local, updatedAt: 2, topic: "موضوعي", topicManual: true }], []);
+    expect(winner?.articleBody).toBe("محلي");
+    expect(winner).toMatchObject({ topic: "موضوعي", topicManual: true });
+  });
+  it("the winning edition's own pin beats the other edition's pin", () => {
+    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, topic: "أ", topicManual: true };
+    const [winner] = mergeIdeas([local], [{ ...local, updatedAt: 2, topic: "ب", topicManual: true }], []);
+    expect(winner?.topic).toBe("أ");
   });
 });

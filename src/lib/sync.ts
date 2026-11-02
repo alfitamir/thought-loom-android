@@ -10,6 +10,7 @@ const cloudRow = (idea: Idea, userId: string) => ({
   id: idea.id, user_id: userId, text: idea.text, created_at: idea.createdAt,
   article_title: idea.articleTitle ?? null, article_body: idea.articleBody ?? null,
   updated_at: idea.updatedAt ?? 0, merged_from: idea.mergedFrom ?? null,
+  topic: idea.topic ?? null, topic_manual: idea.topicManual ?? false,
 });
 
 /** Push one idea to the cloud backup (silently skipped when offline or signed out). */
@@ -68,7 +69,7 @@ async function run(): Promise<number> {
 
   const [{ data: gone, error: goneError }, { data, error }] = await Promise.all([
     supabase.from("idea_deletions").select("idea_id").eq("user_id", uid),
-    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from").eq("user_id", uid),
+    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual").eq("user_id", uid),
   ]);
   if (goneError || error || !gone || !data) return 0;
   if (deleted.length) clearDeleted(deleted);
@@ -82,6 +83,8 @@ async function run(): Promise<number> {
     ...(r.article_title === null ? {} : { articleTitle: r.article_title }),
     ...(r.article_body === null ? {} : { articleBody: r.article_body }),
     ...(r.merged_from?.length ? { mergedFrom: r.merged_from } : {}),
+    ...(r.topic ? { topic: r.topic } : {}),
+    ...(r.topic_manual ? { topicManual: true } : {}),
     updatedAt: Number(r.updated_at),
   }));
   // Read again after network awaits so edits/deletions made during sync are preserved.
@@ -98,7 +101,9 @@ async function run(): Promise<number> {
   const cloudById = new Map(remote.map((i) => [i.id, i]));
   const changed = merged.filter((i) => {
     const cloud = cloudById.get(i.id);
-    return !cloud || (i.updatedAt ?? 0) > (cloud.updatedAt ?? 0) || (!!i.mergedFrom && !cloud.mergedFrom);
+    // Topic pins are metadata that do not bump updatedAt, so they are compared directly.
+    return !cloud || (i.updatedAt ?? 0) > (cloud.updatedAt ?? 0) || (!!i.mergedFrom && !cloud.mergedFrom)
+      || (i.topic ?? null) !== (cloud.topic ?? null) || (i.topicManual ?? false) !== (cloud.topicManual ?? false);
   });
   if (changed.length) await supabase.from("ideas").upsert(changed.map((i) => cloudRow(i, uid)));
   window.dispatchEvent(new Event("afkari:ideas-changed"));

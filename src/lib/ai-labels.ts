@@ -24,7 +24,9 @@ export function labelFor(idea: Idea, all: Record<string, Stored> = load()): Labe
 
 export const unlabeled = (ideas: Idea[]) => {
   const all = load();
-  return ideas.filter((i) => { const s = all[i.id]; return !s || s.v !== version(i); });
+  // A hand-pinned topic is settled by the user: bulk classification skips the article
+  // entirely, so it never counts as awaiting classification either.
+  return ideas.filter((i) => { if (i.topicManual) return false; const s = all[i.id]; return !s || s.v !== version(i); });
 };
 
 export const loadLabels = load;

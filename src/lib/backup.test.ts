@@ -46,4 +46,17 @@ describe("backup", () => {
     window.removeEventListener("afkari:ideas-changed", on);
     expect(fired).toBe(1);
   });
+  it("round-trips a hand-pinned topic", () => {
+    const pinned: Idea[] = [{ id: "p1", text: "نص", createdAt: 5, topic: "موضوعي", topicManual: true }];
+    expect(parseBackup(buildBackup(pinned))).toEqual(pinned);
+  });
+  it("drops a pin flag that arrives without its topic", () => {
+    const raw = JSON.stringify([{ id: "p2", text: "نص", createdAt: 5, topicManual: true }]);
+    expect(parseBackup(raw)[0]).not.toHaveProperty("topicManual");
+  });
+  it("restore brings a hand-pinned topic onto an existing unpinned article", () => {
+    const mine = saveIdea("نص محلي");
+    restoreBackup([{ ...mine, topic: "موضوعي", topicManual: true }]);
+    expect(loadIdeas().find((i) => i.id === mine.id)).toMatchObject({ topic: "موضوعي", topicManual: true });
+  });
 });
