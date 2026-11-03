@@ -58,6 +58,7 @@ export type Database = {
           article_body: string | null
           article_title: string | null
           created_at: number
+          drive_file_id: string | null
           id: string
           merged_from: string[] | null
           song: boolean
@@ -72,7 +73,8 @@ export type Database = {
         Insert: {
           article_body?: string | null
           article_title?: string | null
-          created_at: number
+          created_at?: number
+          drive_file_id?: string | null
           id: string
           merged_from?: string[] | null
           song?: boolean
@@ -88,6 +90,7 @@ export type Database = {
           article_body?: string | null
           article_title?: string | null
           created_at?: number
+          drive_file_id?: string | null
           id?: string
           merged_from?: string[] | null
           song?: boolean
