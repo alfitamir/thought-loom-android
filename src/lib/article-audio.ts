@@ -141,23 +141,36 @@ export function memoryArticleAudioStore(): ArticleAudioStore {
 
 const DB = "thought-loom-audio";
 const STORE = "article-audio";
+const SONGS_STORE = "songs";
 const req = <T,>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 
+/**
+ * One shared open for both stores in this database. Version 2 added the
+ * `songs` store (the user's own singing recordings); the TTS cache store
+ * is untouched by the upgrade.
+ */
+let sharedDbp: Promise<IDBDatabase> | null = null;
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const r = indexedDB.open(DB, 1);
+  sharedDbp ??= new Promise<IDBDatabase>((resolve, reject) => {
+    const r = indexedDB.open(DB, 2);
     r.onupgradeneeded = () => {
-      const store = r.result.createObjectStore(STORE, { keyPath: "key" });
-      store.createIndex("articleId", "articleId");
+      const db = r.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        const store = db.createObjectStore(STORE, { keyPath: "key" });
+        store.createIndex("articleId", "articleId");
+      }
+      if (!db.objectStoreNames.contains(SONGS_STORE)) {
+        db.createObjectStore(SONGS_STORE, { keyPath: "key" });
+      }
     };
     r.onsuccess = () => resolve(r.result);
     r.onerror = () => reject(r.error);
   });
+  return sharedDbp;
 }
 
 export function indexedDbArticleAudioStore(): ArticleAudioStore {
-  let dbp: Promise<IDBDatabase> | null = null;
-  const db = () => (dbp ??= openDb());
+  const db = () => openDb();
   const tx = async (mode: IDBTransactionMode) => (await db()).transaction(STORE, mode);
   const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
   return {
@@ -365,4 +378,97 @@ export async function deleteArticleAudio(
     return !engine || r.engine === engine;
   });
   await Promise.all(doomed.map((r) => store.remove(r.key)));
+}
+
+// ---------------------------------------------------------------------------
+// Song recordings: the user's own singing, one assembled file per song idea.
+// They live in a SEPARATE store of the same database so the TTS cache logic
+// (freshness hashes, chunk manifests, the «صوت» badge pass) can never
+// confuse a real recording with generated speech. A song's audio exists
+// ONLY on the device that recorded it — sync carries the idea (title,
+// lyrics, flag, duration), never the blob.
+// ---------------------------------------------------------------------------
+
+export type SongAudioRecord = {
+  /** The song idea's id (also the record key). */
+  key: string;
+  ideaId: string;
+  mime: string;
+  blob: Blob;
+  /** Recording length in seconds, as measured when it was saved. */
+  duration: number;
+  createdAt: number;
+};
+
+export interface SongAudioStore {
+  get(ideaId: string): Promise<SongAudioRecord | null>;
+  put(rec: SongAudioRecord): Promise<void>;
+  remove(ideaId: string): Promise<void>;
+  listAll(): Promise<SongAudioRecord[]>;
+}
+
+/** In-memory store (tests, or browsers without IndexedDB). */
+export function memorySongAudioStore(): SongAudioStore {
+  const map = new Map<string, SongAudioRecord>();
+  return {
+    async get(ideaId) { return map.get(ideaId) ?? null; },
+    async put(rec) { map.set(rec.key, rec); },
+    async remove(ideaId) { map.delete(ideaId); },
+    async listAll() { return [...map.values()]; },
+  };
+}
+
+export function indexedDbSongAudioStore(): SongAudioStore {
+  const db = () => openDb();
+  const tx = async (mode: IDBTransactionMode) => (await db()).transaction(SONGS_STORE, mode);
+  const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+  return {
+    async get(ideaId) {
+      const t = await tx("readonly");
+      return ((await req(t.objectStore(SONGS_STORE).get(ideaId))) as SongAudioRecord | undefined) ?? null;
+    },
+    async put(rec) { const t = await tx("readwrite"); t.objectStore(SONGS_STORE).put(rec); await done(t); },
+    async remove(ideaId) { const t = await tx("readwrite"); t.objectStore(SONGS_STORE).delete(ideaId); await done(t); },
+    async listAll() {
+      const t = await tx("readonly");
+      return (await req(t.objectStore(SONGS_STORE).getAll())) as SongAudioRecord[];
+    },
+  };
+}
+
+let sharedSongStore: SongAudioStore | null = null;
+export const songAudioStore = (): SongAudioStore =>
+  (sharedSongStore ??= typeof indexedDB !== "undefined" ? indexedDbSongAudioStore() : memorySongAudioStore());
+
+/** Save (or replace) the recording of one song idea. */
+export async function saveSongAudio(
+  input: { ideaId: string; blob: Blob; mime?: string; duration?: number },
+  store: SongAudioStore = songAudioStore(),
+): Promise<SongAudioRecord> {
+  const rec: SongAudioRecord = {
+    key: input.ideaId,
+    ideaId: input.ideaId,
+    mime: input.mime || input.blob.type || "audio/webm",
+    blob: input.blob,
+    duration: input.duration ?? 0,
+    createdAt: Date.now(),
+  };
+  await store.put(rec);
+  return rec;
+}
+
+/** The recording of one song idea on THIS device, or null when it isn't here. */
+export async function getSongAudio(
+  ideaId: string,
+  store: SongAudioStore = songAudioStore(),
+): Promise<SongAudioRecord | null> {
+  return store.get(ideaId);
+}
+
+/** Delete one song's recording from this device. */
+export async function deleteSongAudio(
+  ideaId: string,
+  store: SongAudioStore = songAudioStore(),
+): Promise<void> {
+  await store.remove(ideaId);
 }
