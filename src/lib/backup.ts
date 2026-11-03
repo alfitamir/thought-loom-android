@@ -35,6 +35,14 @@ export function parseBackup(raw: string): Idea[] {
     if (typeof i.songDuration === "number" && i.songDuration > 0) idea.songDuration = i.songDuration;
     // The Drive file id travels too, so a restored song still knows where its copy lives.
     if (typeof i.driveFileId === "string" && i.driveFileId.trim()) idea.driveFileId = i.driveFileId;
+    // A liked article's flag and attribution travel too — a restore must
+    // never turn someone else's article into an unmarked, AI-editable one.
+    if (i.liked === true) idea.liked = true;
+    if (typeof i.source === "string" && i.source.trim()) idea.source = i.source;
+    if (Array.isArray(i.sources)) {
+      const sources = i.sources.filter((s: unknown): s is string => typeof s === "string" && !!s.trim());
+      if (sources.length) idea.sources = sources;
+    }
     return [idea];
   });
   if (list.length && !ideas.length) throw new Error("لم نجد أفكارًا صالحة في هذا الملف.");
