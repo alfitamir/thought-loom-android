@@ -58,6 +58,7 @@ export type Database = {
           article_body: string | null
           article_title: string | null
           created_at: number
+          drive_file_id: string | null
           id: string
           liked: boolean
           merged_from: string[] | null
@@ -75,7 +76,8 @@ export type Database = {
         Insert: {
           article_body?: string | null
           article_title?: string | null
-          created_at: number
+          created_at?: number
+          drive_file_id?: string | null
           id: string
           liked?: boolean
           merged_from?: string[] | null
@@ -94,6 +96,7 @@ export type Database = {
           article_body?: string | null
           article_title?: string | null
           created_at?: number
+          drive_file_id?: string | null
           id?: string
           liked?: boolean
           merged_from?: string[] | null
