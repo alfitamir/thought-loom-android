@@ -421,9 +421,12 @@ export async function deleteArticleAudio(
 // Song recordings: the user's own singing, one assembled file per song idea.
 // They live in a SEPARATE store of the same database so the TTS cache logic
 // (freshness hashes, chunk manifests, the «صوت» badge pass) can never
-// confuse a real recording with generated speech. A song's audio exists
-// ONLY on the device that recorded it — sync carries the idea (title,
-// lyrics, flag, duration), never the blob.
+// confuse a real recording with generated speech. This store is the
+// recording device's own copy; song-drive.ts additionally backs each
+// recording up to the «أفكاري — الأغاني» folder on Google Drive and other
+// devices download it into this same store on demand. Sync proper still
+// carries only the idea (title, lyrics, flag, duration, Drive file id),
+// never the blob.
 // ---------------------------------------------------------------------------
 
 export type SongAudioRecord = {
