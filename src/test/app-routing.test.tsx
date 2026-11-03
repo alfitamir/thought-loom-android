@@ -15,6 +15,29 @@ describe("App routing", () => {
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
 
+  it("matches a page for /medical instead of falling back to not found", () => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+
+    const matches = router.matchRoutes("/medical");
+
+    expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
+    expect(matches.at(-1)?.routeId).toBe("/medical");
+  });
+
+  it("parses the medical-section context on / and ignores junk values", () => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+
+    // The «القسم الطبي» capture buttons deep-link with both params.
+    const linked = router.matchRoutes("/", { record: "1234567890", section: "medical" });
+    expect(linked.at(-1)?.search).toMatchObject({ record: 1234567890, section: "medical" });
+
+    // A junk value stays a raw string in the merged match search (same as
+    // the record nonce); the home page's strict `section === "medical"`
+    // check is what keeps it from ever raising the medical context.
+    const junk = router.matchRoutes("/", { record: "1234567890", section: "other" });
+    expect((junk.at(-1)?.search as { section?: unknown } | undefined)?.section).not.toBe("medical");
+  });
+
   it("parses the bottom-nav record nonce on / and ignores junk values", () => {
     const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
 
