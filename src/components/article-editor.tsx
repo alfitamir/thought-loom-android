@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ListPlus, Lock, Merge, Music, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ImageDown, ListPlus, Lock, Merge, Music, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -19,6 +19,7 @@ import { effectiveListenVoice, getMyVoiceProfile, isMyVoicePublic } from "@/lib/
 import { deriveSongAudioState, songDurationLabel, songRecordedLabel } from "@/lib/songs";
 import { downloadSongAudio } from "@/lib/song-drive";
 import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
+import { deliverCardImage, renderShareCardPng, shareCardModel } from "@/lib/share-card";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -115,6 +116,20 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       if (error instanceof Error && error.name === "AbortError") return;
       await copy().catch(() => setMessage("تعذّرت المشاركة الآن."));
     }
+  };
+  const [imageBusy, setImageBusy] = useState(false);
+  /** «مشاركة كصورة»: render the branded card PNG in-browser and share
+   *  it like the audio files (system sheet, else download). Works for
+   *  articles, songs and liked articles (the card carries the source). */
+  const shareImage = async () => {
+    setMessage("");
+    setImageBusy(true);
+    try {
+      const blob = await renderShareCardPng(shareCardModel(idea, topic ?? articleTopic(idea)));
+      const outcome = await deliverCardImage(blob, article.title);
+      if (outcome === "downloaded") setMessage("نُزّلت صورة المقال ✓");
+    } catch { setMessage("تعذّرت مشاركة الصورة الآن."); }
+    finally { setImageBusy(false); }
   };
   const improve = async () => {
     setMessage("");
@@ -275,6 +290,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="استمع للمقال" title="استمع للمقال" onClick={() => setListenOpen(true)}><Volume2 /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
+        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال كصورة" title="مشاركة المقال كصورة" disabled={imageBusy} onClick={() => void shareImage()}><ImageDown /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="دمج يدوي مع مقال آخر" title="دمج يدوي مع مقال آخر (بدون ذكاء اصطناعي)" onClick={() => setMergeOpen(true)}><Merge /></Button>
         <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
@@ -628,6 +644,18 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
     setStatus("نُزّل ملف الأغنية ✓");
   };
 
+  /** «مشاركة كصورة» for a song: the branded card (title + «أغنية» chip
+   *  + lyrics excerpt) — no local recording needed, so it works on any
+   *  device, shared/downloaded exactly like the article card. */
+  const shareImage = async () => {
+    setStatus("");
+    try {
+      const blob = await renderShareCardPng(shareCardModel(idea));
+      const outcome = await deliverCardImage(blob, article.title);
+      if (outcome === "downloaded") setStatus("نُزّلت صورة الأغنية ✓");
+    } catch { setStatus("تعذّرت مشاركة الصورة الآن."); }
+  };
+
   const saveLyrics = () => {
     const updated = updateSong(idea.id, title, lyrics);
     if (!updated) return;
@@ -694,6 +722,7 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
       {state === "ready" && (
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الصوت" title="مشاركة الصوت" onClick={() => void shareSong()}><Share2 /></Button>
       )}
+      <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الأغنية كصورة" title="مشاركة الأغنية كصورة" onClick={() => void shareImage()}><ImageDown /></Button>
       <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف الأغنية" title="حذف الأغنية" onClick={onDeleteRequest}><Trash2 /></Button>
     </div>
     {status && <p role="status" className="text-sm text-muted-foreground">{status}</p>}
