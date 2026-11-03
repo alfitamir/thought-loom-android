@@ -36,4 +36,14 @@ describe("Google Drive backup merge", () => {
     const merged = mergeDriveState({ ideas: [idea("a", 5, "drive")], deleted: [] }, [local], [], []);
     expect(merged.ideas[0]).toMatchObject({ articleBody: "drive", topic: "موضوعي", topicManual: true });
   });
+  it("round-trips a liked article with its attribution through the Drive file", () => {
+    const liked: Idea = { ...idea("a"), liked: true, source: "مجلة الفكر", sources: ["موقع آخر"] };
+    const back = parseDriveFile(buildDriveFile({ ideas: [liked], deleted: [] }));
+    expect(back.ideas[0]).toMatchObject({ liked: true, source: "مجلة الفكر", sources: ["موقع آخر"] });
+  });
+  it("keeps liked + attribution when the Drive edition of the text is newer", () => {
+    const local: Idea = { ...idea("a", 2), liked: true, source: "مصدر محلي", sources: ["واحد"] };
+    const merged = mergeDriveState({ ideas: [idea("a", 5, "drive")], deleted: [] }, [local], [], []);
+    expect(merged.ideas[0]).toMatchObject({ articleBody: "drive", liked: true, source: "مصدر محلي", sources: ["واحد"] });
+  });
 });
