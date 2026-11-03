@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as ApiArticlesImproveRouteImport } from './routes/api/articles/improve'
+import { Route as ApiDriveSongAudioRouteImport } from './routes/api/drive/song-audio'
 import { Route as ApiDriveSyncRouteImport } from './routes/api/drive/sync'
 import { Route as ApiVoiceTranscribeRouteImport } from './routes/api/voice/transcribe'
 
@@ -36,6 +37,11 @@ const ApiArticlesImproveRoute = ApiArticlesImproveRouteImport.update({
   path: '/api/articles/improve',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDriveSongAudioRoute = ApiDriveSongAudioRouteImport.update({
+  id: '/api/drive/song-audio',
+  path: '/api/drive/song-audio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDriveSyncRoute = ApiDriveSyncRouteImport.update({
   id: '/api/drive/sync',
   path: '/api/drive/sync',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
+  '/api/drive/song-audio': typeof ApiDriveSongAudioRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
   '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
+  '/api/drive/song-audio': typeof ApiDriveSongAudioRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
   '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
+  '/api/drive/song-audio': typeof ApiDriveSongAudioRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
   '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/library'
     | '/api/articles/improve'
+    | '/api/drive/song-audio'
     | '/api/drive/sync'
     | '/api/voice/transcribe'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/library'
     | '/api/articles/improve'
+    | '/api/drive/song-audio'
     | '/api/drive/sync'
     | '/api/voice/transcribe'
   id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/library'
     | '/api/articles/improve'
+    | '/api/drive/song-audio'
     | '/api/drive/sync'
     | '/api/voice/transcribe'
   fileRoutesById: FileRoutesById
@@ -104,6 +116,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   LibraryRoute: typeof LibraryRoute
   ApiArticlesImproveRoute: typeof ApiArticlesImproveRoute
+  ApiDriveSongAudioRoute: typeof ApiDriveSongAudioRoute
   ApiDriveSyncRoute: typeof ApiDriveSyncRoute
   ApiVoiceTranscribeRoute: typeof ApiVoiceTranscribeRoute
 }
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArticlesImproveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/drive/song-audio': {
+      id: '/api/drive/song-audio'
+      path: '/api/drive/song-audio'
+      fullPath: '/api/drive/song-audio'
+      preLoaderRoute: typeof ApiDriveSongAudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/drive/sync': {
       id: '/api/drive/sync'
       path: '/api/drive/sync'
@@ -160,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   LibraryRoute: LibraryRoute,
   ApiArticlesImproveRoute: ApiArticlesImproveRoute,
+  ApiDriveSongAudioRoute: ApiDriveSongAudioRoute,
   ApiDriveSyncRoute: ApiDriveSyncRoute,
   ApiVoiceTranscribeRoute: ApiVoiceTranscribeRoute,
 }
