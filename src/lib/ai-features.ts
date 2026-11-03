@@ -96,10 +96,12 @@ export function excerptFor(body: string, toks: string[], max: number): string {
   return picked.sort((a, b) => a.i - b.i).map((c) => c.p).join("\n\n").slice(0, max);
 }
 
-/** Keyword retrieval over the local library: title hits weigh most. Falls back to the newest articles. */
+/** Keyword retrieval over the local library: title hits weigh most. Falls back to the newest articles.
+ *  Liked articles are other people's writing: they are never part of the ask corpus. */
 export function retrieveRelevant(question: string, ideas: Idea[], k = 8, maxChars = 1800): AskArticle[] {
+  const own = ideas.filter((i) => !i.liked);
   const toks = tokens(question);
-  const scored = ideas.map((idea) => {
+  const scored = own.map((idea) => {
     const a = getArticle(idea);
     const title = norm(a.title), body = norm(a.body);
     const s = toks.reduce((n, t) => n + (title.includes(t) ? 3 : 0) + Math.min(5, body.split(t).length - 1), 0);
@@ -120,20 +122,24 @@ export async function askIdeas(question: string, ideas: Idea[], o: AIOptions = {
 
 // ---------- topics & tags ----------
 export async function classifyBatch(ideas: Idea[], o: AIOptions = {}): Promise<Record<string, Label>> {
-  if (!ideas.length) return {};
-  const items: ClassifyItem[] = ideas.map((idea) => {
+  // Defense in depth (labelAll already skips them): liked articles are never classified.
+  const own = ideas.filter((i) => !i.liked);
+  if (!own.length) return {};
+  const items: ClassifyItem[] = own.map((idea) => {
     const a = getArticle(idea);
     return { id: idea.id, title: a.title, excerpt: a.body.slice(0, 500) };
   });
-  const fallback = (id: string) => classify(ideas.find((i) => i.id === id)?.text ?? "");
+  const fallback = (id: string) => classify(own.find((i) => i.id === id)?.text ?? "");
   const raw = await runTask("classify", JSON.stringify(items), CLASSIFY_SCHEMA, o);
   return sanitizeLabels(raw, items.map((i) => i.id), fallback);
 }
 
 // ---------- insights ----------
 export async function getInsights(ideas: Idea[], o: AIOptions = {}): Promise<Insights> {
-  if (ideas.length < 3) throw new Error("تلزم ثلاثة مقالات على الأقل لاستخراج الرؤى.");
-  const items: InsightItem[] = ideas.slice(0, 120).map((idea) => {
+  // Insights describe the author's own body of work; liked articles never enter the corpus.
+  const own = ideas.filter((i) => !i.liked);
+  if (own.length < 3) throw new Error("تلزم ثلاثة مقالات على الأقل لاستخراج الرؤى.");
+  const items: InsightItem[] = own.slice(0, 120).map((idea) => {
     const a = getArticle(idea);
     return { id: idea.id, title: a.title, excerpt: a.body.slice(0, 500) };
   });
