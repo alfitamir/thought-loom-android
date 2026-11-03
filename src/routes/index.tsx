@@ -1,17 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square } from "lucide-react";
+import { Mic, Music, Square } from "lucide-react";
 import { saveIdea } from "@/lib/ideas";
 import { supabase } from "@/integrations/supabase/client";
 import { pushIdea, syncNow } from "@/lib/sync";
 import { createVoiceRecorder, type VoiceRecorder } from "@/lib/voice-recorder";
-import { browserRecorderDeps, createAudioRecorder, type AudioRecorder } from "@/lib/audio-recorder";
-import { voiceStore } from "@/lib/voice-store";
+import { browserRecorderDeps, createAudioRecorder, NO_RECORDING, type AudioRecorder } from "@/lib/audio-recorder";
+import { songVoiceStore, voiceStore } from "@/lib/voice-store";
 import { deleteSession, processPending, transcribeSession } from "@/lib/transcribe";
 import { transcribeAudio } from "@/lib/ai-features";
 import { resolveEngine } from "@/lib/ai-engine";
 import type { Engine } from "@/lib/article-ai";
 import { formatElapsed, joinTranscript, transcribeFinished } from "@/lib/voice-session";
+import { recoverPendingSongs, saveRecordedSong } from "@/lib/songs";
 
 export const Route = createFileRoute("/")({
   // `?record=<nonce>` is the bottom navigation's "open the recorder" signal:
@@ -51,6 +52,14 @@ function Index() {
   const [elapsed, setElapsed] = useState(0);
   const [mediaMode, setMediaMode] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  // Recorder mode: «فكرة» (the dictation pipeline, unchanged) or «أغنية»
+  // (song mode — the same microphone pipeline, but the audio is kept as a
+  // recording and never transcribed). The kind is captured into a ref when
+  // a recording starts so stop/cancel always route by what was recorded,
+  // not by the toggle's current position.
+  const [recMode, setRecMode] = useState<"idea" | "song">("idea");
+  const recKindRef = useRef<"idea" | "song">("idea");
+  const elapsedRef = useRef(0);
   const recRef = useRef<VoiceRecorder | null>(null);
   const audioRef = useRef<AudioRecorder | null>(null);
   const modeRef = useRef<"media" | "sr" | null>(null);
@@ -132,6 +141,28 @@ function Index() {
     return () => window.removeEventListener("online", resume);
   }, []);
 
+  // Song recordings whose save was interrupted (the app closed mid-stop)
+  // become songs on a later open — song mode's own resume pass. It reads
+  // ONLY the song store, so it can never touch a dictation, and no audio
+  // is ever transcribed here.
+  const songResumedRef = useRef(false);
+  useEffect(() => {
+    const recover = async () => {
+      if (songResumedRef.current) return;
+      songResumedRef.current = true;
+      try {
+        const made = await recoverPendingSongs({ store: songVoiceStore() });
+        if (made.length) {
+          made.forEach((idea) => pushIdea(idea));
+          setMsg("تمت استعادة أغنية مسجلة على هاتفك ✓");
+        }
+      } catch {
+        songResumedRef.current = false; // audio stays on the phone; retried on the next open
+      }
+    };
+    void recover();
+  }, []);
+
   const setTextBoth = (next: string | ((cur: string) => string)) => {
     setText((cur) => {
       const value = typeof next === "function" ? next(cur) : next;
@@ -191,15 +222,41 @@ function Index() {
     }
   };
 
+  // After stop in song mode: assemble the session into one audio file and
+  // save it as a song. No transcription, no engine, no key — the recording
+  // itself is the result. If assembly fails the segments stay in the song
+  // store and the recovery pass above saves the song on a later open.
+  const finishSong = async (session: string, durationSeconds: number) => {
+    if (!session) return;
+    try {
+      const idea = await saveRecordedSong({ store: songVoiceStore(), session, durationSeconds });
+      sessionRef.current = "";
+      if (idea) {
+        pushIdea(idea);
+        setOpen(false);
+        setMsg("حُفظت أغنيتك بصوتك ✓ — ستجدها في المكتبة، ويمكنك إضافة كلماتها من هناك");
+      } else {
+        setMsg("لم يُحفظ من التسجيل شيء.");
+      }
+    } catch {
+      setMsg("تعذّر حفظ الأغنية الآن؛ التسجيل محفوظ على هاتفك وسيظهر لاحقًا.");
+    }
+  };
+
   const stopActive = async () => {
     if (modeRef.current === "media" && audioRef.current) {
       stopDrain();
       const rec = audioRef.current;
       audioRef.current = null;
       modeRef.current = null;
+      const kind = recKindRef.current;
+      const duration = elapsedRef.current;
+      recKindRef.current = "idea";
+      elapsedRef.current = 0;
       const session = await rec.stop();
       setMediaMode(false);
       setElapsed(0);
+      if (kind === "song") { await finishSong(session, duration); return; }
       await finishTranscription(session);
       return;
     }
@@ -217,30 +274,39 @@ function Index() {
     if (listening) { await runStop(); return; }
     // Primary path: record the microphone itself (MediaRecorder). There is no
     // recognition session for Android to kill, so recording runs until «إيقاف».
-    const deps = browserRecorderDeps(voiceStore());
+    // Song mode records into its own store and never starts the transcription
+    // drain; idea mode is exactly as before.
+    const kind = recMode;
+    const deps = browserRecorderDeps(kind === "song" ? songVoiceStore() : voiceStore());
     if (deps) {
       recRef.current?.cancel();
       baseTextRef.current = textRef.current;
       const rec = createAudioRecorder({ ...deps, segmentMs: 60_000 }, {
         onRecording: setListening,
         onMessage: setMsg,
-        onElapsed: setElapsed,
+        onElapsed: (s) => { elapsedRef.current = s; setElapsed(s); },
       });
       audioRef.current = rec;
       modeRef.current = "media";
+      recKindRef.current = kind;
       setElapsed(0);
+      elapsedRef.current = 0;
       setMediaMode(true);
       const ok = await rec.start();
       if (!ok) { // mic refused — MIC_DENIED was already shown
         audioRef.current = null;
         modeRef.current = null;
+        recKindRef.current = "idea";
         setMediaMode(false);
         return;
       }
       sessionRef.current = rec.session();
-      startDrain();
+      if (kind === "idea") startDrain();
       return;
     }
+    // Song mode has no speech-recognition fallback: recognition would turn
+    // the singing into text, and a song must stay audio.
+    if (kind === "song") { setMsg(NO_RECORDING); return; }
     // Fallback: the browser's speech recognition, as before.
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) { setMsg("التسجيل الصوتي غير متاح على هذا الجهاز، اكتب فكرتك."); return; }
@@ -255,6 +321,9 @@ function Index() {
 
   const save = async () => {
     if (stopPromiseRef.current) await stopPromiseRef.current;
+    // In song mode there is no text to save: stopping the recording saves
+    // the song itself (see finishSong).
+    if (recMode === "song") { if (listening) await runStop(); return; }
     if (listening) await runStop();
     const body = textRef.current.trim();
     if (!body) return;
@@ -266,6 +335,23 @@ function Index() {
 
   const cancel = async () => {
     abortRef.current?.abort();
+    if (recKindRef.current === "song" && modeRef.current === "media" && audioRef.current) {
+      // A cancelled song recording is thrown away entirely — unlike a
+      // dictation there is no transcript to salvage, so nothing is kept
+      // for a resume pass.
+      const rec = audioRef.current;
+      audioRef.current = null;
+      modeRef.current = null;
+      recKindRef.current = "idea";
+      setMediaMode(false);
+      setElapsed(0);
+      elapsedRef.current = 0;
+      await rec.cancel().catch(() => {});
+      setListening(false);
+      sessionRef.current = "";
+      setOpen(false);
+      return;
+    }
     if (modeRef.current === "media" && audioRef.current) {
       stopDrain();
       const rec = audioRef.current;
@@ -297,8 +383,24 @@ function Index() {
         <button onClick={() => setOpen(true)} className="record-btn">سجّل فكرة</button>
       ) : (
         <div className="w-full max-w-md space-y-4">
-          <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={8}
-            placeholder="اكتب أو تكلم..." className="w-full rounded-2xl border border-border bg-card p-4 text-lg leading-relaxed text-card-foreground outline-none focus:ring-2 focus:ring-ring" />
+          <div className="flex rounded-lg border border-border bg-muted/30 p-1" role="group" aria-label="وضع التسجيل">
+            <button type="button" aria-pressed={recMode === "idea"} disabled={listening || transcribing} onClick={() => setRecMode("idea")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-all disabled:opacity-50 ${recMode === "idea" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+              <Mic className="size-4" />فكرة
+            </button>
+            <button type="button" aria-pressed={recMode === "song"} disabled={listening || transcribing} onClick={() => setRecMode("song")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-all disabled:opacity-50 ${recMode === "song" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+              <Music className="size-4" />أغنية
+            </button>
+          </div>
+          {recMode === "idea" ? (
+            <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={8}
+              placeholder="اكتب أو تكلم..." className="w-full rounded-2xl border border-border bg-card p-4 text-lg leading-relaxed text-card-foreground outline-none focus:ring-2 focus:ring-ring" />
+          ) : (
+            <p className="rounded-2xl border border-border bg-card p-4 text-center leading-relaxed text-muted-foreground">
+              غنِّ أغنيتك كاملة — ستُحفظ بصوتك كما هي، من غير أن تتحول إلى نص. الكلمات يمكنك إضافتها لاحقًا من المكتبة.
+            </p>
+          )}
           {listening && (
             <p className="text-center text-sm text-destructive">
               ● جاري التسجيل…{mediaMode && <> <span dir="ltr">{formatElapsed(elapsed)}</span> —</>} لن يتوقف إلا بضغطك على «إيقاف التسجيل»
@@ -310,7 +412,7 @@ function Index() {
               {listening ? <Square className="size-5" /> : <Mic className="size-5" />}
               {transcribing ? "جارٍ التحويل…" : listening ? "إيقاف التسجيل" : "ابدأ التسجيل"}
             </button>
-            <button onClick={save} className="flex-1 rounded-full bg-primary py-3 font-semibold text-primary-foreground">حفظ</button>
+            {recMode === "idea" && <button onClick={save} className="flex-1 rounded-full bg-primary py-3 font-semibold text-primary-foreground">حفظ</button>}
           </div>
           <button onClick={cancel} className="w-full text-sm text-muted-foreground">إلغاء</button>
         </div>
