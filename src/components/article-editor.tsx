@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ImageDown, ListPlus, Lock, Merge, Music, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ImageDown, ListPlus, Lock, Merge, Music, Pencil, Pin, PinOff, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -8,7 +8,8 @@ import { ManualMergeDialog } from "@/components/manual-merge-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
 import { countOccurrences } from "@/lib/search-highlight";
-import { articleTopic, clearArticleTopic, getArticle, loadIdeas, setArticleTopic, topicOptions, updateArticle, updateSong, type Idea } from "@/lib/ideas";
+import { articleTopic, clearArticleTopic, getArticle, loadIdeas, setArticleTopic, setPinned, topicOptions, updateArticle, updateSong, type Idea } from "@/lib/ideas";
+import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
@@ -102,6 +103,14 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     void pushIdea(updated).catch(() => {});
     setMessage("أُلغي الضبط اليدوي؛ سيعود المقال إلى التصنيف التلقائي ✓");
   };
+  /** Pin/unpin: display metadata (no updatedAt bump), synced like the topic pin. */
+  const togglePin = () => {
+    const updated = setPinned(idea.id, !idea.pinned);
+    if (!updated) return;
+    onChange();
+    void pushIdea(updated).catch(() => {});
+    setMessage(updated.pinned ? "ثُبّت المقال في أعلى تصنيفه ✓" : "أُلغي تثبيت المقال ✓");
+  };
   const share = async () => {
     setMessage("");
     const full = `${article.title}\n\n${article.body}`;
@@ -142,7 +151,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     try {
       // Style samples are the author's own voice: liked articles are other
       // people's writing and never stand in for it.
-      const samples = loadIdeas().filter((i) => i.id !== idea.id && !i.liked).slice(0, 3).map((i) => i.text.slice(0, 2000));
+      const samples = loadVisibleIdeas().filter((i) => i.id !== idea.id && !i.liked).slice(0, 3).map((i) => i.text.slice(0, 2000));
       setSuggestion(await improveFull(article, idea.text, samples, engine, controller.signal, setPreview));
     } catch (error) {
       setMessage(controller.signal.aborted ? "توقف التحسين؛ مقالك لم يتغير." : error instanceof Error ? error.message : "تعذّر الاتصال بخدمة تحسين المقالات.");
@@ -214,13 +223,19 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       <div className="flex gap-2">
         <Button onClick={() => save(title, body)} disabled={!title.trim() || !body.trim()}><Check />حفظ</Button>
         <Button variant="ghost" onClick={() => setEditing(false)}><X />إلغاء</Button>
+        <Button variant="ghost" className="ms-auto" aria-label={idea.pinned ? "إلغاء تثبيت المقال" : "تثبيت المقال"} title={idea.pinned ? "إلغاء تثبيت المقال" : "تثبيت المقال"} onClick={togglePin}>{idea.pinned ? <PinOff /> : <Pin />}{idea.pinned ? "إلغاء التثبيت" : "تثبيت"}</Button>
       </div>
     </div> : <>
       <h2 className="break-words font-display text-xl text-primary">{hlQuery
         ? <HighlightedText text={article.title} query={hlQuery} startIndex={matchStartIndex} currentIndex={currentMatchIndex} />
         : article.title}</h2>
-      {(topic || hasAudio || isSong || isLiked || idea.sources?.length) && (
+      {(topic || hasAudio || isSong || isLiked || idea.sources?.length || idea.pinned) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
+          {idea.pinned && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+              <Pin className="size-3.5" />مثبت
+            </span>
+          )}
           {isSong && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               <Music className="size-3.5" />أغنية{durationLabel && <> · <span dir="ltr">{durationLabel}</span></>}
@@ -292,6 +307,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال كصورة" title="مشاركة المقال كصورة" disabled={imageBusy} onClick={() => void shareImage()}><ImageDown /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="دمج يدوي مع مقال آخر" title="دمج يدوي مع مقال آخر (بدون ذكاء اصطناعي)" onClick={() => setMergeOpen(true)}><Merge /></Button>
+        <Button variant="ghost" size="icon" className={`[&_svg]:size-5 ${idea.pinned ? "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400" : ""}`} aria-label={idea.pinned ? "إلغاء تثبيت المقال" : "تثبيت المقال"} title={idea.pinned ? "إلغاء تثبيت المقال" : "تثبيت المقال"} aria-pressed={!!idea.pinned} onClick={togglePin}>{idea.pinned ? <PinOff /> : <Pin />}</Button>
         <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
       </>}
@@ -477,7 +493,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
           </div>
         )}
         <div className="space-y-1.5">
-          {topicOpen && topicOptions(loadIdeas()).map(({ topic: name, count }) => (
+          {topicOpen && topicOptions(loadVisibleIdeas()).map(({ topic: name, count }) => (
             <button key={name} type="button" onClick={() => chooseTopic(name)}
               className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-start hover:bg-accent">
               <span className="text-sm font-medium text-foreground">{name}</span>
@@ -665,6 +681,15 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
     setStatus("حُفظت الأغنية ✓");
   };
 
+  /** Pin/unpin a song, same display metadata as articles. */
+  const togglePin = () => {
+    const updated = setPinned(idea.id, !idea.pinned);
+    if (!updated) return;
+    onChange();
+    void pushIdea(updated).catch(() => {});
+    setStatus(updated.pinned ? "ثُبّتت الأغنية في أعلى تصنيفها ✓" : "أُلغي تثبيت الأغنية ✓");
+  };
+
   if (editing) {
     return <div className="space-y-3">
       <input aria-label="عنوان الأغنية" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
@@ -672,6 +697,7 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
       <div className="flex gap-2">
         <Button onClick={saveLyrics} disabled={!title.trim()}><Check />حفظ</Button>
         <Button variant="ghost" onClick={() => setEditing(false)}><X />إلغاء</Button>
+        <Button variant="ghost" className="ms-auto" aria-label={idea.pinned ? "إلغاء تثبيت الأغنية" : "تثبيت الأغنية"} title={idea.pinned ? "إلغاء تثبيت الأغنية" : "تثبيت الأغنية"} onClick={togglePin}>{idea.pinned ? <PinOff /> : <Pin />}{idea.pinned ? "إلغاء التثبيت" : "تثبيت"}</Button>
       </div>
     </div>;
   }
@@ -723,6 +749,7 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الصوت" title="مشاركة الصوت" onClick={() => void shareSong()}><Share2 /></Button>
       )}
       <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الأغنية كصورة" title="مشاركة الأغنية كصورة" onClick={() => void shareImage()}><ImageDown /></Button>
+      <Button variant="ghost" size="icon" className={`[&_svg]:size-5 ${idea.pinned ? "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400" : ""}`} aria-label={idea.pinned ? "إلغاء تثبيت الأغنية" : "تثبيت الأغنية"} title={idea.pinned ? "إلغاء تثبيت الأغنية" : "تثبيت الأغنية"} aria-pressed={!!idea.pinned} onClick={togglePin}>{idea.pinned ? <PinOff /> : <Pin />}</Button>
       <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف الأغنية" title="حذف الأغنية" onClick={onDeleteRequest}><Trash2 /></Button>
     </div>
     {status && <p role="status" className="text-sm text-muted-foreground">{status}</p>}

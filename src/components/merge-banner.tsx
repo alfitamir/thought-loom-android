@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceDialog } from "@/components/evidence-dialog";
 import { deleteIdea, getArticle, loadIdeas, saveArticleIdea, type Idea } from "@/lib/ideas";
+import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { deleteSongAudio } from "@/lib/article-audio";
 import { deleteSongDriveCopy } from "@/lib/song-drive";
 import { pushIdea } from "@/lib/sync";
@@ -40,7 +41,7 @@ export function MergeBanner({ ideas, online, onChange }: { ideas: Idea[]; online
         // Automatic suggestions use only the free personal key, never platform credits.
         const found = await findMerges(ideas, { kind: "gemini", key }, controller.signal);
         saveSuggestionCache(fp, found);
-        setList(liveSuggestions(found, loadIdeas()));
+        setList(liveSuggestions(found, loadVisibleIdeas()));
       } catch { /* suggestions are optional; try again after the next change */ }
     }, 2500);
     return () => { clearTimeout(timer); controller.abort(); };
@@ -73,7 +74,7 @@ function MergeDialog({ suggestion, online, onClose }: { suggestion: MergeSuggest
   const [message, setMessage] = useState("");
   const abort = useRef<AbortController | null>(null);
   const versions = useRef(new Map<string, number>());
-  const sources = suggestion.ids.map((id) => loadIdeas().find((i) => i.id === id)).filter((i): i is Idea => !!i);
+  const sources = suggestion.ids.map((id) => loadVisibleIdeas().find((i) => i.id === id)).filter((i): i is Idea => !!i);
 
   const run = async () => {
     if (!navigator.onLine) { setMessage("الدمج يحتاج اتصالًا بالإنترنت."); return; }

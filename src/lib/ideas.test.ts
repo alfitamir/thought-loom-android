@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { classify, toArticle, OTHER, getArticle, matchesArticle, saveIdea, updateArticle, loadIdeas, mergeIdeas, articleTopic, setArticleTopic, clearArticleTopic, topicOptions } from "./ideas";
+import { classify, toArticle, OTHER, getArticle, matchesArticle, saveIdea, updateArticle, loadIdeas, mergeIdeas, articleTopic, setArticleTopic, clearArticleTopic, topicOptions, setPinned, sortWithPinnedFirst } from "./ideas";
 
 describe("ideas", () => {
   it("classifies by topic keywords", () => {
@@ -120,5 +120,50 @@ describe("manual topics", () => {
     const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, topic: "أ", topicManual: true };
     const [winner] = mergeIdeas([local], [{ ...local, updatedAt: 2, topic: "ب", topicManual: true }], []);
     expect(winner?.topic).toBe("أ");
+  });
+});
+
+describe("library pinning", () => {
+  beforeEach(() => localStorage.clear());
+  it("pins and unpins without ever bumping updatedAt", () => {
+    const idea = saveIdea("فكرة للتثبيت");
+    const edited = updateArticle(idea.id, "عنوان", "نص المقال") ?? idea;
+    const stamp = edited.updatedAt;
+    const pinned = setPinned(idea.id, true);
+    expect(pinned?.pinned).toBe(true);
+    expect(pinned?.updatedAt).toBe(stamp);
+    expect(loadIdeas().find((i) => i.id === idea.id)?.pinned).toBe(true);
+    const unpinned = setPinned(idea.id, false);
+    expect(unpinned).not.toHaveProperty("pinned");
+    expect(unpinned?.updatedAt).toBe(stamp);
+  });
+  it("setting the pin state the article already has is a no-op", () => {
+    const idea = saveIdea("فكرة عادية");
+    expect(setPinned(idea.id, false)).not.toHaveProperty("pinned");
+    setPinned(idea.id, true);
+    const again = setPinned(idea.id, true);
+    expect(again?.pinned).toBe(true);
+    expect(setPinned("missing-id", true)).toBeUndefined();
+  });
+  it("sorts pinned articles first and keeps the rest in their order", () => {
+    const a = { id: "a", text: "أ", createdAt: 3 };
+    const b = { id: "b", text: "ب", createdAt: 2, pinned: true };
+    const c = { id: "c", text: "ج", createdAt: 1 };
+    const d = { id: "d", text: "د", createdAt: 0, pinned: true };
+    expect(sortWithPinnedFirst([a, b, c, d]).map((i) => i.id)).toEqual(["b", "d", "a", "c"]);
+    // The input list is not mutated.
+    expect([a, b, c, d].map((i) => i.id)).toEqual(["a", "b", "c", "d"]);
+  });
+  it("a newer edition without the pin does not unpin the winner", () => {
+    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 2, articleBody: "محلي", pinned: true };
+    const [winner] = mergeIdeas([local], [{ id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "سحابي" }], []);
+    expect(winner?.articleBody).toBe("سحابي");
+    expect(winner?.pinned).toBe(true);
+  });
+  it("an unpinned winner adopts the other edition's pin", () => {
+    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "محلي" };
+    const [winner] = mergeIdeas([local], [{ ...local, updatedAt: 2, pinned: true }], []);
+    expect(winner?.articleBody).toBe("محلي");
+    expect(winner?.pinned).toBe(true);
   });
 });

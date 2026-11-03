@@ -22,6 +22,7 @@ const idea = z.object({
   song: z.boolean().optional(),
   songDuration: z.number().optional(),
   driveFileId: z.string().max(200).optional(),
+  pinned: z.boolean().optional(),
 });
 const inputSchema = z.object({
   ideas: z.array(idea).max(10000),

@@ -35,6 +35,10 @@ export type Idea = {
    *  Drive, once the recording has been backed up there. The blob itself is
    *  never an idea field — this id is how another device finds its copy. */
   driveFileId?: string;
+  /** True when the user pinned this article by hand: it sorts to the top of
+   *  its topic group in the library. Display metadata only — like the topic
+   *  pin it never bumps `updatedAt`, and no AI pass reads or writes it. */
+  pinned?: boolean;
 };
 
 export const TOPICS: Record<string, string[]> = {
@@ -153,6 +157,9 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     // A Drive copy is metadata like the pin: an edition that lacks the file id
     // must not orphan the winner's backed-up recording.
     if (!winner.driveFileId && loser.driveFileId) winner = { ...winner, driveFileId: loser.driveFileId };
+    // The library pin is metadata too: an edition that lacks it must not
+    // silently unpin the winner.
+    if (!winner.pinned && loser.pinned) winner = { ...winner, pinned: true };
     // As before: a local winner that was never polished adopts the remote polish stamp.
     if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
     merged.set(idea.id, winner);
@@ -246,6 +253,27 @@ export function clearArticleTopic(id: string): Idea | undefined {
   delete updated.topicManual;
   replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
   return updated;
+}
+
+/**
+ * Pin or unpin an article by hand. This is display metadata, not a text edit,
+ * so `updatedAt` is left alone (exactly like the topic pin). Setting the state
+ * the article already has is a no-op.
+ */
+export function setPinned(id: string, pinned: boolean): Idea | undefined {
+  const all = loadIdeas();
+  const current = all.find((idea) => idea.id === id);
+  if (!current) return;
+  if (!!current.pinned === pinned) return current;
+  const updated: Idea = { ...current };
+  if (pinned) updated.pinned = true; else delete updated.pinned;
+  replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
+  return updated;
+}
+
+/** Pinned articles first, everything else in its existing order (stable). */
+export function sortWithPinnedFirst(list: Idea[]): Idea[] {
+  return [...list].sort((a, b) => Number(b.pinned ?? false) - Number(a.pinned ?? false));
 }
 
 /** Every topic currently in use, with its article count, busiest first — the manual picker's list. */

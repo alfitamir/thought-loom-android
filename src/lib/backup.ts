@@ -43,6 +43,9 @@ export function parseBackup(raw: string): Idea[] {
     }
     // The Drive file id travels too, so a restored song still knows where its copy lives.
     if (typeof i.driveFileId === "string" && i.driveFileId.trim()) idea.driveFileId = i.driveFileId;
+    // The library pin travels too — a restore must not silently unpin what
+    // the user fixed to the top of its group.
+    if (i.pinned === true) idea.pinned = true;
     return [idea];
   });
   if (list.length && !ideas.length) throw new Error("لم نجد أفكارًا صالحة في هذا الملف.");

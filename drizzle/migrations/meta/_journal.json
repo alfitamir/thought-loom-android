@@ -50,6 +50,13 @@
       "when": 1793913600000,
       "tag": "0006_liked_articles",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794000000000,
+      "tag": "0007_idea_pinned",
+      "breakpoints": true
     }
   ]
 }

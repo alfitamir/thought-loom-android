@@ -2,12 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { cleanFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
-import { articleTopic, deleteIdea, getArticle, loadIdeas, matchesArticle, needsPolish, updateArticle, type Idea } from "@/lib/ideas";
-import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
+import { articleTopic, getArticle, matchesArticle, needsPolish, sortWithPinnedFirst, updateArticle, type Idea } from "@/lib/ideas";
+import { pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { deleteSongAudio, listArticleIdsWithAudio } from "@/lib/article-audio";
-import { deleteSongDriveCopy } from "@/lib/song-drive";
+import { listArticleIdsWithAudio } from "@/lib/article-audio";
+import { loadVisibleIdeas, PENDING_DELETE_GRACE_MS } from "@/lib/pending-deletes";
+import { requestDelete, undoDelete } from "@/lib/delete-flow";
+import { toast } from "sonner";
 import { ArticleEditor } from "@/components/article-editor";
 import { MergeBanner } from "@/components/merge-banner";
 import { LikedDialog } from "@/components/liked-dialog";
@@ -56,7 +58,19 @@ function Library() {
   }, [ideas]);
   const [labeling, setLabeling] = useState<{ done: number; total: number } | null>(null);
   const [labelError, setLabelError] = useState("");
-  const refresh = () => { setIdeas(loadIdeas()); setLabels(loadLabels()); };
+  // Surfaces read the VISIBLE ideas: anything pending deletion (inside its
+  // undo window) is already gone from here, exactly as if deleted.
+  const refresh = () => { setIdeas(loadVisibleIdeas()); setLabels(loadLabels()); };
+  /** Delete is undoable: the item vanishes now and a toast offers «تراجع»
+   *  for the grace window; the real removal runs only when it expires. */
+  const handleDelete = (idea: Idea) => {
+    requestDelete(idea.id);
+    toast(idea.song ? "حُذفت الأغنية" : "حُذف المقال", {
+      duration: PENDING_DELETE_GRACE_MS,
+      action: { label: "تراجع", onClick: () => { undoDelete(idea.id); } },
+    });
+    refresh();
+  };
   const stale = unlabeled(ideas).length;
   const classifyAll = async () => {
     setLabelError(""); setLabeling({ done: 0, total: stale });
@@ -71,7 +85,7 @@ function Library() {
     if (typeof engine === "string") { setBulkMsg(engine); return; }
     // Songs are never polished: their text is the author's own lyrics, and
     // no AI pass may rewrite them.
-    const queue = loadIdeas().filter((i) => !i.song && needsPolish(i));
+    const queue = loadVisibleIdeas().filter((i) => !i.song && needsPolish(i));
     if (!queue.length) { setBulkMsg("كل المقالات مضبوطة ✓"); return; }
     const controller = new AbortController(); bulkAbort.current = controller;
     let done = 0, skipped = 0; setBulk({ done, total: queue.length });
@@ -80,7 +94,7 @@ function Library() {
         if (controller.signal.aborted || !navigator.onLine) break;
         try {
           const result = await cleanFull(getArticle(idea), engine, controller.signal, () => {});
-          const latest = loadIdeas().find((i) => i.id === idea.id);
+          const latest = loadVisibleIdeas().find((i) => i.id === idea.id);
           if (latest && (latest.updatedAt ?? 0) === (idea.updatedAt ?? 0)) {
             const updated = updateArticle(idea.id, result.title, result.body, true);
             if (updated) void pushIdea(updated).catch(() => {});
@@ -116,6 +130,12 @@ function Library() {
   const likedCount = ideas.filter((i) => i.liked).length;
   const groups: Record<string, Idea[]> = {};
   ideas.filter((i) => matchesArticle(i, query) && (!likedOnly || i.liked)).forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
+  // Hand-pinned articles ride to the top of their own topic group; the rest
+  // keep their order.
+  for (const list of Object.values(groups)) {
+    const sorted = sortWithPinnedFirst(list);
+    list.splice(0, list.length, ...sorted);
+  }
 
   // Search-highlight accounting, in the exact order articles render below
   // (topic groups in order, title occurrences before body occurrences), so a
@@ -232,7 +252,7 @@ function Library() {
                         ))}
                       </div>
                     )}
-                    <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => { deleteIdea(i.id); if (i.song) { void deleteSongAudio(i.id).catch(() => {}); void deleteSongDriveCopy(i).catch(() => {}); } void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }}
+                    <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => handleDelete(i)}
                       searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
                   </div>;
                 })}

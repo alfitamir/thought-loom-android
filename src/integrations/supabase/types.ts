@@ -62,6 +62,7 @@ export type Database = {
           id: string
           liked: boolean
           merged_from: string[] | null
+          pinned: boolean
           song: boolean
           song_duration: number | null
           source: string | null
@@ -81,6 +82,7 @@ export type Database = {
           id: string
           liked?: boolean
           merged_from?: string[] | null
+          pinned?: boolean
           song?: boolean
           song_duration?: number | null
           source?: string | null
@@ -100,6 +102,7 @@ export type Database = {
           id?: string
           liked?: boolean
           merged_from?: string[] | null
+          pinned?: boolean
           song?: boolean
           song_duration?: number | null
           source?: string | null
