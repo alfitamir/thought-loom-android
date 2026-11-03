@@ -12,6 +12,7 @@ const cloudRow = (idea: Idea, userId: string) => ({
   updated_at: idea.updatedAt ?? 0, merged_from: idea.mergedFrom ?? null,
   topic: idea.topic ?? null, topic_manual: idea.topicManual ?? false,
   song: idea.song ?? false, song_duration: idea.songDuration ?? null,
+  liked: idea.liked ?? false, source: idea.source ?? null, sources: idea.sources ?? null,
 });
 
 /** Push one idea to the cloud backup (silently skipped when offline or signed out). */
@@ -70,7 +71,7 @@ async function run(): Promise<number> {
 
   const [{ data: gone, error: goneError }, { data, error }] = await Promise.all([
     supabase.from("idea_deletions").select("idea_id").eq("user_id", uid),
-    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration").eq("user_id", uid),
+    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration,liked,source,sources").eq("user_id", uid),
   ]);
   if (goneError || error || !gone || !data) return 0;
   if (deleted.length) clearDeleted(deleted);
@@ -88,6 +89,9 @@ async function run(): Promise<number> {
     ...(r.topic_manual ? { topicManual: true } : {}),
     ...(r.song ? { song: true } : {}),
     ...(typeof r.song_duration === "number" ? { songDuration: r.song_duration } : {}),
+    ...(r.liked ? { liked: true } : {}),
+    ...(r.source ? { source: r.source } : {}),
+    ...(r.sources?.length ? { sources: r.sources } : {}),
     updatedAt: Number(r.updated_at),
   }));
   // Read again after network awaits so edits/deletions made during sync are preserved.
@@ -108,7 +112,9 @@ async function run(): Promise<number> {
     // The song flag rides along the same way (a merge can adopt it without a text edit).
     return !cloud || (i.updatedAt ?? 0) > (cloud.updatedAt ?? 0) || (!!i.mergedFrom && !cloud.mergedFrom)
       || (i.topic ?? null) !== (cloud.topic ?? null) || (i.topicManual ?? false) !== (cloud.topicManual ?? false)
-      || (i.song ?? false) !== (cloud.song ?? false) || (i.songDuration ?? null) !== (cloud.songDuration ?? null);
+      || (i.song ?? false) !== (cloud.song ?? false) || (i.songDuration ?? null) !== (cloud.songDuration ?? null)
+      || (i.liked ?? false) !== (cloud.liked ?? false) || (i.source ?? null) !== (cloud.source ?? null)
+      || JSON.stringify(i.sources ?? null) !== JSON.stringify(cloud.sources ?? null);
   });
   if (changed.length) await supabase.from("ideas").upsert(changed.map((i) => cloudRow(i, uid)));
   window.dispatchEvent(new Event("afkari:ideas-changed"));
