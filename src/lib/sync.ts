@@ -12,6 +12,7 @@ const cloudRow = (idea: Idea, userId: string) => ({
   updated_at: idea.updatedAt ?? 0, merged_from: idea.mergedFrom ?? null,
   topic: idea.topic ?? null, topic_manual: idea.topicManual ?? false,
   song: idea.song ?? false, song_duration: idea.songDuration ?? null,
+  drive_file_id: idea.driveFileId ?? null,
   liked: idea.liked ?? false, source: idea.source ?? null, sources: idea.sources ?? null,
 });
 
@@ -71,7 +72,7 @@ async function run(): Promise<number> {
 
   const [{ data: gone, error: goneError }, { data, error }] = await Promise.all([
     supabase.from("idea_deletions").select("idea_id").eq("user_id", uid),
-    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration,liked,source,sources").eq("user_id", uid),
+    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration,drive_file_id,liked,source,sources").eq("user_id", uid),
   ]);
   if (goneError || error || !gone || !data) return 0;
   if (deleted.length) clearDeleted(deleted);
@@ -89,6 +90,7 @@ async function run(): Promise<number> {
     ...(r.topic_manual ? { topicManual: true } : {}),
     ...(r.song ? { song: true } : {}),
     ...(typeof r.song_duration === "number" ? { songDuration: r.song_duration } : {}),
+    ...(r.drive_file_id ? { driveFileId: r.drive_file_id } : {}),
     ...(r.liked ? { liked: true } : {}),
     ...(r.source ? { source: r.source } : {}),
     ...(r.sources?.length ? { sources: r.sources } : {}),
@@ -113,6 +115,7 @@ async function run(): Promise<number> {
     return !cloud || (i.updatedAt ?? 0) > (cloud.updatedAt ?? 0) || (!!i.mergedFrom && !cloud.mergedFrom)
       || (i.topic ?? null) !== (cloud.topic ?? null) || (i.topicManual ?? false) !== (cloud.topicManual ?? false)
       || (i.song ?? false) !== (cloud.song ?? false) || (i.songDuration ?? null) !== (cloud.songDuration ?? null)
+      || (i.driveFileId ?? null) !== (cloud.driveFileId ?? null)
       || (i.liked ?? false) !== (cloud.liked ?? false) || (i.source ?? null) !== (cloud.source ?? null)
       || JSON.stringify(i.sources ?? null) !== JSON.stringify(cloud.sources ?? null);
   });
