@@ -19,6 +19,17 @@ export type Idea = {
   song?: boolean;
   /** Length of the recording in seconds, when known. Display metadata only. */
   songDuration?: number;
+  /** True for an article the user liked ELSEWHERE (not his own writing). It
+   *  arrives through its own paste-in path and AI must NEVER modify it: no
+   *  polish, no classification, no smart tools, and it is excluded from every
+   *  AI corpus (ask, insights, merge suggestions, style samples). */
+  liked?: boolean;
+  /** Where a liked article came from (author / site / URL), exactly as the
+   *  user pasted it. Always shown with the article. */
+  source?: string;
+  /** Attributions accumulated by manual merges: every liked article a merge
+   *  consumed contributes its source (or its title) here, permanently. */
+  sources?: string[];
 };
 
 export const TOPICS: Record<string, string[]> = {
@@ -125,6 +136,14 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
       winner = { ...winner, song: true, ...(winner.songDuration === undefined && loser.songDuration !== undefined ? { songDuration: loser.songDuration } : {}) };
     } else if (winner.song && winner.songDuration === undefined && loser.songDuration !== undefined) {
       winner = { ...winner, songDuration: loser.songDuration };
+    }
+    // A liked article is liked on every device: an edition that lacks the flag
+    // (or the attribution) must not un-like the winner or lose where it came from.
+    if (!winner.liked && loser.liked) winner = { ...winner, liked: true };
+    if (!winner.source && loser.source) winner = { ...winner, source: loser.source };
+    if (winner.sources?.length || loser.sources?.length) {
+      const union = [...new Set([...(winner.sources ?? []), ...(loser.sources ?? [])])];
+      if (union.join("\n") !== (winner.sources ?? []).join("\n")) winner = { ...winner, sources: union };
     }
     // As before: a local winner that was never polished adopts the remote polish stamp.
     if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
@@ -233,16 +252,62 @@ export function topicOptions(ideas: Idea[]): { topic: string; count: number }[] 
     .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic, "ar"));
 }
 
-export const needsPolish = (idea: Idea) => idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0);
+/** A liked article is someone else's text: the AI polish must never run on it. */
+export const needsPolish = (idea: Idea) => !idea.liked && (idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0));
 
 /** Save a ready article (e.g. a merge) as a new idea; `text` keeps the combined originals. */
-export const saveArticleIdea = (text: string, title: string, body: string, mergedFrom?: string[]): Idea => {
+export const saveArticleIdea = (text: string, title: string, body: string, mergedFrom?: string[], extra?: { liked?: boolean; source?: string; sources?: string[] }): Idea => {
   const now = Date.now();
   const idea: Idea = { id: crypto.randomUUID(), text, createdAt: now, articleTitle: title.trim(), articleBody: body.trim(), updatedAt: now, aiPolishedAt: now };
   if (mergedFrom?.length) idea.mergedFrom = [...new Set(mergedFrom)];
+  if (extra?.liked) idea.liked = true;
+  if (extra?.source?.trim()) idea.source = extra.source.trim();
+  if (extra?.sources?.length) idea.sources = [...new Set(extra.sources.map((s) => s.trim()).filter(Boolean))];
   replaceIdeas([idea, ...loadIdeas()]);
   return idea;
 };
+
+/**
+ * Save an article the user liked elsewhere, pasted in by hand. The pasted
+ * body is kept verbatim as both the original text and the article body —
+ * no derivation, no polish, no AI pass of any kind runs on it, ever.
+ */
+export const saveLikedArticle = (title: string, source: string, body: string): Idea | undefined => {
+  if (!title.trim() || !body.trim()) return;
+  const now = Date.now();
+  const idea: Idea = {
+    id: crypto.randomUUID(), text: body.trim(), createdAt: now,
+    articleTitle: title.trim(), articleBody: body.trim(), updatedAt: now, liked: true,
+  };
+  if (source.trim()) idea.source = source.trim();
+  replaceIdeas([idea, ...loadIdeas()]);
+  return idea;
+};
+
+/** Every attribution an article carries: its own source first, then the
+ *  sources it accumulated from merges. A liked article with neither falls
+ *  back to its title — a merge must never leave it unattributed. */
+export function attributionsOf(idea: Idea): string[] {
+  const out = [...new Set([idea.source, ...(idea.sources ?? [])].map((s) => s?.trim()).filter((s): s is string => !!s))];
+  if (!out.length && idea.liked) out.push(getArticle(idea).title);
+  return out;
+}
+
+/**
+ * The attribution outcome of a MANUAL merge (pure; the AI merge path never
+ * sees liked articles). The result is `liked` (AI-locked) only when EVERY
+ * consumed article was liked. Every consumed liked article contributes its
+ * attribution; when the result itself stays liked, the first consumed source
+ * remains its primary `source` and the rest ride in `sources`.
+ */
+export function mergeAttributions(consumed: Idea[]): { liked: boolean; source?: string; sources: string[] } {
+  const liked = consumed.length > 0 && consumed.every((i) => i.liked);
+  const collected: string[] = [];
+  for (const idea of consumed) for (const a of attributionsOf(idea)) if (!collected.includes(a)) collected.push(a);
+  if (!liked) return { liked: false, sources: collected };
+  const source = consumed.map((i) => i.source?.trim()).find(Boolean);
+  return { liked: true, ...(source ? { source } : {}), sources: collected.filter((a) => a !== source) };
+}
 
 /**
  * Build (not yet saved) a song idea. The recording is the content; `text`
