@@ -14,7 +14,8 @@
 //   shareable until replaced.
 
 import {
-  CURRENT_TTS_VOICE_KEY, GEMINI_TTS_SAMPLE_RATE, modelForVoiceKey, toSpeechText, type TtsEngine,
+  CURRENT_TTS_VOICE_KEY, GEMINI_TTS_MODELS, GEMINI_TTS_SAMPLE_RATE, modelForVoiceKey, toSpeechText,
+  ttsVoiceKey, voicePartOfKey, type TtsEngine,
 } from "./tts";
 
 export type ArticleAudioRecord = {
@@ -251,6 +252,42 @@ export async function findCachedAudio(
   const legacy = all.filter(isLegacyAudio).sort((a, b) => b.createdAt - a.createdAt)[0];
   if (legacy) return cachedFromRecord(legacy, articleId, title, body, store);
   return null;
+}
+
+/**
+ * Like findCachedAudio, but restricted to ONE voice (the prebuilt voice or
+ * the user's replicated voice): an article can hold one generation per
+ * voice, and the listen dialog loads, resumes, and deletes exactly the
+ * voice the user picked — the other voice's audio is never touched.
+ * `voicePart` is the voice half of a cache voice key (see voicePartOfKey).
+ */
+export async function findCachedAudioForVoice(
+  articleId: string, engine: TtsEngine, voicePart: string, title: string, body: string,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<CachedAudio | null> {
+  const all = (await store.listForArticle(articleId))
+    .filter((r) => r.engine === engine && voicePartOfKey(r.voiceKey) === voicePart);
+  const manifests = all.filter(isChunkedManifest)
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const preferredKey = ttsVoiceKey(GEMINI_TTS_MODELS[0], voicePart);
+  const chosenManifest = manifests.find((m) => m.voiceKey === preferredKey) ?? manifests[0];
+  if (chosenManifest) return cachedFromRecord(chosenManifest, articleId, title, body, store);
+  const legacy = all.filter(isLegacyAudio).sort((a, b) => b.createdAt - a.createdAt)[0];
+  if (legacy) return cachedFromRecord(legacy, articleId, title, body, store);
+  return null;
+}
+
+/**
+ * Delete one voice's audio for an article (its manifest or legacy record
+ * AND every chunk record), leaving any other voice's generation intact.
+ */
+export async function deleteArticleAudioForVoice(
+  articleId: string, engine: TtsEngine, voicePart: string,
+  store: ArticleAudioStore = articleAudioStore(),
+): Promise<void> {
+  const all = await store.listForArticle(articleId);
+  const doomed = all.filter((r) => r.engine === engine && voicePartOfKey(r.voiceKey) === voicePart);
+  await Promise.all(doomed.map((r) => store.remove(r.key)));
 }
 
 /**
