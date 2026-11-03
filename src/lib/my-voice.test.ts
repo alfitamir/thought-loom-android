@@ -3,7 +3,8 @@ import {
   buildCreateVoiceRequest, bytesToBase64, clearMyVoiceProfile, CONSENT_STATEMENT_AR,
   createMyVoice, deleteMyVoice, encodeWav24k, floatToPcm16, getMyVoiceProfile,
   MAX_SAMPLE_SECONDS, MIN_SAMPLE_SECONDS, parseCreatedVoiceId, READING_SAMPLE_AR,
-  sampleDurationState, samplesSeconds, saveMyVoiceProfile, trimSamplesToSeconds, VOICES_API_URL,
+  sampleDurationState, samplesSeconds, saveMyVoiceProfile, trimSamplesToSeconds, voiceCreateErrorMessage,
+  VOICES_API_URL,
 } from "./my-voice";
 import { base64ToBytes } from "./tts";
 
@@ -120,13 +121,82 @@ describe("createMyVoice", () => {
     await expect(createMyVoice("k", wav, wav)).rejects.toThrow("الموافقة");
   });
 
-  it("maps a rejected key to the settings message and refuses an empty key without fetching", async () => {
+  it("maps a plain 403 to the project-not-enabled message and refuses an empty key without fetching", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(
       JSON.stringify({ error: { message: "denied" } }), { status: 403 }));
     vi.stubGlobal("fetch", fetch);
-    await expect(createMyVoice("bad", wav, wav)).rejects.toThrow("مفتاح Gemini");
+    await expect(createMyVoice("bad", wav, wav)).rejects.toThrow("غير مفعّل لمشروع مفتاحك");
     await expect(createMyVoice("", wav, wav)).rejects.toThrow("أضف مفتاح Gemini");
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a quota hit as a wait-and-retry message, end to end", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: {
+        status: "RESOURCE_EXHAUSTED", message: "Quota exceeded",
+        details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "rateLimitExceeded" }],
+      },
+    }), { status: 403 })));
+    await expect(createMyVoice("k", wav, wav)).rejects.toThrow("حد إنشاء الأصوات");
+  });
+});
+
+describe("voiceCreateErrorMessage", () => {
+  const QUOTA = "وصلت لحد إنشاء الأصوات عند Google مؤقتًا — حاول تاني بعد ساعات أو بكرة.";
+  const PERMISSION = "إنشاء الأصوات غير مفعّل لمشروع مفتاحك — راجع حالة المشروع في Google AI Studio (قيود/فوترة/تحقق من العمر).";
+  const VERIFY = "Google ما قدرش يطابق تسجيل الموافقة مع العيّنة — سجّل الاتنين بنفس الميكروفون وفي نفس الجلسة.";
+
+  it("reads a 403 as quota when a details reason says so", () => {
+    const body = {
+      error: {
+        message: "Quota exceeded for quota metric",
+        details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "rateLimitExceeded" }],
+      },
+    };
+    expect(voiceCreateErrorMessage(403, body)).toBe(QUOTA);
+    const body2 = { error: { details: [{ reason: "quotaExceeded" }] } };
+    expect(voiceCreateErrorMessage(403, body2)).toBe(QUOTA);
+  });
+
+  it("reads RESOURCE_EXHAUSTED status and bare HTTP 429 as quota", () => {
+    expect(voiceCreateErrorMessage(403, { error: { status: "RESOURCE_EXHAUSTED" } })).toBe(QUOTA);
+    expect(voiceCreateErrorMessage(429, { error: { message: "slow down" } })).toBe(QUOTA);
+    expect(voiceCreateErrorMessage(429, null)).toBe(QUOTA);
+  });
+
+  it("reads a plain 403 and PERMISSION_DENIED as project-not-enabled", () => {
+    expect(voiceCreateErrorMessage(403, { error: { message: "denied" } })).toBe(PERMISSION);
+    expect(voiceCreateErrorMessage(403, { error: { status: "PERMISSION_DENIED" } })).toBe(PERMISSION);
+  });
+
+  it("reads FAILED_PRECONDITION and consent/speaker wording as a verification mismatch", () => {
+    expect(voiceCreateErrorMessage(400, { error: { status: "FAILED_PRECONDITION" } })).toBe(VERIFY);
+    expect(voiceCreateErrorMessage(400, { error: { message: "Consent audio does not match the consent statement" } })).toBe(VERIFY);
+    expect(voiceCreateErrorMessage(400, { error: { message: "Speaker verification failed for the sample" } })).toBe(VERIFY);
+  });
+
+  it("keeps the shared mapped message for unknown errors and appends Google's text", () => {
+    expect(voiceCreateErrorMessage(500, { error: { message: "Backend exploded while cloning" } }))
+      .toBe("Gemini مشغول الآن. حاول بعد قليل؛ مقالك محفوظ كما هو. (Backend exploded while cloning)");
+    expect(voiceCreateErrorMessage(401, { error: { message: "API key expired" } }))
+      .toBe("مفتاح Gemini غير صالح أو غير مفعّل. راجعه من الإعدادات ⚙️. (API key expired)");
+  });
+
+  it("sanitizes and caps the appended Google text at 140 characters", () => {
+    const out = voiceCreateErrorMessage(500, { error: { message: `  Error\n\twith   spacing ${"x".repeat(300)}` } });
+    const appended = out.slice(out.indexOf("(") + 1, -1);
+    expect(appended.length).toBe(140);
+    expect(appended.startsWith("Error with spacing")).toBe(true);
+    expect(appended).not.toMatch(/\s{2,}/);
+  });
+
+  it("degrades malformed bodies to the shared message with nothing appended", () => {
+    const base = "تعذّر الاتصال بـ Gemini الآن. مقالك محفوظ كما هو.";
+    expect(voiceCreateErrorMessage(400, null)).toBe(base);
+    expect(voiceCreateErrorMessage(400, "not json")).toBe(base);
+    expect(voiceCreateErrorMessage(400, {})).toBe(base);
+    expect(voiceCreateErrorMessage(400, { error: "nope" })).toBe(base);
+    expect(voiceCreateErrorMessage(400, { error: { message: 42, details: "nope" } })).toBe(base);
   });
 });
 
