@@ -11,12 +11,15 @@ import { loadVisibleIdeas, PENDING_DELETE_GRACE_MS } from "@/lib/pending-deletes
 import { requestDelete, undoDelete } from "@/lib/delete-flow";
 import { toast } from "sonner";
 import { ArticleEditor } from "@/components/article-editor";
+import { CompileBar } from "@/components/compile-bar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { isSelectable, selectedIdeas, toggleSelected } from "@/lib/document";
 import { MergeBanner } from "@/components/merge-banner";
 import { LikedDialog } from "@/components/liked-dialog";
 import { AskDialog } from "@/components/ask-dialog";
 import { InsightsDialog } from "@/components/insights-dialog";
 import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronUp, Feather, Heart, Lightbulb, MessageCircleQuestion, MoreHorizontal, Search, Sparkles, Square, Stethoscope, Tags, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronUp, Feather, Heart, Lightbulb, ListChecks, MessageCircleQuestion, MoreHorizontal, Search, Sparkles, Square, Stethoscope, Tags, X } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
 
 export const Route = createFileRoute("/library")({
@@ -51,6 +54,13 @@ export function Library() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [likedOpen, setLikedOpen] = useState(false);
   const [likedOnly, setLikedOnly] = useState(false);
+  // Selection mode for «تجميع في مستند»: checkboxes on the cards (songs
+  // are never selectable) and the sticky CompileBar. Leaving the mode —
+  // or the page — clears the selection with it.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const exitSelection = () => { setSelecting(false); setSelected(new Set()); };
+  const chosen = selectedIdeas(ideas, selected);
   const [labels, setLabels] = useState(loadLabels);
   // Articles with generated audio cached on this device (one store pass per
   // ideas change) — drives the «صوت» badge on article cards.
@@ -209,6 +219,7 @@ export function Library() {
         {likedCount > 0 && (
           <button onClick={() => setLikedOnly(!likedOnly)} aria-pressed={likedOnly} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${likedOnly ? "bg-rose-500 text-white hover:opacity-90" : "border border-border bg-card text-foreground hover:bg-accent"}`}><Heart className="size-5" />أعجبني ({likedCount})</button>
         )}
+        <button onClick={() => (selecting ? exitSelection() : setSelecting(true))} aria-pressed={selecting} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${selecting ? "bg-primary text-primary-foreground hover:opacity-90" : "border border-border bg-card text-foreground hover:bg-accent"}`}><ListChecks className="size-5" />اختيار</button>
         <DropdownMenu dir="rtl">
           <DropdownMenuTrigger asChild>
             <button type="button" aria-label="المزيد" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><MoreHorizontal className="size-5" />المزيد</button>
@@ -265,16 +276,23 @@ export function Library() {
               <div>
                 {list.map((i) => {
                   const tags = labelFor(i, labels).tags;
-                  return <div key={i.id}>
-                    {tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pt-4">
-                        {tags.map((t) => (
-                          <button key={t} onClick={() => pick(t)} className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80">#{t}</button>
-                        ))}
-                      </div>
+                  const selectable = selecting && isSelectable(i);
+                  return <div key={i.id} className={selectable ? "flex items-start gap-2.5" : undefined}>
+                    {selectable && (
+                      <Checkbox checked={selected.has(i.id)} onCheckedChange={() => setSelected((s) => toggleSelected(s, i.id))}
+                        aria-label={`اختيار مقالة: ${getArticle(i).title}`} className="mt-7 size-5 shrink-0 [&_svg]:size-4" />
                     )}
-                    <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => handleDelete(i)}
-                      searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
+                    <div className={selectable ? "min-w-0 flex-1" : undefined}>
+                      {tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-4">
+                          {tags.map((t) => (
+                            <button key={t} onClick={() => pick(t)} className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80">#{t}</button>
+                          ))}
+                        </div>
+                      )}
+                      <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => handleDelete(i)}
+                        searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
+                    </div>
                   </div>;
                 })}
               </div>
@@ -282,6 +300,7 @@ export function Library() {
           </section>
         ))}
       </div>
+      {selecting && <CompileBar ideas={chosen} onCancel={exitSelection} />}
     </div></main>
   );
 }

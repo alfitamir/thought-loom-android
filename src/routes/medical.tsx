@@ -8,7 +8,10 @@ import { loadVisibleIdeas, PENDING_DELETE_GRACE_MS } from "@/lib/pending-deletes
 import { requestDelete, undoDelete } from "@/lib/delete-flow";
 import { toast } from "sonner";
 import { ArticleEditor } from "@/components/article-editor";
-import { ArrowRight, ChevronDown, ChevronUp, Mic, PenLine, Search, Stethoscope, X } from "lucide-react";
+import { CompileBar } from "@/components/compile-bar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { isSelectable, selectedIdeas, toggleSelected } from "@/lib/document";
+import { ArrowRight, ChevronDown, ChevronUp, ListChecks, Mic, PenLine, Search, Stethoscope, X } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
 
 export const Route = createFileRoute("/medical")({
@@ -42,6 +45,12 @@ export function MedicalSection() {
   const [query, setQuery] = useState("");
   const [online, setOnline] = useState(true);
   const [currentMatch, setCurrentMatch] = useState<number | null>(null);
+  // Selection mode for «تجميع في مستند» — the same machinery as the main
+  // library, over the medical partition only. Leaving clears the picks.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const exitSelection = () => { setSelecting(false); setSelected(new Set()); };
+  const chosen = selectedIdeas(ideas, selected);
   // Articles with generated audio cached on this device — drives the
   // «صوت» badge on article cards, exactly as in the library.
   const [audioIds, setAudioIds] = useState<ReadonlySet<string>>(new Set());
@@ -132,6 +141,7 @@ export function MedicalSection() {
       <div className="mb-5 flex flex-wrap gap-2">
         <Button asChild className="rounded-full px-4"><Link to="/" search={captureSearch}><Mic />سجّل فكرة طبية</Link></Button>
         <Button asChild variant="outline" className="rounded-full px-4"><Link to="/" search={captureSearch}><PenLine />اكتب فكرة طبية</Link></Button>
+        <Button variant={selecting ? "default" : "outline"} className="rounded-full px-4" aria-pressed={selecting} onClick={() => (selecting ? exitSelection() : setSelecting(true))}><ListChecks />اختيار</Button>
       </div>
       {searchOpen && <div className="mb-6">
         <div className="flex items-center gap-2 border-b border-border pb-3">
@@ -170,15 +180,27 @@ export function MedicalSection() {
             </Button>
             {(query.trim() || openTopic === topic) && (
               <div>
-                {list.map((i) => (
-                  <ArticleEditor key={i.id} idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => handleDelete(i)}
-                    searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
-                ))}
+                {list.map((i) => {
+                  const selectable = selecting && isSelectable(i);
+                  return (
+                    <div key={i.id} className={selectable ? "flex items-start gap-2.5" : undefined}>
+                      {selectable && (
+                        <Checkbox checked={selected.has(i.id)} onCheckedChange={() => setSelected((s) => toggleSelected(s, i.id))}
+                          aria-label={`اختيار مقالة: ${getArticle(i).title}`} className="mt-7 size-5 shrink-0 [&_svg]:size-4" />
+                      )}
+                      <div className={selectable ? "min-w-0 flex-1" : undefined}>
+                        <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => handleDelete(i)}
+                          searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
         ))}
       </div>
+      {selecting && <CompileBar ideas={chosen} onCancel={exitSelection} />}
     </div></main>
   );
 }
