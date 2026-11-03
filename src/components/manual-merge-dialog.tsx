@@ -22,7 +22,10 @@ export function ManualMergeDialog({ idea, onClose }: { idea: Idea; onClose: (don
   const [body, setBody] = useState("");
   const [message, setMessage] = useState("");
   const versions = useRef(new Map<string, number>());
-  const partners = loadVisibleIdeas().filter((i) => i.id !== idea.id && !i.song);
+  // Partners live in the SAME section as this article: a medical article
+  // merges inside the medical section, a general one never sees medical
+  // partners — so the merged result's section is never ambiguous.
+  const partners = loadVisibleIdeas().filter((i) => i.id !== idea.id && !i.song && !!i.medical === !!idea.medical);
 
   const pick = (p: Idea) => {
     versions.current = new Map([[idea.id, idea.updatedAt ?? 0], [p.id, p.updatedAt ?? 0]]);
@@ -42,7 +45,7 @@ export function ManualMergeDialog({ idea, onClose }: { idea: Idea; onClose: (don
     if (changed) { setMessage("تغيّر أحد المقالين أثناء الدمج. لم نغيّر شيئًا."); return; }
     const consumed = [idea, partner];
     const origins = [...new Set(consumed.flatMap((s) => [s.id, ...(s.mergedFrom ?? [])]))];
-    const merged = saveArticleIdea(consumed.map((s) => s.text).join("\n\n"), title, body, origins, mergeAttributions(consumed));
+    const merged = saveArticleIdea(consumed.map((s) => s.text).join("\n\n"), title, body, origins, { ...mergeAttributions(consumed), ...(idea.medical ? { medical: true } : {}) });
     if (removeOriginals) consumed.forEach((s) => deleteIdea(s.id));
     void pushIdea(merged).catch(() => {});
     onClose(true);
