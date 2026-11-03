@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildCreateVoiceRequest, bytesToBase64, clearMyVoiceProfile, CONSENT_STATEMENT_AR,
-  createMyVoice, deleteMyVoice, encodeWav24k, floatToPcm16, getMyVoiceProfile,
-  MAX_SAMPLE_SECONDS, MIN_SAMPLE_SECONDS, parseCreatedVoiceId, READING_SAMPLE_AR,
+  createMyVoice, deleteMyVoice, effectiveListenVoice, encodeWav24k, floatToPcm16, getMyVoiceProfile,
+  isMyVoicePublic, MAX_SAMPLE_SECONDS, MIN_SAMPLE_SECONDS, MY_VOICE_PUBLIC, parseCreatedVoiceId, READING_SAMPLE_AR,
   sampleDurationState, samplesSeconds, saveMyVoiceProfile, trimSamplesToSeconds, voiceCreateErrorMessage,
   VOICES_API_URL,
 } from "./my-voice";
@@ -241,5 +241,32 @@ describe("WAV conversion helpers", () => {
   it("base64 round-trips arbitrary bytes", () => {
     const bytes = new Uint8Array([0, 1, 2, 127, 128, 250, 255, 66]);
     expect([...base64ToBytes(bytesToBase64(bytes))]).toEqual([...bytes]);
+  });
+});
+
+describe("temporary hide (MY_VOICE_PUBLIC)", () => {
+  it("is parked off, and the gate reflects the flag", () => {
+    // Parked at the owner's instruction until the clone quality/account
+    // issue is solved; restore = MY_VOICE_PUBLIC back to true.
+    expect(MY_VOICE_PUBLIC).toBe(false);
+    expect(isMyVoicePublic()).toBe(false);
+  });
+
+  it("routes every listen choice to the default voice while hidden", () => {
+    expect(effectiveListenVoice("mine", false)).toBe("default");
+    expect(effectiveListenVoice("default", false)).toBe("default");
+    // The default (shipped) flag state routes the same way.
+    expect(effectiveListenVoice("mine")).toBe("default");
+  });
+
+  it("passes the choice through untouched when the feature is public", () => {
+    expect(effectiveListenVoice("mine", true)).toBe("mine");
+    expect(effectiveListenVoice("default", true)).toBe("default");
+  });
+
+  it("leaves the stored profile alone — hiding never clears it", () => {
+    saveMyVoiceProfile("voice_test123");
+    expect(isMyVoicePublic()).toBe(false);
+    expect(getMyVoiceProfile()?.voiceId).toBe("voice_test123");
   });
 });
