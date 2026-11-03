@@ -12,8 +12,9 @@ import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
 import { getGeminiKey } from "@/lib/gemini";
-import { blobToBytes, concatPcm, createTtsSession, mapWithConcurrency, modelForVoiceKey, pcmToWav, speakWithDevice, splitForSpeech, synthesizeGeminiChunkWithModel, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
-import { audioFileName, deleteArticleAudio, findCachedAudio, getAudioChunk, getSongAudio, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest, type SongAudioRecord } from "@/lib/article-audio";
+import { blobToBytes, concatPcm, createTtsSession, GEMINI_TTS_VOICE, mapWithConcurrency, modelForVoiceKey, pcmToWav, speakWithDevice, splitForSpeech, synthesizeGeminiChunkWithModel, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
+import { audioFileName, deleteArticleAudioForVoice, findCachedAudioForVoice, getAudioChunk, getSongAudio, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest, type SongAudioRecord } from "@/lib/article-audio";
+import { getMyVoiceProfile } from "@/lib/my-voice";
 import { deriveSongAudioState, songDurationLabel, songRecordedLabel } from "@/lib/songs";
 import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
 
@@ -661,12 +662,24 @@ const SPEECH_RATES = [0.75, 1, 1.25, 1.5];
  * ONE Gemini TTS model (the session resolves it on the first chunk), and
  * its cache entry is keyed by that model — a cached generation is played,
  * shared, and completed as-is, never mixed with another model's audio.
+ * The Gemini engine additionally offers the author's own replicated voice
+ * («صوتي», created in Settings): cache entries are scoped per voice, so a
+ * default-voice generation and a my-voice generation of the same article
+ * coexist and are loaded, resumed, shared, and deleted independently.
  */
 function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   open: boolean; onOpenChange: (open: boolean) => void; articleId: string; title: string; body: string;
 }) {
   const [engine, setEngine] = useState<TtsEngine>("device");
   const [hasKey, setHasKey] = useState(false);
+  // Which voice the Gemini engine speaks in: the prebuilt default, or the
+  // user's own replicated voice («صوتي», created in Settings). Each voice
+  // has its own cached generation per article — they never mix.
+  const [voiceChoice, setVoiceChoice] = useState<"default" | "mine">("default");
+  const [myVoiceId, setMyVoiceId] = useState("");
+  /** The voice half of the cache voice key all cache operations apply to:
+   * the prebuilt voice name, or the replicated voice id when «صوتي» is on. */
+  const voicePartRef = useRef<string>(GEMINI_TTS_VOICE);
   const [rate, setRate] = useState(1);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -790,7 +803,7 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     if (legacyUrl.current) { URL.revokeObjectURL(legacyUrl.current); legacyUrl.current = ""; }
     setAudioUrl("");
     voiceKeyRef.current = "";
-    const cached = await findCachedAudio(articleId, "gemini", title, body).catch(() => null);
+    const cached = await findCachedAudioForVoice(articleId, "gemini", voicePartRef.current, title, body).catch(() => null);
     if (!cached) { setCacheState("none"); return; }
     if (cached.kind === "legacy") {
       setLegacy(cached.record); legacyRef.current = cached.record;
@@ -823,6 +836,10 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     const key = getGeminiKey();
     setHasKey(!!key);
     setEngine(key ? "gemini" : "device");
+    const profile = getMyVoiceProfile();
+    setMyVoiceId(profile?.voiceId ?? "");
+    setVoiceChoice("default");
+    voicePartRef.current = GEMINI_TTS_VOICE;
     setError(""); setStatus("");
     void loadCache();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -891,10 +908,11 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     if (!key) { setError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت."); return; }
     const chunks = splitForSpeech(text);
     if (!chunks.length) { setError("لا يوجد نص للقراءة."); return; }
+    const activeVoiceId = voicePartRef.current !== GEMINI_TTS_VOICE ? voicePartRef.current : undefined;
     const resumeManifest = !force && !legacy && manifestFresh ? manifest : null;
-    const session = resumeManifest ? null : createTtsSession(key);
+    const session = resumeManifest ? null : createTtsSession(key, { ...(activeVoiceId ? { voiceId: activeVoiceId } : {}) });
     if (!resumeManifest) {
-      await deleteArticleAudio(articleId, "gemini").catch(() => {});
+      await deleteArticleAudioForVoice(articleId, "gemini", voicePartRef.current).catch(() => {});
       readyPcm.current.clear();
       readyIdx.current.clear();
       revokeChunkUrls();
@@ -937,7 +955,7 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
       await mapWithConcurrency(missing, 3, async (i) => {
         const chunk = chunks[i] as string;
         const pcm = resumeManifest
-          ? await synthesizeGeminiChunkWithModel(chunk, key, modelForVoiceKey(resumeManifest.voiceKey), controller.signal)
+          ? await synthesizeGeminiChunkWithModel(chunk, key, modelForVoiceKey(resumeManifest.voiceKey), controller.signal, activeVoiceId)
           : await (session as NonNullable<typeof session>).synthesizeChunk(chunk, controller.signal);
         await ensureManifest();
         handleChunkReady(i, pcm);
@@ -992,7 +1010,7 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   const removeSaved = async () => {
     genAbort.current?.abort();
     audioRef.current?.pause();
-    await deleteArticleAudio(articleId, "gemini").catch(() => {});
+    await deleteArticleAudioForVoice(articleId, "gemini", voicePartRef.current).catch(() => {});
     voiceKeyRef.current = "";
     readyPcm.current.clear();
     readyIdx.current.clear();
@@ -1019,6 +1037,19 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
     }
     setEngine(next);
     setError("");
+  };
+
+  /** Switch the Gemini voice: each voice keeps its own cached generation,
+   * so switching reloads the cache scoped to the newly picked voice. */
+  const pickVoice = (next: "default" | "mine") => {
+    if (next === voiceChoice) return;
+    if (next === "mine" && !myVoiceId) return;
+    genAbort.current?.abort();
+    audioRef.current?.pause();
+    setVoiceChoice(next);
+    voicePartRef.current = next === "mine" ? myVoiceId : GEMINI_TTS_VOICE;
+    setError(""); setStatus("");
+    void loadCache();
   };
 
   const rateSelect = (onRate: (r: number) => void) => (
@@ -1067,6 +1098,26 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
 
         {engine === "gemini" && (
           <div className="space-y-3">
+            {hasKey && (
+              <>
+                <div className="flex rounded-lg border border-border p-1 bg-muted/30">
+                  <button type="button" onClick={() => pickVoice("default")}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${voiceChoice === "default" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    الصوت الافتراضي
+                  </button>
+                  <button type="button" onClick={() => pickVoice("mine")} disabled={!myVoiceId}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${voiceChoice === "mine" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"} disabled:opacity-50`}>
+                    صوتي
+                  </button>
+                </div>
+                {!myVoiceId && (
+                  <p className="text-xs text-muted-foreground">أنشئ صوتك من الإعدادات ⚙️ ليقرأ Gemini المقالات بصوتك أنت.</p>
+                )}
+                {voiceChoice === "mine" && (
+                  <p className="text-xs text-muted-foreground">هذه القراءة بصوتك المُستنسخ — ولكل صوت نسخته المحفوظة الخاصة.</p>
+                )}
+              </>
+            )}
             {!hasKey ? (
               <p className="text-sm leading-relaxed text-muted-foreground">
                 أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد صوت لهذا المقال — نفس مفتاح الضبط والدمج. الصوت المولّد ملف حقيقي: يُحفَظ على هاتفك ويُشارَك مثل المقال تمامًا.
