@@ -7,7 +7,7 @@ import { buildDriveFile, mergeDriveState, parseDriveFile } from "./drive-merge";
 import { buildSongIdea, loadIdeas, mergeIdeas, updateSong, type Idea } from "./ideas";
 import {
   assembleSongAudio, defaultSongTitle, deriveSongAudioState, recoverPendingSongs,
-  saveRecordedSong, songDurationLabel,
+  saveRecordedSong, songDurationLabel, songRecordedLabel,
 } from "./songs";
 import { blobToBytes } from "./tts";
 import { memoryVoiceStore, type VoiceStore } from "./voice-store";
@@ -153,6 +153,15 @@ describe("song derivations", () => {
     const title = defaultSongTitle(new Date(1_700_000_000_000));
     expect(title.startsWith("أغنية ")).toBe(true);
     expect(title.length).toBeGreaterThan("أغنية ".length);
+  });
+
+  it("labels a song with its recording date and time, from createdAt", () => {
+    const at = new Date(1_700_000_000_000);
+    const label = songRecordedLabel(songIdea({ createdAt: at.getTime() }));
+    const expected = `سُجّلت في ${at.toLocaleDateString("ar")} · ${at.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" })}`;
+    expect(label).toBe(expected);
+    // Non-songs have no recording date.
+    expect(songRecordedLabel({ id: "a", text: "x", createdAt: 1 })).toBeNull();
   });
 });
 
