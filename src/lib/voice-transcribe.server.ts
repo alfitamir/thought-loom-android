@@ -15,12 +15,17 @@ export async function transcribeVoice(request: Request): Promise<Response> {
   if (!(file instanceof File) || !file.size || file.size > MAX_BYTES || !file.type.startsWith("audio/")) {
     return jsonFail("ملف الصوت فارغ أو غير صالح.", 400);
   }
+  // A song recording is transcribed as sung lyrics (one line per phrase),
+  // never as dictation — the client flags it, the prompt stays server-side.
+  const song = form?.get("song") === "1";
   const upstream = new FormData();
   upstream.append("model", MODEL);
   upstream.append("file", file, file.name || "voice.webm");
   upstream.append("response_format", "json");
   upstream.append("stream", "true");
-  upstream.append("prompt", "تسجيل صوتي بالعربية (لهجة مصرية وفصحى) لكاتب يملي أفكاره. فرّغه حرفيًا.");
+  upstream.append("prompt", song
+    ? "تسجيل غنائي بالعربية (فصحى ولهجات عربية) لصاحبه يغنّي أغنية من تأليفه. فرّغ الكلمات المغناة فقط كما غُنّيت، سطرًا لكل عبارة مغناة، دون أي تعليق أو وصف."
+    : "تسجيل صوتي بالعربية (لهجة مصرية وفصحى) لكاتب يملي أفكاره. فرّغه حرفيًا.");
   let response: Response;
   try {
     response = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
