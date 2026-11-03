@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, Trash2 } from "lucide-react";
+import { Mic, Square, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getGeminiKey } from "@/lib/gemini";
 import { MIC_DENIED, pickMime } from "@/lib/audio-recorder";
 import {
   blobToWav24k, clearMyVoiceProfile, CONSENT_STATEMENT_AR, createMyVoice, deleteMyVoice,
-  getMyVoiceProfile, MAX_SAMPLE_SECONDS, MIN_SAMPLE_SECONDS, READING_SAMPLE_AR,
+  getMyVoiceProfile, MAX_SAMPLE_SECONDS, MIN_SAMPLE_SECONDS, prepareUploadedAudio, READING_SAMPLE_AR,
   sampleDurationState, saveMyVoiceProfile, type MyVoiceProfile,
 } from "@/lib/my-voice";
 
-type Clip = { blob: Blob; seconds: number; url: string };
+type Clip = { blob: Blob; seconds: number; url: string; trimmed?: boolean };
 type RecordingKind = "sample" | "consent";
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -34,6 +34,8 @@ export function MyVoiceSection() {
 
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const sampleFileRef = useRef<HTMLInputElement | null>(null);
+  const consentFileRef = useRef<HTMLInputElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startedRef = useRef(0);
   const kindRef = useRef<RecordingKind>("sample");
@@ -111,6 +113,27 @@ export function MyVoiceSection() {
     try { recorderRef.current?.stop(); } catch { setRecording(null); }
   };
 
+  /**
+   * An uploaded file as a take: the same decode → 24 kHz mono WAV
+   * conversion as a recording (see prepareUploadedAudio), so the clip
+   * that reaches «إنشاء صوتي» is indistinguishable from a recorded one —
+   * playback check included. A long reference file keeps its first 30s.
+   */
+  const onFile = async (kind: RecordingKind, file: File | undefined) => {
+    if (!file) return;
+    setError(""); setMsg("");
+    try {
+      const prep = await prepareUploadedAudio(file, kind === "sample");
+      const blob = new Blob([prep.wav.buffer as ArrayBuffer], { type: "audio/wav" });
+      const clip: Clip = { blob, seconds: prep.seconds, url: URL.createObjectURL(blob), trimmed: prep.trimmed };
+      const prev = kind === "sample" ? sampleRef.current : consentRef.current;
+      if (prev) URL.revokeObjectURL(prev.url);
+      if (kind === "sample") setSample(clip); else setConsent(clip);
+    } catch {
+      setError("تعذّرت قراءة الملف الصوتي — جرّب ملفًا آخر (mp3 أو wav أو m4a).");
+    }
+  };
+
   const sampleState = sample ? sampleDurationState(sample.seconds) : null;
   const canCreate = !!sample && sampleState === "ok" && !!consent && hasKey && !creating;
 
@@ -156,8 +179,29 @@ export function MyVoiceSection() {
             <Mic />{clip ? "إعادة التسجيل" : "تسجيل"}
           </Button>
         )}
+        {recording !== kind && (
+          <>
+            <Button
+              variant="outline" className="[&_svg]:size-5" disabled={recording !== null || creating}
+              onClick={() => (kind === "sample" ? sampleFileRef : consentFileRef).current?.click()}
+            >
+              <Upload />رفع ملف صوتي
+            </Button>
+            <input
+              ref={kind === "sample" ? sampleFileRef : consentFileRef}
+              type="file" accept="audio/*" className="hidden"
+              onChange={(e) => { void onFile(kind, e.target.files?.[0]); e.target.value = ""; }}
+            />
+          </>
+        )}
         {clip && recording !== kind && <span className="text-xs text-muted-foreground">المدة: {fmt(clip.seconds)}</span>}
       </div>
+      {clip?.trimmed && (
+        <p className="text-xs text-muted-foreground">الملف أطول من {MAX_SAMPLE_SECONDS} ثانية — هنستخدم أول {MAX_SAMPLE_SECONDS} ثانية بس.</p>
+      )}
+      {kind === "consent" && (
+        <p className="text-xs text-muted-foreground">سواء سجّلت أو رفعت ملفًا: لازم يكون بصوتك إنت، وبتقول فيه الجملة اللي فوق بالنص.</p>
+      )}
       {clip && recording !== kind && <audio src={clip.url} controls className="w-full" />}
     </div>
   );
@@ -177,6 +221,9 @@ export function MyVoiceSection() {
             صوتك المُستنسخ جاهز منذ {new Date(profile.createdAt).toLocaleDateString("ar-EG", { dateStyle: "medium" })}.
             من «استمع» في أي مقال، اختر «صوتي» لتوليد القراءة بصوتك ومشاركتها.
           </p>
+          <p className="text-sm text-muted-foreground">
+            لو الصوت مش شبهك، امسحه وسجّل من جديد بالإرشادات دي — جودة العيّنة هي أكبر عامل.
+          </p>
           <Button variant="ghost" className="text-destructive [&_svg]:size-5" onClick={() => void remove()}>
             <Trash2 />حذف صوتي
           </Button>
@@ -192,6 +239,17 @@ export function MyVoiceSection() {
           {!hasKey && (
             <p className="text-sm text-muted-foreground">أضف مفتاح Gemini أعلاه أولًا — إنشاء الصوت يتم بمفتاحك.</p>
           )}
+          <div className="space-y-1 rounded-lg bg-muted/40 px-3 py-2">
+            <p className="text-sm font-medium">لأقرب شبه لصوتك الحقيقي</p>
+            <ul className="list-disc space-y-0.5 ps-4 text-xs leading-relaxed text-muted-foreground">
+              <li>أوضة هادية وباب مقفول، بعيد عن أي دوشة.</li>
+              <li>الموبايل على بعد ٢٠–٣٠ سم من بقك.</li>
+              <li>اتكلم طبيعي بلهجتك، كأنك بتشرح لصاحبك — مش قراءة رسمية.</li>
+              <li>نوّع نبرتك: كلام عادي، وسؤال، وتأكيد على كلمة مهمة.</li>
+              <li>كمّل لآخر الوقت المتاح (٣٠ ثانية) — كل ثانية زيادة بتفرق.</li>
+              <li>التسجيلان بنفس الميكروفون وفي نفس المكان.</li>
+            </ul>
+          </div>
           <div className="space-y-2">
             <h4 className="text-sm font-medium">١. عيّنة القراءة ({MIN_SAMPLE_SECONDS}–{MAX_SAMPLE_SECONDS} ثانية)</h4>
             <p className="rounded-lg bg-muted/40 px-3 py-2 text-sm leading-loose">{READING_SAMPLE_AR}</p>
