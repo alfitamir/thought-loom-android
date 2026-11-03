@@ -37,9 +37,36 @@ export const GEMINI_TTS_SAMPLE_RATE = 24000;
 /**
  * Cache voice key for one model + voice. A generation's manifest and chunks
  * are stored under this key, so audio is only ever resumed, completed, or
- * exported by the exact model that produced it — never mixed across models.
+ * exported by the exact model AND voice that produced it — never mixed
+ * across models, and never across the prebuilt voice and the user's own
+ * replicated voice.
  */
-export const ttsVoiceKey = (model: string): string => `${model}:${GEMINI_TTS_VOICE}`;
+export const ttsVoiceKey = (model: string, voice: string = GEMINI_TTS_VOICE): string => `${model}:${voice}`;
+
+/**
+ * The voice half of a cache voice key: everything after the model id, or
+ * the whole key for legacy bare keys ("Charon", written by the 2.5 pipeline).
+ */
+export function voicePartOfKey(voiceKey: string): string {
+  const sep = voiceKey.indexOf(":");
+  return sep > 0 ? voiceKey.slice(sep + 1) : voiceKey;
+}
+
+/** A replicated-voice handle from the Voices API: a stored voice id
+ * (`voice_...`) or a stateless replication key (`voicekey_...`). */
+export const isReplicatedVoiceId = (voice: string): boolean =>
+  voice.startsWith("voice_") || voice.startsWith("voicekey_");
+
+/**
+ * The models that accept a replicated voice (docs:
+ * ai.google.dev/gemini-api/docs/voice-replication — both 3.8 TTS models;
+ * the 2.5 preview model takes prebuilt voices only). A session speaking in
+ * the user's own voice probes exactly these, in the usual order.
+ */
+export const REPLICATED_VOICE_MODELS: readonly GeminiTtsModelId[] = [
+  GEMINI_TTS_MODELS[0],
+  GEMINI_TTS_MODELS[1],
+];
 
 /** The voice key new generations write under (the primary model's). */
 export const CURRENT_TTS_VOICE_KEY = ttsVoiceKey(GEMINI_TTS_MODELS[0]);
@@ -55,6 +82,34 @@ export function modelForVoiceKey(voiceKey: string): string {
 }
 
 export class TtsError extends Error {}
+
+/**
+ * The user's replicated voice itself failed (deleted, expired, or rejected)
+ * — as opposed to a model being unavailable. A session never falls through
+ * and never substitutes another voice for it: this error surfaces as-is so
+ * the user learns their voice needs attention (usually: create it again
+ * from Settings).
+ */
+export class VoiceUnavailableError extends TtsError {
+  constructor(message = "تعذّر استخدام صوتك المُستنسخ — ربما حُذف أو انتهت صلاحيته. أعد إنشاءه من الإعدادات ⚙️.") {
+    super(message);
+  }
+}
+
+/**
+ * Whether a failed request in a replicated-voice session blames the VOICE
+ * rather than the model. A message naming the model stays a model problem
+ * (the session may still fall through); a message naming the voice — or a
+ * bare 404, where the voice id is the resource that can actually be
+ * missing — is a voice problem.
+ */
+export function isVoiceUnavailable(status: number, message: string): boolean {
+  if (/model/i.test(message)) return false;
+  if (/voice/i.test(message)) {
+    return status === 404 || /not found|invalid|expired|deleted|does not exist|not available|unavailable/i.test(message);
+  }
+  return status === 404;
+}
 
 /** Plain text prepared for speaking: title then body, markdown marks removed. */
 export function toSpeechText(title: string, body: string): string {
@@ -248,13 +303,15 @@ const responseErrorMessage = (json: unknown): string => {
  * The single-speaker Interactions API request for the 3.8 models. It asks
  * explicitly for headerless PCM (`audio/l16`): the unary default is a full
  * WAV file, which could not be concatenated chunk-by-chunk like raw PCM.
+ * `voice` is a prebuilt voice name ("Charon") or a replicated voice id
+ * (`voice_...`) — the field accepts both.
  */
-export function buildInteractionsTtsRequest(model: string, text: string) {
+export function buildInteractionsTtsRequest(model: string, text: string, voice: string = GEMINI_TTS_VOICE) {
   return {
     model,
     input: [{ type: "user_input", content: [{ type: "text", text }] }],
     response_format: { type: "audio", mime_type: "audio/l16", sample_rate: GEMINI_TTS_SAMPLE_RATE },
-    generation_config: { speech_config: [{ voice: GEMINI_TTS_VOICE }] },
+    generation_config: { speech_config: [{ voice }] },
   };
 }
 
@@ -310,12 +367,21 @@ export function parseInteractionsTtsAudio(json: unknown): Uint8Array {
   return unwrapPcm(base64ToBytes(data), mimeType);
 }
 
-/** One TTS request for a single chunk through one specific model's API. */
+/**
+ * One TTS request for a single chunk through one specific model's API.
+ * With `voiceId` (a replicated voice), the request speaks in the user's own
+ * voice: only the Interactions-API models accept one, and a failure that
+ * blames the voice raises VoiceUnavailableError instead of falling through
+ * or degrading to another voice.
+ */
 export async function synthesizeGeminiChunkWithModel(
-  chunk: string, key: string, model: string, signal?: AbortSignal,
+  chunk: string, key: string, model: string, signal?: AbortSignal, voiceId?: string,
 ): Promise<Uint8Array> {
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const interactions = usesInteractionsApi(model);
+  if (voiceId && !interactions) {
+    throw new TtsError("صوتك المُستنسخ يعمل مع نماذج Gemini 3.8 فقط.");
+  }
   let response: Response;
   try {
     response = await fetch(
@@ -326,7 +392,7 @@ export async function synthesizeGeminiChunkWithModel(
         method: "POST",
         ...(signal ? { signal } : {}),
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(interactions ? buildInteractionsTtsRequest(model, chunk) : buildGeminiTtsRequest(chunk)),
+        body: JSON.stringify(interactions ? buildInteractionsTtsRequest(model, chunk, voiceId) : buildGeminiTtsRequest(chunk)),
       },
     );
   } catch (error) {
@@ -336,6 +402,7 @@ export async function synthesizeGeminiChunkWithModel(
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     const message = responseErrorMessage(err);
+    if (voiceId && isVoiceUnavailable(response.status, message)) throw new VoiceUnavailableError();
     if (isModelUnavailable(response.status, message)) throw new ModelUnavailableError(response.status, message);
     throw new TtsError(geminiErrorMessage(response.status, message));
   }
@@ -376,7 +443,12 @@ type PendingChunk = {
  * therefore never mixes models. A failed probe rejects the waiting chunks
  * with the same error and re-arms, so a later call can probe again.
  */
-export function createTtsSession(key: string): TtsSession {
+export function createTtsSession(key: string, opts: { voiceId?: string } = {}): TtsSession {
+  const voiceId = opts.voiceId;
+  // A replicated voice is accepted by the 3.8 models only, so a my-voice
+  // session probes exactly those; a voice failure is not a model failure
+  // and never falls through to the prebuilt voice (see VoiceUnavailableError).
+  const models: readonly string[] = voiceId ? REPLICATED_VOICE_MODELS : GEMINI_TTS_MODELS;
   let resolved: string | null = null;
   let probing = false;
   let waiters: PendingChunk[] = [];
@@ -389,15 +461,15 @@ export function createTtsSession(key: string): TtsSession {
 
   const runProbe = async (first: PendingChunk) => {
     let lastUnavailable: ModelUnavailableError | null = null;
-    for (const candidate of GEMINI_TTS_MODELS) {
+    for (const candidate of models) {
       try {
-        const pcm = await synthesizeGeminiChunkWithModel(first.chunk, key, candidate, first.signal);
+        const pcm = await synthesizeGeminiChunkWithModel(first.chunk, key, candidate, first.signal, voiceId);
         resolved = candidate;
         first.resolve(pcm);
         const pending = waiters;
         waiters = [];
         for (const w of pending) {
-          void synthesizeGeminiChunkWithModel(w.chunk, key, candidate, w.signal).then(w.resolve, w.reject);
+          void synthesizeGeminiChunkWithModel(w.chunk, key, candidate, w.signal, voiceId).then(w.resolve, w.reject);
         }
         return;
       } catch (error) {
@@ -415,7 +487,7 @@ export function createTtsSession(key: string): TtsSession {
   };
 
   const synthesizeChunk = (chunk: string, signal?: AbortSignal): Promise<Uint8Array> => {
-    if (resolved) return synthesizeGeminiChunkWithModel(chunk, key, resolved, signal);
+    if (resolved) return synthesizeGeminiChunkWithModel(chunk, key, resolved, signal, voiceId);
     if (signal?.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
     return new Promise<Uint8Array>((resolve, reject) => {
       const waiter: PendingChunk = { chunk, ...(signal ? { signal } : {}), resolve, reject };
@@ -429,8 +501,8 @@ export function createTtsSession(key: string): TtsSession {
   };
 
   return {
-    get model() { return resolved ?? GEMINI_TTS_MODELS[0]; },
-    get voiceKey() { return ttsVoiceKey(resolved ?? GEMINI_TTS_MODELS[0]); },
+    get model() { return resolved ?? models[0]!; },
+    get voiceKey() { return ttsVoiceKey(resolved ?? models[0]!, voiceId); },
     synthesizeChunk,
   };
 }
@@ -440,6 +512,9 @@ export type SynthesizeChunksOptions = {
   concurrency?: number;
   /** Chunk size passed to splitForSpeech (default 1800 chars). */
   maxChars?: number;
+  /** A replicated voice id (`voice_...`) to speak in instead of the
+   * prebuilt voice. Restricts the session to the 3.8 models. */
+  voiceId?: string;
   /** Called as EACH chunk completes — possibly out of index order — with the
    * chunk's index and its raw PCM, so callers can cache and play early. */
   onChunkReady?: (index: number, pcm: Uint8Array) => void;
@@ -451,7 +526,7 @@ async function synthesizeChunkList(
 ): Promise<Uint8Array[]> {
   if (!key.trim()) throw new TtsError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت.");
   if (!chunks.length) throw new TtsError("لا يوجد نص للقراءة.");
-  const session = createTtsSession(key);
+  const session = createTtsSession(key, { ...(opts.voiceId ? { voiceId: opts.voiceId } : {}) });
   return mapWithConcurrency(chunks, opts.concurrency ?? 3, async (chunk, i) => {
     const pcm = await session.synthesizeChunk(chunk, opts.signal);
     opts.onChunkReady?.(i, pcm);
