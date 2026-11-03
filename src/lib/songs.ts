@@ -1,8 +1,10 @@
 // Song mode: the user records himself SINGING his own songs. The recording
 // is the content — segments are assembled into one audio file kept on this
-// device, and the idea carries only the title, the lyrics (written by hand
-// later) and the song flag. Nothing here transcribes or sends audio to any
-// AI: no engine, no key, no network.
+// device, and the idea carries only the title, the lyrics and the song flag.
+// Nothing here transcribes or sends audio to any AI: no engine, no key, no
+// network. (Written lyrics are extracted from the singing only deliberately
+// — the editor's button or the post-save pass in song-lyrics.ts — and never
+// by the dictation pipeline.)
 import { saveSongAudio, songAudioStore, type SongAudioRecord, type SongAudioStore } from "./article-audio";
 import { buildSongIdea, loadIdeas, replaceIdeas, type Idea } from "./ideas";
 import { formatElapsed } from "./voice-session";
@@ -15,6 +17,15 @@ export const defaultSongTitle = (at: Date): string =>
 /** mm:ss label for a song's length, or null when the length is unknown. */
 export const songDurationLabel = (idea: Idea): string | null =>
   idea.song && idea.songDuration && idea.songDuration > 0 ? formatElapsed(idea.songDuration) : null;
+
+/** «سُجّلت في {date} · {time}» — a song's creation timestamp IS its recording
+ *  moment, so the label just surfaces `createdAt` (Arabic locale, date and
+ *  time). Null for non-songs. */
+export const songRecordedLabel = (idea: Idea): string | null => {
+  if (!idea.song) return null;
+  const at = new Date(idea.createdAt);
+  return `سُجّلت في ${at.toLocaleDateString("ar")} · ${at.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" })}`;
+};
 
 /**
  * Whether the editor can offer playback for a song: still looking, the
