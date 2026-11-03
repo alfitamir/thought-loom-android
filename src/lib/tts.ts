@@ -60,12 +60,15 @@ export const isReplicatedVoiceId = (voice: string): boolean =>
 /**
  * The models that accept a replicated voice (docs:
  * ai.google.dev/gemini-api/docs/voice-replication — both 3.8 TTS models;
- * the 2.5 preview model takes prebuilt voices only). A session speaking in
- * the user's own voice probes exactly these, in the usual order.
+ * the 2.5 preview model takes prebuilt voices only). A my-voice session
+ * probes the FULL model first: Flash-Lite is the speed tier and imitates
+ * a replicated voice noticeably worse, so for the user's own voice
+ * fidelity outranks speed and Lite is only the fallback. (The prebuilt
+ * voice keeps the usual lite-first order in GEMINI_TTS_MODELS.)
  */
 export const REPLICATED_VOICE_MODELS: readonly GeminiTtsModelId[] = [
-  GEMINI_TTS_MODELS[0],
   GEMINI_TTS_MODELS[1],
+  GEMINI_TTS_MODELS[0],
 ];
 
 /** The voice key new generations write under (the primary model's). */

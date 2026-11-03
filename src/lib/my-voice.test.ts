@@ -3,7 +3,7 @@ import {
   buildCreateVoiceRequest, bytesToBase64, clearMyVoiceProfile, CONSENT_STATEMENT_AR,
   createMyVoice, deleteMyVoice, encodeWav24k, floatToPcm16, getMyVoiceProfile,
   MAX_SAMPLE_SECONDS, MIN_SAMPLE_SECONDS, parseCreatedVoiceId, READING_SAMPLE_AR,
-  sampleDurationState, saveMyVoiceProfile, VOICES_API_URL,
+  sampleDurationState, samplesSeconds, saveMyVoiceProfile, trimSamplesToSeconds, VOICES_API_URL,
 } from "./my-voice";
 import { base64ToBytes } from "./tts";
 
@@ -20,6 +20,27 @@ describe("sampleDurationState", () => {
     expect(sampleDurationState(25)).toBe("ok");
     expect(sampleDurationState(30)).toBe("ok");
     expect(sampleDurationState(30.1)).toBe("long");
+  });
+});
+
+describe("uploaded-file trimming (shared with the recorder's conversion)", () => {
+  it("measures duration from the sample count at 24 kHz", () => {
+    expect(samplesSeconds(new Float32Array(24000))).toBe(1);
+    expect(samplesSeconds(new Float32Array(24000 * 45))).toBe(45);
+  });
+
+  it("cuts an over-long buffer to exactly the requested seconds, keeping the head", () => {
+    const samples = new Float32Array(24000 * 45);
+    samples[0] = 0.5; samples[24000 * 30 - 1] = 0.25; samples[24000 * 30] = 0.75;
+    const trimmed = trimSamplesToSeconds(samples, MAX_SAMPLE_SECONDS);
+    expect(trimmed).toHaveLength(24000 * 30);
+    expect(trimmed[0]).toBe(0.5);
+    expect(trimmed[24000 * 30 - 1]).toBe(0.25);
+  });
+
+  it("passes a buffer inside the window through untouched", () => {
+    const samples = new Float32Array(24000 * 20);
+    expect(trimSamplesToSeconds(samples, MAX_SAMPLE_SECONDS)).toBe(samples);
   });
 });
 
