@@ -53,6 +53,12 @@ describe("archivePool eligibility", () => {
     expect(archivePool([song, plain], NOW).map((i) => i.id)).toEqual([plain.id]);
   });
 
+  it("excludes medical articles — home is the general surface", () => {
+    const medical = mk({ medical: true });
+    const plain = mk();
+    expect(archivePool([medical, plain], NOW).map((i) => i.id)).toEqual([plain.id]);
+  });
+
   it("includes liked articles — re-reading is their point", () => {
     const liked = mk({ liked: true, source: "مدونة ما" });
     expect(archivePool([liked], NOW).map((i) => i.id)).toEqual([liked.id]);
