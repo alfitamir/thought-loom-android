@@ -60,6 +60,8 @@ export type Database = {
           created_at: number
           id: string
           merged_from: string[] | null
+          song: boolean
+          song_duration: number | null
           synced_at: string
           text: string
           topic: string | null
@@ -73,6 +75,8 @@ export type Database = {
           created_at: number
           id: string
           merged_from?: string[] | null
+          song?: boolean
+          song_duration?: number | null
           synced_at?: string
           text: string
           topic?: string | null
@@ -86,6 +90,8 @@ export type Database = {
           created_at?: number
           id?: string
           merged_from?: string[] | null
+          song?: boolean
+          song_duration?: number | null
           synced_at?: string
           text?: string
           topic?: string | null
