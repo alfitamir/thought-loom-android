@@ -7,6 +7,7 @@ import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { deleteSongAudio, listArticleIdsWithAudio } from "@/lib/article-audio";
+import { deleteSongDriveCopy } from "@/lib/song-drive";
 import { ArticleEditor } from "@/components/article-editor";
 import { MergeBanner } from "@/components/merge-banner";
 import { LikedDialog } from "@/components/liked-dialog";
@@ -231,7 +232,7 @@ function Library() {
                         ))}
                       </div>
                     )}
-                    <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => { deleteIdea(i.id); if (i.song) void deleteSongAudio(i.id).catch(() => {}); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }}
+                    <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => { deleteIdea(i.id); if (i.song) { void deleteSongAudio(i.id).catch(() => {}); void deleteSongDriveCopy(i).catch(() => {}); } void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }}
                       searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
                   </div>;
                 })}
