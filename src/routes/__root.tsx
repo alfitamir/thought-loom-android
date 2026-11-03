@@ -13,6 +13,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { BottomNav } from "../components/bottom-nav";
+import { Toaster } from "../components/ui/sonner";
+import { initPendingDeletes } from "../lib/delete-flow";
 
 function NotFoundComponent() {
   return (
@@ -116,12 +118,17 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // Undoable deletions left pending by an app close settle on startup:
+  // anything past its grace deadline finalizes, the rest re-arms its timer.
+  useEffect(() => { initPendingDeletes(); }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       {/* Fixed bottom navigation; renders only on "/" and "/library". */}
       <BottomNav />
+      <Toaster />
     </QueryClientProvider>
   );
 }
