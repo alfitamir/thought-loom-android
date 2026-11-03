@@ -282,3 +282,32 @@ describe("getFacebookPost", () => {
     await expect(getFacebookPost(art)).rejects.toThrow("لم يقترح");
   });
 });
+
+describe("liked articles stay out of every AI corpus", () => {
+  const likedX: Idea = { ...idea("x", "غزة بعيون أخرى", "غزة والمقاومة والاحتلال غزة غزة غزة", 9), liked: true, source: "موقع خارجي" };
+  const mixed = [...lib, likedX];
+
+  it("retrieveRelevant never returns a liked article, even on a perfect match", () => {
+    const out = retrieveRelevant("غزة", mixed);
+    expect(out.map((a) => a.id)).not.toContain("x");
+    expect(out[0]!.id).toBe("g");
+  });
+
+  it("askIdeas builds its corpus without liked articles", async () => {
+    replyModel({ answer: "إجابة", points: [], articleIds: ["g"] });
+    const res = await askIdeas("ما رأيي في غزة؟", mixed);
+    expect(res.used.map((a) => a.id)).not.toContain("x");
+  });
+
+  it("getInsights counts only the author's own articles toward the minimum", async () => {
+    await expect(getInsights([lib[0]!, lib[1]!, likedX])).rejects.toThrow("ثلاثة");
+  });
+
+  it("classifyBatch sends no liked article to the model", async () => {
+    expect(await classifyBatch([likedX], { key: "K" })).toEqual({});
+    expect(geminiStream).not.toHaveBeenCalled();
+    geminiStream.mockResolvedValue(JSON.stringify([{ id: "g", topic: "الأمة والعالم", tags: [] }, { id: "x", topic: "الأمة والعالم", tags: [] }]));
+    const out = await classifyBatch(mixed, { key: "K" });
+    expect(Object.keys(out)).not.toContain("x");
+  });
+});
