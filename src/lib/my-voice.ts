@@ -41,14 +41,18 @@ export const CONSENT_STATEMENT_AR =
 
 /**
  * The suggested reading text for the reference sample: neutral prose about
- * ideas and writing, ~60 words — about 25 seconds of natural Arabic
- * reading, inside the API's 10–30 second window.
+ * ideas and writing, ~70 words — about 25–30 seconds of natural Arabic
+ * reading, inside the API's 10–30 second window. The closing lines add a
+ * question and an emphatic sentence on purpose: a sample read in one flat
+ * formal tone gives the replication little of the speaker's real voice to
+ * learn from, so the text itself invites intonation variety.
  */
 export const READING_SAMPLE_AR =
   "أكتب أفكاري هنا كما تخطر في بالي، بصوت هادئ وطبيعي، لأن الفكرة الجيدة تستحق أن تُحفظ قبل أن تضيع. " +
   "بعض الأفكار تولد صغيرة ثم تكبر مع الوقت، وبعضها يحتاج إلى مراجعة وصبر حتى ينضج. " +
   "أحب أن أقرأ ما أكتبه بصوت مرتفع، فالقراءة تكشف جمال الجملة وتوضح مواضع الضعف فيها. " +
-  "هذه عينة من صوتي أقدمها ليقرأ التطبيق مقالاتي بنفس النبرة والإيقاع.";
+  "هذه عينة من صوتي أقدمها ليقرأ التطبيق مقالاتي بنفس النبرة والإيقاع. " +
+  "وهل جرّبت أن تقرأ ما كتبته بصوت مرتفع؟ جرّبها بنفسك — ستُدهشك النتيجة حتمًا!";
 
 // ---------------------------------------------------------------------------
 // Profile storage: just the voice id + creation date, beside the Gemini key.
@@ -113,11 +117,11 @@ export function mixToMono(buffer: AudioBuffer): Float32Array {
 }
 
 /**
- * Convert a browser recording (webm/opus…) to 24 kHz mono WAV bytes.
- * Decoding through an AudioContext created at 24 kHz resamples for us.
- * Browser-only (WebAudio); the pure helpers above carry the unit tests.
+ * Decode an audio blob (a recording or an uploaded file) to mono float
+ * samples at 24 kHz. An AudioContext created at 24 kHz resamples for us.
+ * Browser-only (WebAudio); the pure helpers carry the unit tests.
  */
-export async function blobToWav24k(blob: Blob): Promise<Uint8Array> {
+export async function blobToSamples24k(blob: Blob): Promise<Float32Array> {
   const Ctor = typeof window !== "undefined"
     ? (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
     : undefined;
@@ -126,10 +130,46 @@ export async function blobToWav24k(blob: Blob): Promise<Uint8Array> {
   const ctx = new Ctor({ sampleRate: GEMINI_TTS_SAMPLE_RATE });
   try {
     const buffer = await ctx.decodeAudioData(bytes);
-    return encodeWav24k(mixToMono(buffer));
+    return mixToMono(buffer);
   } finally {
     void ctx.close().catch(() => {});
   }
+}
+
+/**
+ * Convert a browser recording (webm/opus…) to 24 kHz mono WAV bytes.
+ */
+export async function blobToWav24k(blob: Blob): Promise<Uint8Array> {
+  return encodeWav24k(await blobToSamples24k(blob));
+}
+
+/** Seconds of audio in a mono buffer at the given sample rate. */
+export const samplesSeconds = (samples: Float32Array, rate: number = GEMINI_TTS_SAMPLE_RATE): number =>
+  samples.length / rate;
+
+/** The first `seconds` of a mono buffer — longer input is cut, shorter
+ * input passes through untouched (same reference). */
+export function trimSamplesToSeconds(
+  samples: Float32Array, seconds: number, rate: number = GEMINI_TTS_SAMPLE_RATE,
+): Float32Array {
+  const max = Math.max(0, Math.floor(seconds * rate));
+  return samples.length > max ? samples.slice(0, max) : samples;
+}
+
+export type PreparedUpload = { wav: Uint8Array; seconds: number; trimmed: boolean };
+
+/**
+ * Prepare an UPLOADED audio file as a voice-creation take, through the
+ * exact same decode → 24 kHz mono WAV conversion the recorder path uses.
+ * A reference file longer than the API's window is cut to its first
+ * MAX_SAMPLE_SECONDS (the UI says so); a consent file passes through
+ * whole — the API verifies its content, only its duration is sanity here.
+ */
+export async function prepareUploadedAudio(file: Blob, isSample: boolean): Promise<PreparedUpload> {
+  const samples = await blobToSamples24k(file);
+  const trimmed = isSample && samplesSeconds(samples) > MAX_SAMPLE_SECONDS;
+  const used = trimmed ? trimSamplesToSeconds(samples, MAX_SAMPLE_SECONDS) : samples;
+  return { wav: encodeWav24k(used), seconds: Math.max(1, Math.round(samplesSeconds(used))), trimmed };
 }
 
 // ---------------------------------------------------------------------------
