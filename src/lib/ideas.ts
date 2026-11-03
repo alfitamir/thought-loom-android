@@ -20,6 +20,10 @@ export type Idea = {
   song?: boolean;
   /** Length of the recording in seconds, when known. Display metadata only. */
   songDuration?: number;
+  /** Id of this song's audio file in the «أفكاري — الأغاني» folder on Google
+   *  Drive, once the recording has been backed up there. The blob itself is
+   *  never an idea field — this id is how another device finds its copy. */
+  driveFileId?: string;
   /** True for an article the user liked ELSEWHERE (not his own writing). It
    *  arrives through its own paste-in path and AI must NEVER modify it: no
    *  polish, no classification, no smart tools, and it is excluded from every
@@ -138,6 +142,9 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     } else if (winner.song && winner.songDuration === undefined && loser.songDuration !== undefined) {
       winner = { ...winner, songDuration: loser.songDuration };
     }
+    // A Drive copy is metadata like the pin: an edition that lacks the file id
+    // must not orphan the winner's backed-up recording.
+    if (!winner.driveFileId && loser.driveFileId) winner = { ...winner, driveFileId: loser.driveFileId };
     // A liked article is liked on every device: an edition that lacks the flag
     // (or the attribution) must not un-like the winner or lose where it came from.
     if (!winner.liked && loser.liked) winner = { ...winner, liked: true };
