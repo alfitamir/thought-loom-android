@@ -13,6 +13,7 @@ import { resolveEngine } from "@/lib/ai-engine";
 import type { Engine } from "@/lib/article-ai";
 import { formatElapsed, joinTranscript, transcribeFinished } from "@/lib/voice-session";
 import { recoverPendingSongs, saveRecordedSong } from "@/lib/songs";
+import { autoExtractSongLyrics } from "@/lib/song-lyrics";
 
 export const Route = createFileRoute("/")({
   // `?record=<nonce>` is the bottom navigation's "open the recorder" signal:
@@ -155,6 +156,10 @@ function Index() {
         if (made.length) {
           made.forEach((idea) => pushIdea(idea));
           setMsg("تمت استعادة أغنية مسجلة على هاتفك ✓");
+          // A recovered song is a saved song: same background lyrics pass.
+          made.forEach((idea) => {
+            void autoExtractSongLyrics(idea.id).then((updated) => { if (updated) pushIdea(updated); });
+          });
         }
       } catch {
         songResumedRef.current = false; // audio stays on the phone; retried on the next open
@@ -223,9 +228,10 @@ function Index() {
   };
 
   // After stop in song mode: assemble the session into one audio file and
-  // save it as a song. No transcription, no engine, no key — the recording
-  // itself is the result. If assembly fails the segments stay in the song
-  // store and the recovery pass above saves the song on a later open.
+  // save it as a song. The recording itself is the result; if assembly
+  // fails the segments stay in the song store and the recovery pass above
+  // saves the song on a later open. Only afterwards, and only with his own
+  // Gemini key, a background pass writes the sung words onto the song.
   const finishSong = async (session: string, durationSeconds: number) => {
     if (!session) return;
     try {
@@ -235,6 +241,10 @@ function Index() {
         pushIdea(idea);
         setOpen(false);
         setMsg("حُفظت أغنيتك بصوتك ✓ — ستجدها في المكتبة، ويمكنك إضافة كلماتها من هناك");
+        // Background bonus: with his own Gemini key configured, the sung
+        // words are written onto the song on their own (still-empty lyrics
+        // only). Silent on any failure — the editor button covers it.
+        void autoExtractSongLyrics(idea.id).then((updated) => { if (updated) pushIdea(updated); });
       } else {
         setMsg("لم يُحفظ من التسجيل شيء.");
       }
