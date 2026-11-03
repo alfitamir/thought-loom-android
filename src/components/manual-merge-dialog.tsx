@@ -3,6 +3,7 @@ import { Check, Copy, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { deleteIdea, getArticle, loadIdeas, mergeAttributions, saveArticleIdea, type Idea } from "@/lib/ideas";
+import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { pushIdea } from "@/lib/sync";
 
 /**
@@ -21,7 +22,7 @@ export function ManualMergeDialog({ idea, onClose }: { idea: Idea; onClose: (don
   const [body, setBody] = useState("");
   const [message, setMessage] = useState("");
   const versions = useRef(new Map<string, number>());
-  const partners = loadIdeas().filter((i) => i.id !== idea.id && !i.song);
+  const partners = loadVisibleIdeas().filter((i) => i.id !== idea.id && !i.song);
 
   const pick = (p: Idea) => {
     versions.current = new Map([[idea.id, idea.updatedAt ?? 0], [p.id, p.updatedAt ?? 0]]);
