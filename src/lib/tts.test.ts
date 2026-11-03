@@ -489,48 +489,49 @@ describe("replicated voice («صوتي»)", () => {
     expect(isVoiceUnavailable(429, "quota exceeded")).toBe(false);
   });
 
-  it("speaks with the cloned voice on the primary 3.8 model and keys the cache by model + voice", async () => {
+  it("speaks with the cloned voice on the FULL 3.8 model first (fidelity over speed) and keys the cache by model + voice", async () => {
     const calls: Call[] = [];
     vi.stubGlobal("fetch", routedFetch({
-      "gemini-3.8-flash-lite-tts": () => interactionsOk([11]),
+      "gemini-3.8-flash-tts": () => interactionsOk([11]),
+      "gemini-3.8-flash-lite-tts": () => interactionsOk([99]),
     }, calls));
     const session = createTtsSession("k", { voiceId: VOICE });
     expect([...await session.synthesizeChunk("نص.")]).toEqual([11]);
-    expect(session.model).toBe("gemini-3.8-flash-lite-tts");
-    expect(session.voiceKey).toBe(`gemini-3.8-flash-lite-tts:${VOICE}`);
+    expect(session.model).toBe("gemini-3.8-flash-tts");
+    expect(session.voiceKey).toBe(`gemini-3.8-flash-tts:${VOICE}`);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.voice).toBe(VOICE);
   });
 
-  it("still falls through to the next 3.8 model when the MODEL is unavailable", async () => {
+  it("still falls through to Lite when the MODEL is unavailable", async () => {
     const calls: Call[] = [];
     vi.stubGlobal("fetch", routedFetch({
-      "gemini-3.8-flash-lite-tts": () => err(404, "model not found"),
-      "gemini-3.8-flash-tts": () => interactionsOk([12]),
+      "gemini-3.8-flash-tts": () => err(404, "model not found"),
+      "gemini-3.8-flash-lite-tts": () => interactionsOk([12]),
     }, calls));
     const session = createTtsSession("k", { voiceId: VOICE });
     expect([...await session.synthesizeChunk("نص.")]).toEqual([12]);
-    expect(session.voiceKey).toBe(`gemini-3.8-flash-tts:${VOICE}`);
-    expect(calls.map((c) => c.model)).toEqual(["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"]);
+    expect(session.voiceKey).toBe(`gemini-3.8-flash-lite-tts:${VOICE}`);
+    expect(calls.map((c) => c.model)).toEqual(["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"]);
   });
 
   it("never reaches the 2.5 prebuilt-only fallback with a cloned voice", async () => {
     const calls: Call[] = [];
     vi.stubGlobal("fetch", routedFetch({
-      "gemini-3.8-flash-lite-tts": () => err(404, "model not found"),
       "gemini-3.8-flash-tts": () => err(404, "model not found"),
+      "gemini-3.8-flash-lite-tts": () => err(404, "model not found"),
       "gemini-2.5-flash-preview-tts": () => geminiOk([99]),
     }, calls));
     const session = createTtsSession("k", { voiceId: VOICE });
     await expect(session.synthesizeChunk("نص.")).rejects.toThrow();
-    expect(calls.map((c) => c.model)).toEqual(["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"]);
+    expect(calls.map((c) => c.model)).toEqual(["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"]);
   });
 
   it("surfaces a voice failure honestly: no fall-through, no default-voice substitution", async () => {
     const calls: Call[] = [];
     vi.stubGlobal("fetch", routedFetch({
-      "gemini-3.8-flash-lite-tts": () => err(404, "Voice voice_abc123 not found"),
-      "gemini-3.8-flash-tts": () => interactionsOk([13]),
+      "gemini-3.8-flash-tts": () => err(404, "Voice voice_abc123 not found"),
+      "gemini-3.8-flash-lite-tts": () => interactionsOk([13]),
     }, calls));
     const session = createTtsSession("k", { voiceId: VOICE });
     const failure = await session.synthesizeChunk("نص.").catch((e: unknown) => e);
