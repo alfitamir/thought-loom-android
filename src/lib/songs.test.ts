@@ -131,6 +131,15 @@ describe("song derivations", () => {
     })).toBe("ready");
   });
 
+  it("derives the Drive state when the recording is absent here but backed up", () => {
+    expect(deriveSongAudioState(null, true)).toBe("drive");
+    expect(deriveSongAudioState(null, false)).toBe("missing");
+    expect(deriveSongAudioState(undefined, true)).toBe("checking"); // lookup first, Drive second
+    expect(deriveSongAudioState({
+      key: "s1", ideaId: "s1", mime: "audio/webm", blob: new Blob(["x"]), duration: 5, createdAt: 1,
+    }, true)).toBe("ready"); // a local copy always wins over the Drive copy
+  });
+
   it("labels durations as mm:ss and stays silent without one", () => {
     expect(songDurationLabel(songIdea())).toBe("02:05");
     const noDuration = songIdea();
