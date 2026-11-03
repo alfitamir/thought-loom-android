@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, HelpCircle, ListPlus, Lock, Music, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ListPlus, Lock, Merge, Music, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EvidenceDialog } from "@/components/evidence-dialog";
+import { ManualMergeDialog } from "@/components/manual-merge-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
 import { countOccurrences } from "@/lib/search-highlight";
@@ -40,6 +41,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
 }) {
   const article = getArticle(idea);
   const isSong = !!idea.song;
+  const isLiked = !!idea.liked;
   const durationLabel = songDurationLabel(idea);
   const hlQuery = searchQuery?.trim() ? searchQuery : "";
   const bodyMatchStart = (matchStartIndex ?? 0) + (hlQuery ? countOccurrences(article.title, hlQuery) : 0);
@@ -69,6 +71,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   // Manual topic picker state (the new-topic draft lives here, not in the dialog)
   const [topicOpen, setTopicOpen] = useState(false);
   const [newTopic, setNewTopic] = useState("");
+  const [mergeOpen, setMergeOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const version = useRef(idea.updatedAt ?? 0);
   useEffect(() => () => abort.current?.abort(), []);
@@ -121,7 +124,9 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     version.current = idea.updatedAt ?? 0;
     setPreview(""); setSuggestion(null); setPreviewOpen(true); setBusy(true);
     try {
-      const samples = loadIdeas().filter((i) => i.id !== idea.id).slice(0, 3).map((i) => i.text.slice(0, 2000));
+      // Style samples are the author's own voice: liked articles are other
+      // people's writing and never stand in for it.
+      const samples = loadIdeas().filter((i) => i.id !== idea.id && !i.liked).slice(0, 3).map((i) => i.text.slice(0, 2000));
       setSuggestion(await improveFull(article, idea.text, samples, engine, controller.signal, setPreview));
     } catch (error) {
       setMessage(controller.signal.aborted ? "توقف التحسين؛ مقالك لم يتغير." : error instanceof Error ? error.message : "تعذّر الاتصال بخدمة تحسين المقالات.");
@@ -198,13 +203,23 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       <h2 className="break-words font-display text-xl text-primary">{hlQuery
         ? <HighlightedText text={article.title} query={hlQuery} startIndex={matchStartIndex} currentIndex={currentMatchIndex} />
         : article.title}</h2>
-      {(topic || hasAudio || isSong) && (
+      {(topic || hasAudio || isSong || isLiked || idea.sources?.length) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {isSong && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               <Music className="size-3.5" />أغنية{durationLabel && <> · <span dir="ltr">{durationLabel}</span></>}
             </span>
           )}
+          {isLiked && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-0.5 text-xs font-medium text-rose-600 dark:text-rose-400">
+              <Heart className="size-3.5" />أعجبني
+            </span>
+          )}
+          {(idea.sources ?? []).map((s) => (
+            <span key={s} className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground" title={`يتضمن مقالًا من: ${s}`}>
+              يتضمن مقالًا من: {s}
+            </span>
+          ))}
           {topic && (
             <button type="button" aria-label={`التصنيف: ${topic} — تغيير التصنيف`} title="تغيير التصنيف"
               onClick={() => { setNewTopic(""); setTopicOpen(true); }}
@@ -220,6 +235,10 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       <p className="mb-1 mt-1 text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString("ar")}{isSong
         ? (durationLabel && <> · <span dir="ltr">{durationLabel}</span></>)
         : <> · {readingTimeLabel(article.body)}</>}</p>
+      {isLiked && <>
+        {idea.source && <p className="mb-1 break-words text-sm text-foreground">المصدر: {idea.source}</p>}
+        <p className="mb-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Lock className="size-3.5" />مقال من مصدر خارجي — الذكاء الاصطناعي لا يعدّله</p>
+      </>}
       {isSong ? (
         <SongSection idea={idea} onChange={onChange} onDeleteRequest={() => setConfirmDelete(true)}
           hlQuery={hlQuery} bodyMatchStart={bodyMatchStart} currentMatchIndex={currentMatchIndex} />
@@ -238,7 +257,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         ? <HighlightedText text={article.body} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
         : article.body}</p>
       <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
-      <div className="mt-4">
+      {!isLiked && <div className="mt-4">
         <DropdownMenu dir="rtl">
           <DropdownMenuTrigger asChild>
             <button type="button" aria-label="أدوات ذكية" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Sparkles className="size-5" />أدوات ذكية<ChevronDown className="size-4" /></button>
@@ -250,16 +269,18 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
             <DropdownMenuItem aria-label="منشور فيسبوك" title={online ? "اقتراح منشور فيسبوك من هذا المقال" : "المنشور يحتاج الإنترنت"} disabled={!online || fbBusy} onSelect={openFacebook} className="[&>svg]:size-5"><Facebook className="text-[#1877F2]" />منشور فيسبوك</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
+      </div>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="استمع للمقال" title="استمع للمقال" onClick={() => setListenOpen(true)}><Volume2 /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
+        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="دمج يدوي مع مقال آخر" title="دمج يدوي مع مقال آخر (بدون ذكاء اصطناعي)" onClick={() => setMergeOpen(true)}><Merge /></Button>
         <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
       </>}
     </>}
     {message && <p role="status" className="mt-3 break-words text-sm text-muted-foreground">{message}</p>}
+    {mergeOpen && <ManualMergeDialog idea={idea} onClose={(done) => { setMergeOpen(false); if (done) { onChange(); setMessage("دُمج المقالان يدويًا ✓"); } }} />}
     <ListenDialog open={listenOpen} onOpenChange={setListenOpen} articleId={idea.id} title={article.title} body={article.body} />
     <EvidenceDialog open={evidenceOpen} onOpenChange={setEvidenceOpen} title={article.title} body={article.body} online={online}
       onInsert={(snippet) => {
