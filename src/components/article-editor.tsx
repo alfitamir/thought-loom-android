@@ -15,7 +15,8 @@ import { getGeminiKey } from "@/lib/gemini";
 import { blobToBytes, concatPcm, createTtsSession, GEMINI_TTS_VOICE, mapWithConcurrency, modelForVoiceKey, pcmToWav, speakWithDevice, splitForSpeech, synthesizeGeminiChunkWithModel, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
 import { audioFileName, deleteArticleAudioForVoice, findCachedAudioForVoice, getAudioChunk, getSongAudio, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest, type SongAudioRecord } from "@/lib/article-audio";
 import { getMyVoiceProfile } from "@/lib/my-voice";
-import { deriveSongAudioState, songDurationLabel } from "@/lib/songs";
+import { deriveSongAudioState, songDurationLabel, songRecordedLabel } from "@/lib/songs";
+import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -489,8 +490,10 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
  * recorded it there is a native player and a share button for the real
  * audio file; on any other device a calm note says where the recording
  * lives (song audio never syncs — title, lyrics and flag do). No smart
- * tools and no «استمع»: the voice is already the author's own, and no AI
- * ever touches a song. The lyrics are the idea's text, edited plainly.
+ * tools and no «استمع»: the voice is already the author's own. The one
+ * deliberate AI touch is lyrics extraction (here and as a background
+ * post-save pass): the sung words written onto the song, never a rewrite.
+ * The lyrics are the idea's text, edited plainly.
  */
 function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart, currentMatchIndex }: {
   idea: Idea; onChange: () => void; onDeleteRequest: () => void;
@@ -505,7 +508,47 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [lyrics, setLyrics] = useState("");
+  const [extracting, setExtracting] = useState(() => isSongLyricsPending(idea.id));
+  const [preview, setPreview] = useState<string | null>(null);
   const state = deriveSongAudioState(record);
+  const recordedLabel = songRecordedLabel(idea);
+
+  // The background post-save pass also extracts: mirror the shared pending
+  // registry so its run shows here (and its finish re-renders the lyrics).
+  useEffect(() => onSongLyricsPendingChange(() => setExtracting(isSongLyricsPending(idea.id))), [idea.id]);
+
+  /** Extract the sung words. Empty lyrics fill directly; written lyrics are
+   *  never replaced silently — the extraction waits in a preview panel
+   *  until the user picks «استخدامها بدل الحالية» or dismisses it. */
+  const runExtract = async () => {
+    setStatus("");
+    setPreview(null);
+    try {
+      const text = await transcribeSong(idea.id);
+      const decision = decideLyricsApplication(idea.text, text);
+      if (decision === "none") { setStatus("لم نسمع كلمات واضحة في التسجيل."); return; }
+      if (decision === "confirm") { setPreview(text); return; }
+      const updated = applySongLyrics(idea.id, text, "fill-if-empty");
+      if (updated) {
+        onChange();
+        void pushIdea(updated).catch(() => {});
+        setStatus("استُخرجت الكلمات ✓");
+      }
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "تعذّر استخراج الكلمات الآن. حاول مرة أخرى.");
+    }
+  };
+
+  const usePreview = () => {
+    if (!preview) return;
+    const updated = applySongLyrics(idea.id, preview, "replace");
+    setPreview(null);
+    if (updated) {
+      onChange();
+      void pushIdea(updated).catch(() => {});
+      setStatus("استُخرجت الكلمات ✓");
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -571,6 +614,17 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
         التسجيل الصوتي على الجهاز اللي سجّلته عليه — المزامنة تنقل العنوان والكلمات والتصنيف، لا الصوت نفسه.
       </p>
     )}
+    {recordedLabel && <p className="text-xs text-muted-foreground">{recordedLabel}</p>}
+    {preview !== null && (
+      <div className="space-y-2 rounded-lg border border-input bg-card p-3">
+        <p className="text-sm font-medium">الكلمات المستخرجة من الغنا:</p>
+        <p className="whitespace-pre-wrap break-words font-article text-lg leading-loose">{preview}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={usePreview}><Check />استخدامها بدل الحالية</Button>
+          <Button size="sm" variant="ghost" onClick={() => setPreview(null)}><X />تجاهل</Button>
+        </div>
+      </div>
+    )}
     {idea.text.trim() ? (
       <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{hlQuery
         ? <HighlightedText text={idea.text} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
@@ -580,6 +634,11 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
     )}
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="تعديل الأغنية" title="تعديل الأغنية" onClick={() => { setTitle(article.title); setLyrics(idea.text); setEditing(true); setStatus(""); }}><Pencil /></Button>
+      {state === "ready" && (
+        extracting
+          ? <Button variant="outline" size="sm" disabled>جارٍ استخراج الكلمات…</Button>
+          : <Button variant="outline" size="sm" onClick={() => void runExtract()}><Sparkles />استخرج الكلمات من الغنا</Button>
+      )}
       {state === "ready" && (
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الصوت" title="مشاركة الصوت" onClick={() => void shareSong()}><Share2 /></Button>
       )}
