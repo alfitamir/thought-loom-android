@@ -61,6 +61,7 @@ export type Database = {
           drive_file_id: string | null
           id: string
           liked: boolean
+          medical: boolean
           merged_from: string[] | null
           pinned: boolean
           song: boolean
@@ -81,6 +82,7 @@ export type Database = {
           drive_file_id?: string | null
           id: string
           liked?: boolean
+          medical?: boolean
           merged_from?: string[] | null
           pinned?: boolean
           song?: boolean
@@ -101,6 +103,7 @@ export type Database = {
           drive_file_id?: string | null
           id?: string
           liked?: boolean
+          medical?: boolean
           merged_from?: string[] | null
           pinned?: boolean
           song?: boolean
