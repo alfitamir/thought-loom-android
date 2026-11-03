@@ -66,4 +66,13 @@ describe("ai labels", () => {
     expect(classifyBatch.mock.calls).toHaveLength(1);
     expect((classifyBatch.mock.calls[0]?.[0] as Idea[]).map((c) => c.id)).toEqual(["a"]);
   });
+  it("never classifies a liked article — it is someone else's writing", async () => {
+    const liked: Idea = { ...idea("l"), liked: true, source: "مجلة" };
+    expect(unlabeled([liked])).toEqual([]);
+    expect(await labelAll([liked])).toBe(0);
+    expect(classifyBatch).not.toHaveBeenCalled();
+    classifyBatch.mockResolvedValue({ a: { topic: "الصحة", tags: [] } });
+    expect(await labelAll([idea("a"), liked])).toBe(1);
+    expect((classifyBatch.mock.calls[0]?.[0] as Idea[]).map((c) => c.id)).toEqual(["a"]);
+  });
 });
