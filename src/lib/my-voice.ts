@@ -226,10 +226,67 @@ export function parseCreatedVoiceId(json: unknown): string | null {
 
 export class MyVoiceError extends Error {}
 
+/** The `reason` strings out of a Google error body's `error.details[]`
+ * (ErrorInfo entries carry one; other detail shapes don't). */
+function googleErrorReasons(details: unknown): string[] {
+  if (!Array.isArray(details)) return [];
+  const out: string[] = [];
+  for (const detail of details) {
+    const reason = (detail as { reason?: unknown } | null)?.reason;
+    if (typeof reason === "string") out.push(reason);
+  }
+  return out;
+}
+
+/** Google's own error text, made safe to append to a user message:
+ * single line, whitespace collapsed, capped at 140 characters. */
+function sanitizeGoogleErrorText(message: string): string {
+  const clean = message.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  return clean.length > 140 ? clean.slice(0, 140) : clean;
+}
+
+/**
+ * Turn a failed CreateVoice response into a SPECIFIC Arabic message.
+ * The shared `geminiErrorMessage` maps a 403 to "key invalid", but on the
+ * Voices endpoint a 403 is usually a quota hit or a project that hasn't
+ * enabled voice creation — so the create path parses Google's error body
+ * (error.status / error.message / details reasons) itself:
+ * quota → wait-and-retry; consent/speaker verification → re-record both
+ * takes together; permission → check the key's project; anything else
+ * keeps the shared mapped message with Google's own short text appended
+ * so the real cause stays visible. Malformed bodies degrade to the
+ * shared message with nothing appended.
+ */
+export function voiceCreateErrorMessage(httpStatus: number, body: unknown): string {
+  const error = (body as {
+    error?: { status?: unknown; message?: unknown; details?: unknown };
+  } | null)?.error;
+  const status = typeof error?.status === "string" ? error.status : "";
+  const message = typeof error?.message === "string" ? error.message : "";
+  const reasons = googleErrorReasons(error?.details);
+  if (
+    httpStatus === 429 || status === "RESOURCE_EXHAUSTED"
+    || reasons.includes("rateLimitExceeded") || reasons.includes("quotaExceeded")
+  ) {
+    return "وصلت لحد إنشاء الأصوات عند Google مؤقتًا — حاول تاني بعد ساعات أو بكرة.";
+  }
+  if (status === "FAILED_PRECONDITION" || /consent|verif|speaker/i.test(message)) {
+    return "Google ما قدرش يطابق تسجيل الموافقة مع العيّنة — سجّل الاتنين بنفس الميكروفون وفي نفس الجلسة.";
+  }
+  if (status === "PERMISSION_DENIED" || httpStatus === 403) {
+    return "إنشاء الأصوات غير مفعّل لمشروع مفتاحك — راجع حالة المشروع في Google AI Studio (قيود/فوترة/تحقق من العمر).";
+  }
+  const base = geminiErrorMessage(httpStatus, message);
+  const detail = sanitizeGoogleErrorText(message);
+  return detail ? `${base} (${detail})` : base;
+}
+
 /**
  * Create the replicated voice from two WAV recordings (reference + consent)
- * and return its `voice_...` id. Consent mismatches get their own message:
- * they are the one failure the user can fix by simply re-recording.
+ * and return its `voice_...` id. Failures go through
+ * `voiceCreateErrorMessage`, so the user sees the specific cause (quota,
+ * project not enabled, consent/speaker mismatch) instead of a generic
+ * "key invalid" line.
  */
 export async function createMyVoice(
   key: string, sourceWav: Uint8Array, consentWav: Uint8Array, signal?: AbortSignal,
@@ -249,12 +306,7 @@ export async function createMyVoice(
   }
   const json = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = (json as { error?: { message?: unknown } } | null)?.error?.message;
-    const text = typeof message === "string" ? message : "";
-    if (/consent/i.test(text)) {
-      throw new MyVoiceError("لم تتطابق قراءة الموافقة مع المطلوب. أعد تسجيلها كما هي مكتوبة تمامًا، وبنفس الميكروفون والغرفة.");
-    }
-    throw new MyVoiceError(geminiErrorMessage(response.status, text));
+    throw new MyVoiceError(voiceCreateErrorMessage(response.status, json));
   }
   const voiceId = parseCreatedVoiceId(json);
   if (!voiceId) throw new MyVoiceError("وصل رد من Gemini دون معرّف للصوت. حاول مرة أخرى.");
