@@ -2,7 +2,7 @@
 // strength/thesis, excerptForMatching, liveSuggestions, fingerprint) run verbatim against
 // Thought Loom's upgraded merge.ts; the mergeArticles suite is adapted to Loom's Engine API.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dismissSuggestion, excerptForMatching, fingerprint, liveSuggestions, mergeArticles, sanitizeSuggestions } from "./merge";
+import { dismissSuggestion, excerptForMatching, fingerprint, findMerges, liveSuggestions, mergeArticles, sanitizeSuggestions } from "./merge";
 import { INCOMPLETE } from "./article-ai";
 import type { Idea } from "./ideas";
 
@@ -105,5 +105,27 @@ describe("mergeArticles (cloud engine)", () => {
   it("REGRESSION: rejects a merge that silently dropped a source", async () => {
     stub(`مدمج\n\n${A}`);
     await expect(run()).rejects.toThrow(INCOMPLETE);
+  });
+});
+
+describe("findMerges never touches liked articles", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const engine = { kind: "cloud", token: "T" } as const;
+  const ownA: Idea = { id: "a", text: "نص أ", createdAt: 1, updatedAt: 1, articleTitle: "أ", articleBody: "الدولة والمجتمع والمنظومة" };
+  const ownB: Idea = { id: "b", text: "نص ب", createdAt: 2, updatedAt: 2, articleTitle: "ب", articleBody: "المقاومة والأمة والعالم" };
+  const likedX: Idea = { id: "x", text: "نص خارجي", createdAt: 3, updatedAt: 3, articleTitle: "خارجي", articleBody: "الدولة والمجتمع والمنظومة والخلل", liked: true, source: "موقع" };
+
+  it("with fewer than two own articles it asks the model nothing", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await findMerges([ownA, likedX], engine, new AbortController().signal)).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a model group naming a liked article is dropped whole", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      `${JSON.stringify({ type: "text", text: JSON.stringify([{ ids: ["a", "x"], title: "دمج", reason: "تشابه", strength: 5 }]) })}\n${JSON.stringify({ type: "done" })}\n`,
+      { status: 200, headers: { "Content-Type": "application/x-ndjson" } })));
+    expect(await findMerges([ownA, ownB, likedX], engine, new AbortController().signal)).toEqual([]);
   });
 });
