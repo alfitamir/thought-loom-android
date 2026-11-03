@@ -10,10 +10,11 @@ import { deleteSongAudio, listArticleIdsWithAudio } from "@/lib/article-audio";
 import { deleteSongDriveCopy } from "@/lib/song-drive";
 import { ArticleEditor } from "@/components/article-editor";
 import { MergeBanner } from "@/components/merge-banner";
+import { LikedDialog } from "@/components/liked-dialog";
 import { AskDialog } from "@/components/ask-dialog";
 import { InsightsDialog } from "@/components/insights-dialog";
 import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
-import { ArrowRight, ChevronDown, ChevronUp, Feather, Lightbulb, MessageCircleQuestion, MoreHorizontal, Search, Sparkles, Square, Tags, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Feather, Heart, Lightbulb, MessageCircleQuestion, MoreHorizontal, Search, Sparkles, Square, Tags, X } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
 
 export const Route = createFileRoute("/library")({
@@ -42,6 +43,8 @@ function Library() {
   const [currentMatch, setCurrentMatch] = useState<number | null>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [likedOpen, setLikedOpen] = useState(false);
+  const [likedOnly, setLikedOnly] = useState(false);
   const [labels, setLabels] = useState(loadLabels);
   // Articles with generated audio cached on this device (one store pass per
   // ideas change) — drives the «صوت» badge on article cards.
@@ -110,8 +113,9 @@ function Library() {
     };
   }, []);
 
+  const likedCount = ideas.filter((i) => i.liked).length;
   const groups: Record<string, Idea[]> = {};
-  ideas.filter((i) => matchesArticle(i, query)).forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
+  ideas.filter((i) => matchesArticle(i, query) && (!likedOnly || i.liked)).forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
 
   // Search-highlight accounting, in the exact order articles render below
   // (topic groups in order, title occurrences before body occurrences), so a
@@ -161,11 +165,15 @@ function Library() {
       {ideas.length > 0 && <div className="mb-4 flex flex-wrap gap-2">
         <button onClick={() => setAskOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"><MessageCircleQuestion className="size-5" />اسأل أفكاري</button>
         <button onClick={() => setInsightsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Lightbulb className="size-5" />رؤى</button>
+        {likedCount > 0 && (
+          <button onClick={() => setLikedOnly(!likedOnly)} aria-pressed={likedOnly} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${likedOnly ? "bg-rose-500 text-white hover:opacity-90" : "border border-border bg-card text-foreground hover:bg-accent"}`}><Heart className="size-5" />أعجبني ({likedCount})</button>
+        )}
         <DropdownMenu dir="rtl">
           <DropdownMenuTrigger asChild>
             <button type="button" aria-label="المزيد" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><MoreHorizontal className="size-5" />المزيد</button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-64">
+            <DropdownMenuItem aria-label="إضافة مقال أعجبني" onSelect={() => setLikedOpen(true)} className="[&>svg]:size-5"><Heart />مقال أعجبني — إضافة مقال من مصدر آخر</DropdownMenuItem>
             <DropdownMenuItem aria-label="تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)" disabled={!online || !!bulk} onSelect={() => void polishAll()} className="[&>svg]:size-5"><Sparkles />تنظيف كل المقالات (حذف الشوائب وضبط الإملاء والترقيم فقط)</DropdownMenuItem>
             {stale > 0 && (
               <DropdownMenuItem aria-label="صنّف بالذكاء الاصطناعي" disabled={!online || !!labeling} onSelect={() => void classifyAll()} className="[&>svg]:size-5">
@@ -178,6 +186,7 @@ function Library() {
       {labelError && <p role="alert" className="mb-4 text-sm text-destructive">{labelError}</p>}
       <MergeBanner ideas={ideas} online={online} onChange={refresh} />
       <AskDialog open={askOpen} onOpenChange={setAskOpen} ideas={ideas} online={online} onPick={pick} />
+      <LikedDialog open={likedOpen} onOpenChange={setLikedOpen} onSaved={refresh} />
       <InsightsDialog open={insightsOpen} onOpenChange={setInsightsOpen} ideas={ideas} online={online} onChange={refresh} onPick={pick} />
       {searchOpen && <div className="mb-6">
         <div className="flex items-center gap-2 border-b border-border pb-3">

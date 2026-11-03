@@ -60,9 +60,12 @@ export type Database = {
           created_at: number
           drive_file_id: string | null
           id: string
+          liked: boolean
           merged_from: string[] | null
           song: boolean
           song_duration: number | null
+          source: string | null
+          sources: string[] | null
           synced_at: string
           text: string
           topic: string | null
@@ -76,9 +79,12 @@ export type Database = {
           created_at?: number
           drive_file_id?: string | null
           id: string
+          liked?: boolean
           merged_from?: string[] | null
           song?: boolean
           song_duration?: number | null
+          source?: string | null
+          sources?: string[] | null
           synced_at?: string
           text: string
           topic?: string | null
@@ -92,9 +98,12 @@ export type Database = {
           created_at?: number
           drive_file_id?: string | null
           id?: string
+          liked?: boolean
           merged_from?: string[] | null
           song?: boolean
           song_duration?: number | null
+          source?: string | null
+          sources?: string[] | null
           synced_at?: string
           text?: string
           topic?: string | null
