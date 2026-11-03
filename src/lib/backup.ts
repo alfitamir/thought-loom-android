@@ -46,6 +46,9 @@ export function parseBackup(raw: string): Idea[] {
     // The library pin travels too — a restore must not silently unpin what
     // the user fixed to the top of its group.
     if (i.pinned === true) idea.pinned = true;
+    // Section membership travels too — a restore must not drop a medical
+    // article back into the general library.
+    if (i.medical === true) idea.medical = true;
     return [idea];
   });
   if (list.length && !ideas.length) throw new Error("لم نجد أفكارًا صالحة في هذا الملف.");
