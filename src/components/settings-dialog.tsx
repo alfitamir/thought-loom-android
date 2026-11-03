@@ -105,6 +105,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
         <p className="text-sm text-muted-foreground">تُحفظ أفكارك ومقالاتك تلقائيًا في ملف «afkari-sync.json» على Google Drive كلما اتصلت بالإنترنت وأنت مسجّل الدخول، وتُستعاد منه على أي هاتف.</p>
         <p className="text-sm text-muted-foreground">{driveAt ? `آخر مزامنة: ${new Date(driveAt).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}` : "لم تتم المزامنة بعد على هذا الهاتف."}</p>
+        <p className="text-sm text-muted-foreground">نسخ الأغاني على Drive: <span className={driveAt ? "text-primary" : ""}>{driveAt ? "مفعّل" : "غير مفعّل"}</span>{driveAt ? " — تُرفع التسجيلات تلقائيًا إلى مجلد «أفكاري — الأغاني»." : " — يُفعَّل مع أول مزامنة ناجحة."}</p>
         <Button variant="outline" className="[&_svg]:size-5" onClick={syncDriveNow} disabled={driveBusy}><CloudUpload />مزامنة الآن</Button>
         {driveMsg && <p role="status" className="break-words text-sm text-muted-foreground">{driveMsg}</p>}
       </section>
