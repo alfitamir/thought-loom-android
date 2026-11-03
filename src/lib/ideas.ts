@@ -15,7 +15,8 @@ export type Idea = {
   topicManual?: boolean;
   /** True for a song the user recorded singing in his own voice. The recording
    *  itself is the content (kept as audio on the recording device only);
-   *  `text` holds the lyrics, written by hand — no AI ever touches a song. */
+   *  `text` holds the lyrics — written by hand, or extracted from the singing
+   *  itself by song-lyrics.ts; no AI ever rewrites a song. */
   song?: boolean;
   /** Length of the recording in seconds, when known. Display metadata only. */
   songDuration?: number;
