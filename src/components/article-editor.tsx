@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ImageDown, ListPlus, Lock, Merge, Music, Pencil, Pin, PinOff, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ImageDown, Library, ListPlus, Lock, Merge, Music, Pencil, Pin, PinOff, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Stethoscope, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -8,7 +8,7 @@ import { ManualMergeDialog } from "@/components/manual-merge-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
 import { countOccurrences } from "@/lib/search-highlight";
-import { articleTopic, clearArticleTopic, getArticle, loadIdeas, setArticleTopic, setPinned, topicOptions, updateArticle, updateSong, type Idea } from "@/lib/ideas";
+import { articleTopic, clearArticleTopic, getArticle, loadIdeas, setArticleTopic, setMedical, setPinned, topicOptions, updateArticle, updateSong, type Idea } from "@/lib/ideas";
 import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
@@ -45,6 +45,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   const article = getArticle(idea);
   const isSong = !!idea.song;
   const isLiked = !!idea.liked;
+  const isMedical = !!idea.medical;
   const durationLabel = songDurationLabel(idea);
   const hlQuery = searchQuery?.trim() ? searchQuery : "";
   const bodyMatchStart = (matchStartIndex ?? 0) + (hlQuery ? countOccurrences(article.title, hlQuery) : 0);
@@ -110,6 +111,15 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     onChange();
     void pushIdea(updated).catch(() => {});
     setMessage(updated.pinned ? "ثُبّت المقال في أعلى تصنيفه ✓" : "أُلغي تثبيت المقال ✓");
+  };
+  /** Move into / out of the «القسم الطبي»: section membership, not a text
+   *  edit (no updatedAt bump), synced like the pins. */
+  const toggleMedical = () => {
+    const updated = setMedical(idea.id, !idea.medical);
+    if (!updated) return;
+    onChange();
+    void pushIdea(updated).catch(() => {});
+    setMessage(updated.medical ? "نُقل المقال إلى القسم الطبي ✓" : "أُخرج المقال إلى المكتبة العامة ✓");
   };
   const share = async () => {
     setMessage("");
@@ -226,11 +236,28 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         <Button variant="ghost" className="ms-auto" aria-label={idea.pinned ? "إلغاء تثبيت المقال" : "تثبيت المقال"} title={idea.pinned ? "إلغاء تثبيت المقال" : "تثبيت المقال"} onClick={togglePin}>{idea.pinned ? <PinOff /> : <Pin />}{idea.pinned ? "إلغاء التثبيت" : "تثبيت"}</Button>
       </div>
     </div> : <>
-      <h2 className="break-words font-display text-xl text-primary">{hlQuery
-        ? <HighlightedText text={article.title} query={hlQuery} startIndex={matchStartIndex} currentIndex={currentMatchIndex} />
-        : article.title}</h2>
-      {(topic || hasAudio || isSong || isLiked || idea.sources?.length || idea.pinned) && (
+      {/* Share lives beside the title now (the owner's ask: no scrolling to
+          the bottom of a long article just to share or fix it). The smart
+          tools sit in the header block right below; the bottom row keeps
+          edit, listen, merge, pin and the isolated delete. */}
+      <div className="flex items-start gap-2">
+        <h2 className="min-w-0 flex-1 break-words font-display text-xl text-primary">{hlQuery
+          ? <HighlightedText text={article.title} query={hlQuery} startIndex={matchStartIndex} currentIndex={currentMatchIndex} />
+          : article.title}</h2>
+        {!isSong && (
+          <div className="flex shrink-0 items-center gap-1 pt-0.5">
+            <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
+            <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال كصورة" title="مشاركة المقال كصورة" disabled={imageBusy} onClick={() => void shareImage()}><ImageDown /></Button>
+          </div>
+        )}
+      </div>
+      {(topic || hasAudio || isSong || isLiked || isMedical || idea.sources?.length || idea.pinned || !isSong) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
+          {isMedical && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+              <Stethoscope className="size-3.5" />القسم الطبي
+            </span>
+          )}
           {idea.pinned && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
               <Pin className="size-3.5" />مثبت
@@ -260,6 +287,14 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
               <Pencil className="size-3" />
             </button>
           )}
+          {!isSong && (
+            <button type="button" aria-label={isMedical ? "إخراج إلى المكتبة العامة" : "نقل إلى القسم الطبي"} title={isMedical ? "إخراج إلى المكتبة العامة" : "نقل إلى القسم الطبي"}
+              onClick={toggleMedical}
+              className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80">
+              {isMedical ? <Library className="size-3" /> : <Stethoscope className="size-3" />}
+              {isMedical ? "إخراج إلى المكتبة العامة" : "نقل إلى القسم الطبي"}
+            </button>
+          )}
           {hasAudio && !isSong && <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground"><Volume2 className="size-3.5" />صوت</span>}
         </div>
       )}
@@ -270,6 +305,22 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         {idea.source && <p className="mb-1 break-words text-sm text-foreground">المصدر: {idea.source}</p>}
         <p className="mb-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Lock className="size-3.5" />مقال من مصدر خارجي — الذكاء الاصطناعي لا يعدّله</p>
       </>}
+      {/* Smart tools live in the header block now, beside the title area —
+          still hidden for liked articles (not the author's to modify) and
+          for songs (a recording is never rewritten). */}
+      {!isLiked && !isSong && <div className="mt-3">
+        <DropdownMenu dir="rtl">
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-label="أدوات ذكية" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Sparkles className="size-5" />أدوات ذكية<ChevronDown className="size-4" /></button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-52">
+            <DropdownMenuItem aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onSelect={improve} className="[&>svg]:size-5"><Sparkles />تحسين</DropdownMenuItem>
+            <DropdownMenuItem aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onSelect={() => setEvidenceOpen(true)} className="[&>svg]:size-5"><BookOpen className="text-emerald-600" />شواهد</DropdownMenuItem>
+            <DropdownMenuItem aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onSelect={openEnrichment} className="[&>svg]:size-5"><ListPlus className="text-amber-500" />إثراء</DropdownMenuItem>
+            <DropdownMenuItem aria-label="منشور فيسبوك" title={online ? "اقتراح منشور فيسبوك من هذا المقال" : "المنشور يحتاج الإنترنت"} disabled={!online || fbBusy} onSelect={openFacebook} className="[&>svg]:size-5"><Facebook className="text-[#1877F2]" />منشور فيسبوك</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>}
       {isSong ? (
         <SongSection idea={idea} onChange={onChange} onDeleteRequest={() => setConfirmDelete(true)}
           hlQuery={hlQuery} bodyMatchStart={bodyMatchStart} currentMatchIndex={currentMatchIndex} />
@@ -288,24 +339,9 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         ? <HighlightedText text={article.body} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
         : article.body}</p>
       <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
-      {!isLiked && <div className="mt-4">
-        <DropdownMenu dir="rtl">
-          <DropdownMenuTrigger asChild>
-            <button type="button" aria-label="أدوات ذكية" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"><Sparkles className="size-5" />أدوات ذكية<ChevronDown className="size-4" /></button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-52">
-            <DropdownMenuItem aria-label="تحسين بالذكاء الاصطناعي" title={online ? "تحسين بالذكاء الاصطناعي" : "التحسين يحتاج الإنترنت"} disabled={!online || busy} onSelect={improve} className="[&>svg]:size-5"><Sparkles />تحسين</DropdownMenuItem>
-            <DropdownMenuItem aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onSelect={() => setEvidenceOpen(true)} className="[&>svg]:size-5"><BookOpen className="text-emerald-600" />شواهد</DropdownMenuItem>
-            <DropdownMenuItem aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onSelect={openEnrichment} className="[&>svg]:size-5"><ListPlus className="text-amber-500" />إثراء</DropdownMenuItem>
-            <DropdownMenuItem aria-label="منشور فيسبوك" title={online ? "اقتراح منشور فيسبوك من هذا المقال" : "المنشور يحتاج الإنترنت"} disabled={!online || fbBusy} onSelect={openFacebook} className="[&>svg]:size-5"><Facebook className="text-[#1877F2]" />منشور فيسبوك</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="تعديل المقال" title="تعديل المقال" onClick={() => { setTitle(article.title); setBody(article.body); setEditing(true); setMessage(""); }}><Pencil /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="استمع للمقال" title="استمع للمقال" onClick={() => setListenOpen(true)}><Volume2 /></Button>
-        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
-        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال كصورة" title="مشاركة المقال كصورة" disabled={imageBusy} onClick={() => void shareImage()}><ImageDown /></Button>
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="دمج يدوي مع مقال آخر" title="دمج يدوي مع مقال آخر (بدون ذكاء اصطناعي)" onClick={() => setMergeOpen(true)}><Merge /></Button>
         <Button variant="ghost" size="icon" className={`[&_svg]:size-5 ${idea.pinned ? "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400" : ""}`} aria-label={idea.pinned ? "إلغاء تثبيت المقال" : "تثبيت المقال"} title={idea.pinned ? "إلغاء تثبيت المقال" : "تثبيت المقال"} aria-pressed={!!idea.pinned} onClick={togglePin}>{idea.pinned ? <PinOff /> : <Pin />}</Button>
         <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
@@ -493,7 +529,9 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
           </div>
         )}
         <div className="space-y-1.5">
-          {topicOpen && topicOptions(loadVisibleIdeas()).map(({ topic: name, count }) => (
+          {/* Topic counts are counted inside the article's own section, so
+              the medical view's picker speaks only of medical topics. */}
+          {topicOpen && topicOptions(loadVisibleIdeas().filter((i) => !!i.medical === !!idea.medical)).map(({ topic: name, count }) => (
             <button key={name} type="button" onClick={() => chooseTopic(name)}
               className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-start hover:bg-accent">
               <span className="text-sm font-medium text-foreground">{name}</span>
@@ -703,6 +741,14 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
   }
 
   return <div className="space-y-3">
+    {/* Share sits at the top, right under the song's title (the same move
+        the article header got): no scrolling past the lyrics to share. */}
+    <div className="flex flex-wrap items-center gap-2">
+      {state === "ready" && (
+        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الصوت" title="مشاركة الصوت" onClick={() => void shareSong()}><Share2 /></Button>
+      )}
+      <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الأغنية كصورة" title="مشاركة الأغنية كصورة" onClick={() => void shareImage()}><ImageDown /></Button>
+    </div>
     {state === "checking" && <p className="text-sm text-muted-foreground">جارٍ التحقق من التسجيل…</p>}
     {state === "ready" && url && <audio controls src={url} className="w-full" aria-label="تشغيل الأغنية" />}
     {state === "drive" && (
@@ -745,10 +791,6 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
           ? <Button variant="outline" size="sm" disabled>جارٍ استخراج الكلمات…</Button>
           : <Button variant="outline" size="sm" onClick={() => void runExtract()}><Sparkles />استخرج الكلمات من الغنا</Button>
       )}
-      {state === "ready" && (
-        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الصوت" title="مشاركة الصوت" onClick={() => void shareSong()}><Share2 /></Button>
-      )}
-      <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الأغنية كصورة" title="مشاركة الأغنية كصورة" onClick={() => void shareImage()}><ImageDown /></Button>
       <Button variant="ghost" size="icon" className={`[&_svg]:size-5 ${idea.pinned ? "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400" : ""}`} aria-label={idea.pinned ? "إلغاء تثبيت الأغنية" : "تثبيت الأغنية"} title={idea.pinned ? "إلغاء تثبيت الأغنية" : "تثبيت الأغنية"} aria-pressed={!!idea.pinned} onClick={togglePin}>{idea.pinned ? <PinOff /> : <Pin />}</Button>
       <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف الأغنية" title="حذف الأغنية" onClick={onDeleteRequest}><Trash2 /></Button>
     </div>
