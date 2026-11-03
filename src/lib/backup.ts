@@ -29,6 +29,10 @@ export function parseBackup(raw: string): Idea[] {
     // A hand-pinned topic must survive a restore, or the lock would silently vanish.
     if (typeof i.topic === "string" && i.topic.trim()) idea.topic = i.topic;
     if (i.topicManual === true && idea.topic) idea.topicManual = true;
+    // A song's flag and length travel in backups like any other field; the
+    // recording itself never does (audio stays on the recording device).
+    if (i.song === true) idea.song = true;
+    if (typeof i.songDuration === "number" && i.songDuration > 0) idea.songDuration = i.songDuration;
     return [idea];
   });
   if (list.length && !ideas.length) throw new Error("لم نجد أفكارًا صالحة في هذا الملف.");

@@ -29,6 +29,13 @@
       "when": 1793653200000,
       "tag": "0003_manual_topic",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793740800000,
+      "tag": "0004_song_mode",
+      "breakpoints": true
     }
   ]
 }

@@ -6,7 +6,7 @@ import { articleTopic, deleteIdea, getArticle, loadIdeas, matchesArticle, needsP
 import { deleteIdeaCloud, pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { listArticleIdsWithAudio } from "@/lib/article-audio";
+import { deleteSongAudio, listArticleIdsWithAudio } from "@/lib/article-audio";
 import { ArticleEditor } from "@/components/article-editor";
 import { MergeBanner } from "@/components/merge-banner";
 import { AskDialog } from "@/components/ask-dialog";
@@ -65,7 +65,9 @@ function Library() {
     setBulkMsg("");
     const engine = await resolveEngine();
     if (typeof engine === "string") { setBulkMsg(engine); return; }
-    const queue = loadIdeas().filter(needsPolish);
+    // Songs are never polished: their text is the author's own lyrics, and
+    // no AI pass may rewrite them.
+    const queue = loadIdeas().filter((i) => !i.song && needsPolish(i));
     if (!queue.length) { setBulkMsg("كل المقالات مضبوطة ✓"); return; }
     const controller = new AbortController(); bulkAbort.current = controller;
     let done = 0, skipped = 0; setBulk({ done, total: queue.length });
@@ -220,7 +222,7 @@ function Library() {
                         ))}
                       </div>
                     )}
-                    <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => { deleteIdea(i.id); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }}
+                    <ArticleEditor idea={i} topic={topic} online={online} hasAudio={audioIds.has(i.id)} onChange={refresh} onDelete={() => { deleteIdea(i.id); if (i.song) void deleteSongAudio(i.id).catch(() => {}); void deleteIdeaCloud(i.id).catch(() => {}); refresh(); }}
                       searchQuery={queryActive ? query : undefined} matchStartIndex={matchStarts.get(i.id)} currentMatchIndex={safeCurrent} />
                   </div>;
                 })}

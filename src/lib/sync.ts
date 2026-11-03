@@ -11,6 +11,7 @@ const cloudRow = (idea: Idea, userId: string) => ({
   article_title: idea.articleTitle ?? null, article_body: idea.articleBody ?? null,
   updated_at: idea.updatedAt ?? 0, merged_from: idea.mergedFrom ?? null,
   topic: idea.topic ?? null, topic_manual: idea.topicManual ?? false,
+  song: idea.song ?? false, song_duration: idea.songDuration ?? null,
 });
 
 /** Push one idea to the cloud backup (silently skipped when offline or signed out). */
@@ -69,7 +70,7 @@ async function run(): Promise<number> {
 
   const [{ data: gone, error: goneError }, { data, error }] = await Promise.all([
     supabase.from("idea_deletions").select("idea_id").eq("user_id", uid),
-    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual").eq("user_id", uid),
+    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration").eq("user_id", uid),
   ]);
   if (goneError || error || !gone || !data) return 0;
   if (deleted.length) clearDeleted(deleted);
@@ -85,6 +86,8 @@ async function run(): Promise<number> {
     ...(r.merged_from?.length ? { mergedFrom: r.merged_from } : {}),
     ...(r.topic ? { topic: r.topic } : {}),
     ...(r.topic_manual ? { topicManual: true } : {}),
+    ...(r.song ? { song: true } : {}),
+    ...(typeof r.song_duration === "number" ? { songDuration: r.song_duration } : {}),
     updatedAt: Number(r.updated_at),
   }));
   // Read again after network awaits so edits/deletions made during sync are preserved.
@@ -102,8 +105,10 @@ async function run(): Promise<number> {
   const changed = merged.filter((i) => {
     const cloud = cloudById.get(i.id);
     // Topic pins are metadata that do not bump updatedAt, so they are compared directly.
+    // The song flag rides along the same way (a merge can adopt it without a text edit).
     return !cloud || (i.updatedAt ?? 0) > (cloud.updatedAt ?? 0) || (!!i.mergedFrom && !cloud.mergedFrom)
-      || (i.topic ?? null) !== (cloud.topic ?? null) || (i.topicManual ?? false) !== (cloud.topicManual ?? false);
+      || (i.topic ?? null) !== (cloud.topic ?? null) || (i.topicManual ?? false) !== (cloud.topicManual ?? false)
+      || (i.song ?? false) !== (cloud.song ?? false) || (i.songDuration ?? null) !== (cloud.songDuration ?? null);
   });
   if (changed.length) await supabase.from("ideas").upsert(changed.map((i) => cloudRow(i, uid)));
   window.dispatchEvent(new Event("afkari:ideas-changed"));

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceDialog } from "@/components/evidence-dialog";
 import { deleteIdea, getArticle, loadIdeas, saveArticleIdea, type Idea } from "@/lib/ideas";
+import { deleteSongAudio } from "@/lib/article-audio";
 import { pushIdea } from "@/lib/sync";
 import { getGeminiKey } from "@/lib/gemini";
 import { resolveEngine } from "@/lib/ai-engine";
@@ -100,7 +101,7 @@ function MergeDialog({ suggestion, online, onClose }: { suggestion: MergeSuggest
     if (changed) { setMessage("تغيرت إحدى المقالات أثناء الدمج. لم نغير شيئًا."); return; }
     const origins = [...new Set(sources.flatMap((s) => [s.id, ...(s.mergedFrom ?? [])]))];
     const merged = saveArticleIdea(sources.map((s) => s.text).join("\n\n"), result.title, result.body, origins);
-    if (removeOriginals) sources.forEach((s) => deleteIdea(s.id));
+    if (removeOriginals) sources.forEach((s) => { deleteIdea(s.id); if (s.song) void deleteSongAudio(s.id).catch(() => {}); });
     dismissSuggestion(suggestion.ids);
     void pushIdea(merged).catch(() => {});
     onClose(true);

@@ -13,6 +13,12 @@ export type Idea = {
   topic?: string;
   /** True when `topic` was set manually — classification must never overwrite a hand-set topic. */
   topicManual?: boolean;
+  /** True for a song the user recorded singing in his own voice. The recording
+   *  itself is the content (kept as audio on the recording device only);
+   *  `text` holds the lyrics, written by hand — no AI ever touches a song. */
+  song?: boolean;
+  /** Length of the recording in seconds, when known. Display metadata only. */
+  songDuration?: number;
 };
 
 export const TOPICS: Record<string, string[]> = {
@@ -113,6 +119,13 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     // A hand-pinned topic is metadata a text edition must not silently erase: it rides
     // onto the winning edition unless that edition carries a pin of its own.
     if (!winner.topicManual && loser.topicManual && loser.topic) winner = { ...winner, topic: loser.topic, topicManual: true };
+    // Same for the song flag: an edition that lacks it must not un-song the winner,
+    // and a winner without the recording's length adopts the loser's.
+    if (!winner.song && loser.song) {
+      winner = { ...winner, song: true, ...(winner.songDuration === undefined && loser.songDuration !== undefined ? { songDuration: loser.songDuration } : {}) };
+    } else if (winner.song && winner.songDuration === undefined && loser.songDuration !== undefined) {
+      winner = { ...winner, songDuration: loser.songDuration };
+    }
     // As before: a local winner that was never polished adopts the remote polish stamp.
     if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
     merged.set(idea.id, winner);
@@ -229,4 +242,45 @@ export const saveArticleIdea = (text: string, title: string, body: string, merge
   if (mergedFrom?.length) idea.mergedFrom = [...new Set(mergedFrom)];
   replaceIdeas([idea, ...loadIdeas()]);
   return idea;
+};
+
+/**
+ * Build (not yet saved) a song idea. The recording is the content; `text`
+ * starts empty and later holds the lyrics the user writes by hand.
+ */
+export const buildSongIdea = (input: { id?: string; title: string; durationSeconds?: number; createdAt?: number }): Idea => {
+  const now = input.createdAt ?? Date.now();
+  const idea: Idea = {
+    id: input.id ?? crypto.randomUUID(),
+    text: "",
+    createdAt: now,
+    articleTitle: input.title.trim() || "أغنية",
+    song: true,
+    updatedAt: now,
+  };
+  if (input.durationSeconds && input.durationSeconds > 0) idea.songDuration = Math.round(input.durationSeconds);
+  return idea;
+};
+
+/**
+ * Save a song's title and lyrics. Unlike `updateArticle` this edits `text`
+ * itself — for a song the text IS the lyrics — and empty lyrics are allowed
+ * (a song can exist before its words are written down). Songs only: any
+ * articleBody a song somehow carries is dropped so the lyrics stay the
+ * single source the article view derives from.
+ */
+export function updateSong(id: string, title: string, lyrics: string): Idea | undefined {
+  const all = loadIdeas();
+  const current = all.find((idea) => idea.id === id);
+  if (!current || !current.song) return;
+  const updated: Idea = {
+    ...current,
+    text: lyrics,
+    updatedAt: Math.max(Date.now(), (current.updatedAt ?? 0) + 1),
+  };
+  if (title.trim()) updated.articleTitle = title.trim();
+  delete updated.articleBody;
+  delete updated.aiPolishedAt;
+  replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
+  return updated;
 };

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, HelpCircle, ListPlus, Lock, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, HelpCircle, ListPlus, Lock, Music, Pencil, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -7,13 +7,14 @@ import { EvidenceDialog } from "@/components/evidence-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
 import { countOccurrences } from "@/lib/search-highlight";
-import { articleTopic, clearArticleTopic, getArticle, loadIdeas, setArticleTopic, topicOptions, updateArticle, type Idea } from "@/lib/ideas";
+import { articleTopic, clearArticleTopic, getArticle, loadIdeas, setArticleTopic, topicOptions, updateArticle, updateSong, type Idea } from "@/lib/ideas";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
 import { getGeminiKey } from "@/lib/gemini";
 import { blobToBytes, concatPcm, createTtsSession, mapWithConcurrency, modelForVoiceKey, pcmToWav, speakWithDevice, splitForSpeech, synthesizeGeminiChunkWithModel, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
-import { audioFileName, deleteArticleAudio, findCachedAudio, getAudioChunk, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest } from "@/lib/article-audio";
+import { audioFileName, deleteArticleAudio, findCachedAudio, getAudioChunk, getSongAudio, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest, type SongAudioRecord } from "@/lib/article-audio";
+import { deriveSongAudioState, songDurationLabel } from "@/lib/songs";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -36,6 +37,8 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   searchQuery?: string | undefined; matchStartIndex?: number | undefined; currentMatchIndex?: number | null | undefined;
 }) {
   const article = getArticle(idea);
+  const isSong = !!idea.song;
+  const durationLabel = songDurationLabel(idea);
   const hlQuery = searchQuery?.trim() ? searchQuery : "";
   const bodyMatchStart = (matchStartIndex ?? 0) + (hlQuery ? countOccurrences(article.title, hlQuery) : 0);
   const [editing, setEditing] = useState(false);
@@ -193,8 +196,13 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       <h2 className="break-words font-display text-xl text-primary">{hlQuery
         ? <HighlightedText text={article.title} query={hlQuery} startIndex={matchStartIndex} currentIndex={currentMatchIndex} />
         : article.title}</h2>
-      {(topic || hasAudio) && (
+      {(topic || hasAudio || isSong) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
+          {isSong && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+              <Music className="size-3.5" />أغنية{durationLabel && <> · <span dir="ltr">{durationLabel}</span></>}
+            </span>
+          )}
           {topic && (
             <button type="button" aria-label={`التصنيف: ${topic} — تغيير التصنيف`} title="تغيير التصنيف"
               onClick={() => { setNewTopic(""); setTopicOpen(true); }}
@@ -204,10 +212,16 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
               <Pencil className="size-3" />
             </button>
           )}
-          {hasAudio && <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground"><Volume2 className="size-3.5" />صوت</span>}
+          {hasAudio && !isSong && <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground"><Volume2 className="size-3.5" />صوت</span>}
         </div>
       )}
-      <p className="mb-1 mt-1 text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString("ar")} · {readingTimeLabel(article.body)}</p>
+      <p className="mb-1 mt-1 text-xs text-muted-foreground">{new Date(idea.createdAt).toLocaleDateString("ar")}{isSong
+        ? (durationLabel && <> · <span dir="ltr">{durationLabel}</span></>)
+        : <> · {readingTimeLabel(article.body)}</>}</p>
+      {isSong ? (
+        <SongSection idea={idea} onChange={onChange} onDeleteRequest={() => setConfirmDelete(true)}
+          hlQuery={hlQuery} bodyMatchStart={bodyMatchStart} currentMatchIndex={currentMatchIndex} />
+      ) : <>
       {(() => {
         const flat = article.body.replace(/\s+/g, " ").trim();
         if (!flat) return null;
@@ -241,6 +255,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
         <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف المقال" title="حذف المقال" onClick={() => setConfirmDelete(true)}><Trash2 /></Button>
       </div>
+      </>}
     </>}
     {message && <p role="status" className="mt-3 break-words text-sm text-muted-foreground">{message}</p>}
     <ListenDialog open={listenOpen} onOpenChange={setListenOpen} articleId={idea.id} title={article.title} body={article.body} />
@@ -466,6 +481,111 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
       </DialogContent>
     </Dialog>
   </article>;
+}
+
+/**
+ * A song in the library: the recording IS the content. On the device that
+ * recorded it there is a native player and a share button for the real
+ * audio file; on any other device a calm note says where the recording
+ * lives (song audio never syncs — title, lyrics and flag do). No smart
+ * tools and no «استمع»: the voice is already the author's own, and no AI
+ * ever touches a song. The lyrics are the idea's text, edited plainly.
+ */
+function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart, currentMatchIndex }: {
+  idea: Idea; onChange: () => void; onDeleteRequest: () => void;
+  /** Active library search, for highlighting the lyrics (the same global
+   *  match indexing the article body uses). */
+  hlQuery?: string; bodyMatchStart?: number; currentMatchIndex?: number | null | undefined;
+}) {
+  const article = getArticle(idea);
+  const [record, setRecord] = useState<SongAudioRecord | null | undefined>(undefined);
+  const [url, setUrl] = useState("");
+  const [status, setStatus] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState("");
+  const [lyrics, setLyrics] = useState("");
+  const state = deriveSongAudioState(record);
+
+  useEffect(() => {
+    let alive = true;
+    let objUrl = "";
+    setRecord(undefined);
+    setUrl("");
+    getSongAudio(idea.id)
+      .then((rec) => {
+        if (!alive) return;
+        setRecord(rec);
+        if (rec) { objUrl = URL.createObjectURL(rec.blob); setUrl(objUrl); }
+      })
+      .catch(() => { if (alive) setRecord(null); });
+    return () => { alive = false; if (objUrl) URL.revokeObjectURL(objUrl); };
+  }, [idea.id]);
+
+  /** Share the real recording file, exactly like generated article audio:
+   *  the system share sheet when files are shareable, a download otherwise. */
+  const shareSong = async () => {
+    if (!record) return;
+    setStatus("");
+    const file = new File([record.blob], audioFileName(article.title, record.mime), { type: record.mime });
+    let canFiles = false;
+    try { canFiles = !!navigator.canShare?.({ files: [file] }); } catch { canFiles = false; }
+    if (canFiles) {
+      try { await navigator.share({ files: [file], title: article.title }); return; }
+      catch (e) { if (e instanceof Error && e.name === "AbortError") return; }
+    }
+    const objUrl = URL.createObjectURL(record.blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = file.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+    setStatus("نُزّل ملف الأغنية ✓");
+  };
+
+  const saveLyrics = () => {
+    const updated = updateSong(idea.id, title, lyrics);
+    if (!updated) return;
+    onChange();
+    void pushIdea(updated).catch(() => {});
+    setEditing(false);
+    setStatus("حُفظت الأغنية ✓");
+  };
+
+  if (editing) {
+    return <div className="space-y-3">
+      <input aria-label="عنوان الأغنية" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
+      <textarea aria-label="كلمات الأغنية" value={lyrics} onChange={(e) => setLyrics(e.target.value)} rows={10} placeholder="اكتب كلمات الأغنية هنا…" className="w-full rounded-md border border-input bg-card p-3 font-article text-xl leading-loose outline-none focus:ring-2 focus:ring-ring" />
+      <div className="flex gap-2">
+        <Button onClick={saveLyrics} disabled={!title.trim()}><Check />حفظ</Button>
+        <Button variant="ghost" onClick={() => setEditing(false)}><X />إلغاء</Button>
+      </div>
+    </div>;
+  }
+
+  return <div className="space-y-3">
+    {state === "checking" && <p className="text-sm text-muted-foreground">جارٍ التحقق من التسجيل…</p>}
+    {state === "ready" && url && <audio controls src={url} className="w-full" aria-label="تشغيل الأغنية" />}
+    {state === "missing" && (
+      <p className="rounded-lg bg-secondary px-3 py-2 text-sm leading-relaxed text-secondary-foreground">
+        التسجيل الصوتي على الجهاز اللي سجّلته عليه — المزامنة تنقل العنوان والكلمات والتصنيف، لا الصوت نفسه.
+      </p>
+    )}
+    {idea.text.trim() ? (
+      <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{hlQuery
+        ? <HighlightedText text={idea.text} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
+        : idea.text}</p>
+    ) : (
+      <p className="text-sm text-muted-foreground">لا توجد كلمات مكتوبة بعد — اضغط «تعديل» لإضافة كلمات الأغنية.</p>
+    )}
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="تعديل الأغنية" title="تعديل الأغنية" onClick={() => { setTitle(article.title); setLyrics(idea.text); setEditing(true); setStatus(""); }}><Pencil /></Button>
+      {state === "ready" && (
+        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الصوت" title="مشاركة الصوت" onClick={() => void shareSong()}><Share2 /></Button>
+      )}
+      <Button variant="ghost" size="icon" className="ms-auto bg-destructive/10 text-destructive hover:bg-destructive/20 [&_svg]:size-5" aria-label="حذف الأغنية" title="حذف الأغنية" onClick={onDeleteRequest}><Trash2 /></Button>
+    </div>
+    {status && <p role="status" className="text-sm text-muted-foreground">{status}</p>}
+  </div>;
 }
 
 const SPEECH_RATES = [0.75, 1, 1.25, 1.5];
