@@ -25,8 +25,9 @@ export function labelFor(idea: Idea, all: Record<string, Stored> = load()): Labe
 export const unlabeled = (ideas: Idea[]) => {
   const all = load();
   // A hand-pinned topic is settled by the user: bulk classification skips the article
-  // entirely, so it never counts as awaiting classification either.
-  return ideas.filter((i) => { if (i.topicManual) return false; const s = all[i.id]; return !s || s.v !== version(i); });
+  // entirely, so it never counts as awaiting classification either. A liked article
+  // is someone else's writing — AI classification never touches it at all.
+  return ideas.filter((i) => { if (i.topicManual || i.liked) return false; const s = all[i.id]; return !s || s.v !== version(i); });
 };
 
 export const loadLabels = load;
