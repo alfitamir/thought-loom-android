@@ -17,6 +17,7 @@ import { blobToBytes, concatPcm, createTtsSession, GEMINI_TTS_VOICE, mapWithConc
 import { audioFileName, deleteArticleAudioForVoice, findCachedAudioForVoice, getAudioChunk, getSongAudio, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest, type SongAudioRecord } from "@/lib/article-audio";
 import { getMyVoiceProfile } from "@/lib/my-voice";
 import { deriveSongAudioState, songDurationLabel, songRecordedLabel } from "@/lib/songs";
+import { downloadSongAudio } from "@/lib/song-drive";
 import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
@@ -509,12 +510,16 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
 /**
  * A song in the library: the recording IS the content. On the device that
  * recorded it there is a native player and a share button for the real
- * audio file; on any other device a calm note says where the recording
- * lives (song audio never syncs — title, lyrics and flag do). No smart
- * tools and no «استمع»: the voice is already the author's own. The one
- * deliberate AI touch is lyrics extraction (here and as a background
- * post-save pass): the sung words written onto the song, never a rewrite.
- * The lyrics are the idea's text, edited plainly.
+ * A song in the library: the recording IS the content. On the device that
+ * recorded it there is a native player and a share button for the real
+ * audio file; on any other device the recording waits in the «أفكاري —
+ * الأغاني» folder on Google Drive and one tap downloads it into this
+ * device's store and plays it — only when no Drive copy exists either
+ * does a calm note say the recording lives on the device that made it.
+ * No smart tools and no «استمع»: the voice is already the author's own.
+ * The one deliberate AI touch is lyrics extraction (here and as a
+ * background post-save pass): the sung words written onto the song,
+ * never a rewrite. The lyrics are the idea's text, edited plainly.
  */
 function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart, currentMatchIndex }: {
   idea: Idea; onChange: () => void; onDeleteRequest: () => void;
@@ -529,14 +534,30 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [lyrics, setLyrics] = useState("");
+  const [downloading, setDownloading] = useState(false);
   const [extracting, setExtracting] = useState(() => isSongLyricsPending(idea.id));
   const [preview, setPreview] = useState<string | null>(null);
-  const state = deriveSongAudioState(record);
+  const state = deriveSongAudioState(record, !!idea.driveFileId);
   const recordedLabel = songRecordedLabel(idea);
 
   // The background post-save pass also extracts: mirror the shared pending
   // registry so its run shows here (and its finish re-renders the lyrics).
   useEffect(() => onSongLyricsPendingChange(() => setExtracting(isSongLyricsPending(idea.id))), [idea.id]);
+
+  /** Pull the Drive copy into this device's store; the player takes over. */
+  const downloadFromDrive = async () => {
+    setDownloading(true);
+    setStatus("");
+    try {
+      const rec = await downloadSongAudio(idea);
+      setRecord(rec);
+      setUrl(URL.createObjectURL(rec.blob));
+    } catch {
+      setStatus("تعذّر تنزيل التسجيل من Google Drive الآن — حاول مرة أخرى عند الاتصال.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   /** Extract the sung words. Empty lyrics fill directly; written lyrics are
    *  never replaced silently — the extraction waits in a preview panel
@@ -630,6 +651,16 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
   return <div className="space-y-3">
     {state === "checking" && <p className="text-sm text-muted-foreground">جارٍ التحقق من التسجيل…</p>}
     {state === "ready" && url && <audio controls src={url} className="w-full" aria-label="تشغيل الأغنية" />}
+    {state === "drive" && (
+      <div className="space-y-2 rounded-lg bg-secondary px-3 py-2">
+        <p className="text-sm leading-relaxed text-secondary-foreground">
+          التسجيل محفوظ في Google Drive — نزّله إلى هذا الجهاز لتشغيله هنا.
+        </p>
+        <Button variant="outline" className="[&_svg]:size-5" onClick={() => void downloadFromDrive()} disabled={downloading}>
+          <Download />{downloading ? "جارٍ التنزيل…" : "تنزيل وتشغيل"}
+        </Button>
+      </div>
+    )}
     {state === "missing" && (
       <p className="rounded-lg bg-secondary px-3 py-2 text-sm leading-relaxed text-secondary-foreground">
         التسجيل الصوتي على الجهاز اللي سجّلته عليه — المزامنة تنقل العنوان والكلمات والتصنيف، لا الصوت نفسه.
