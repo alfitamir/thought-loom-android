@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Mic, Music, Square, Stethoscope } from "lucide-react";
-import { saveIdea } from "@/lib/ideas";
+import { ChevronLeft, Mic, Music, Square, Stethoscope } from "lucide-react";
+import { partitionIdeas, saveIdea } from "@/lib/ideas";
+import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { supabase } from "@/integrations/supabase/client";
 import { pushIdea, syncNow } from "@/lib/sync";
 import { createVoiceRecorder, type VoiceRecorder } from "@/lib/voice-recorder";
@@ -72,6 +73,18 @@ function Index() {
   // this session is created medical. Song mode is unaffected — a song is
   // never a medical article, whatever context the form was opened in.
   const [medicalCtx, setMedicalCtx] = useState(false);
+  // The home door to the medical section, with its article count.
+  const [medicalCount, setMedicalCount] = useState(() => partitionIdeas(loadVisibleIdeas()).medical.length);
+  useEffect(() => {
+    const recount = () => setMedicalCount(partitionIdeas(loadVisibleIdeas()).medical.length);
+    recount();
+    window.addEventListener("afkari:ideas-changed", recount);
+    window.addEventListener("storage", recount);
+    return () => {
+      window.removeEventListener("afkari:ideas-changed", recount);
+      window.removeEventListener("storage", recount);
+    };
+  }, []);
   const recKindRef = useRef<"idea" | "song">("idea");
   const elapsedRef = useRef(0);
   const recRef = useRef<VoiceRecorder | null>(null);
@@ -452,6 +465,16 @@ function Index() {
           </div>
           <button onClick={cancel} className="w-full text-sm text-muted-foreground">إلغاء</button>
         </div>
+      )}
+      {!open && (
+        <Link to="/medical" className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-start shadow-sm transition-colors hover:bg-accent">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Stethoscope className="size-6" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-lg text-foreground">القسم الطبي</span>
+            <span className="block text-sm text-muted-foreground">{medicalCount > 0 ? `${medicalCount} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل` : "قسم مستقل لمقالاتك الطبية"}</span>
+          </span>
+          <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
+        </Link>
       )}
       {!open && <ArchiveCard />}
       {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
