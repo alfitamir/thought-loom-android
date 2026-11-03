@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  articleTextHash, audioFileName, audioKey, deleteArticleAudio, findCachedAudio, getAudioChunk,
+  articleTextHash, audioFileName, audioKey, deleteArticleAudio, deleteArticleAudioForVoice, findCachedAudio,
+  findCachedAudioForVoice, getAudioChunk,
   getCachedAudio, isAudioFresh, listArticleIdsWithAudio, listReadyChunks, memoryArticleAudioStore, saveArticleAudio,
   saveAudioChunk, saveAudioManifest, textHash,
   type AudioChunkRecord, type ChunkedAudioManifest,
@@ -263,5 +264,59 @@ describe("findCachedAudio across TTS models", () => {
     expect(found?.kind).toBe("legacy");
     expect(found?.fresh).toBe(true);
     expect(await findCachedAudio("m5", "gemini", "عنوان", "نص", store)).toBeNull();
+  });
+});
+
+describe("per-voice cache scoping (default voice vs «صوتي»)", () => {
+  const pcmBlob = (bytes: number[]) => new Blob([new Uint8Array(bytes)], { type: "audio/L16" });
+  const DEFAULT_KEY = "gemini-3.8-flash-lite-tts:Charon";
+  const MY_KEY = "gemini-3.8-flash-lite-tts:voice_abc123";
+
+  const seedTwoVoices = async (store = memoryArticleAudioStore()) => {
+    await saveAudioManifest(
+      { articleId: "v1", engine: "gemini", voiceKey: DEFAULT_KEY, title: "عنوان", body: "نص", chunkCount: 2 }, store);
+    await saveAudioChunk({ articleId: "v1", engine: "gemini", voiceKey: DEFAULT_KEY, index: 0, pcm: pcmBlob([1]) }, store);
+    await saveAudioManifest(
+      { articleId: "v1", engine: "gemini", voiceKey: MY_KEY, title: "عنوان", body: "نص", chunkCount: 3 }, store);
+    await saveAudioChunk({ articleId: "v1", engine: "gemini", voiceKey: MY_KEY, index: 0, pcm: pcmBlob([7]) }, store);
+    await saveAudioChunk({ articleId: "v1", engine: "gemini", voiceKey: MY_KEY, index: 1, pcm: pcmBlob([8]) }, store);
+    return store;
+  };
+
+  it("loads exactly the picked voice's generation, chunks included", async () => {
+    const store = await seedTwoVoices();
+    const mine = await findCachedAudioForVoice("v1", "gemini", "voice_abc123", "عنوان", "نص", store);
+    expect(mine?.kind).toBe("chunks");
+    if (mine?.kind === "chunks") {
+      expect(mine.manifest.voiceKey).toBe(MY_KEY);
+      expect(mine.manifest.chunkCount).toBe(3);
+      expect(mine.readyIndexes).toEqual([0, 1]);
+    }
+    const dflt = await findCachedAudioForVoice("v1", "gemini", "Charon", "عنوان", "نص", store);
+    expect(dflt?.kind).toBe("chunks");
+    if (dflt?.kind === "chunks") {
+      expect(dflt.manifest.voiceKey).toBe(DEFAULT_KEY);
+      expect(dflt.readyIndexes).toEqual([0]);
+    }
+    // A voice with no generation for this article finds nothing.
+    expect(await findCachedAudioForVoice("v1", "gemini", "voice_other", "عنوان", "نص", store)).toBeNull();
+  });
+
+  it("matches a legacy bare-key record to the default voice only", async () => {
+    const store = memoryArticleAudioStore();
+    await saveArticleAudio(
+      { articleId: "v2", engine: "gemini", voiceKey: "Charon", title: "عنوان", body: "نص", blob: pcmBlob([9]) }, store);
+    expect((await findCachedAudioForVoice("v2", "gemini", "Charon", "عنوان", "نص", store))?.kind).toBe("legacy");
+    expect(await findCachedAudioForVoice("v2", "gemini", "voice_abc123", "عنوان", "نص", store)).toBeNull();
+  });
+
+  it("deletes one voice's generation and leaves the other voice's intact", async () => {
+    const store = await seedTwoVoices();
+    await deleteArticleAudioForVoice("v1", "gemini", "voice_abc123", store);
+    expect(await findCachedAudioForVoice("v1", "gemini", "voice_abc123", "عنوان", "نص", store)).toBeNull();
+    expect(await getAudioChunk("v1", "gemini", MY_KEY, 0, store)).toBeNull();
+    const dflt = await findCachedAudioForVoice("v1", "gemini", "Charon", "عنوان", "نص", store);
+    expect(dflt?.kind).toBe("chunks");
+    if (dflt?.kind === "chunks") expect(dflt.readyIndexes).toEqual([0]);
   });
 });
