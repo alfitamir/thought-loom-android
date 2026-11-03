@@ -20,6 +20,10 @@ export type Idea = {
   song?: boolean;
   /** Length of the recording in seconds, when known. Display metadata only. */
   songDuration?: number;
+  /** Id of this song's audio file in the «أفكاري — الأغاني» folder on Google
+   *  Drive, once the recording has been backed up there. The blob itself is
+   *  never an idea field — this id is how another device finds its copy. */
+  driveFileId?: string;
 };
 
 export const TOPICS: Record<string, string[]> = {
@@ -127,6 +131,9 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     } else if (winner.song && winner.songDuration === undefined && loser.songDuration !== undefined) {
       winner = { ...winner, songDuration: loser.songDuration };
     }
+    // A Drive copy is metadata like the pin: an edition that lacks the file id
+    // must not orphan the winner's backed-up recording.
+    if (!winner.driveFileId && loser.driveFileId) winner = { ...winner, driveFileId: loser.driveFileId };
     // As before: a local winner that was never polished adopts the remote polish stamp.
     if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
     merged.set(idea.id, winner);

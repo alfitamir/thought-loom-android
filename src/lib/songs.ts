@@ -1,10 +1,13 @@
 // Song mode: the user records himself SINGING his own songs. The recording
 // is the content — segments are assembled into one audio file kept on this
-// device, and the idea carries only the title, the lyrics and the song flag.
-// Nothing here transcribes or sends audio to any AI: no engine, no key, no
-// network. (Written lyrics are extracted from the singing only deliberately
-// — the editor's button or the post-save pass in song-lyrics.ts — and never
-// by the dictation pipeline.)
+// device, and the idea carries the title, the lyrics, the song flag and —
+// once song-drive.ts has backed the recording up — the id of its copy in
+// the «أفكاري — الأغاني» folder on Google Drive (`driveFileId`), which is
+// how other devices fetch it on demand. Nothing here transcribes or sends
+// audio to any AI: no engine, no key, no network. (Written lyrics are
+// extracted from the singing only deliberately — the editor's button or
+// the post-save pass in song-lyrics.ts — and never by the dictation
+// pipeline.)
 import { saveSongAudio, songAudioStore, type SongAudioRecord, type SongAudioStore } from "./article-audio";
 import { buildSongIdea, loadIdeas, replaceIdeas, type Idea } from "./ideas";
 import { formatElapsed } from "./voice-session";
@@ -29,12 +32,16 @@ export const songRecordedLabel = (idea: Idea): string | null => {
 
 /**
  * Whether the editor can offer playback for a song: still looking, the
- * recording is on this device, or it lives on another device (a song's
- * audio never syncs — only its title, lyrics and flag do).
+ * recording is on this device, it is not here but a copy waits on Google
+ * Drive (`drive` — downloadable on demand), or it exists only on the
+ * device that recorded it (`missing`).
  */
-export type SongAudioState = "checking" | "ready" | "missing";
-export const deriveSongAudioState = (record: SongAudioRecord | null | undefined): SongAudioState =>
-  record === undefined ? "checking" : record ? "ready" : "missing";
+export type SongAudioState = "checking" | "ready" | "drive" | "missing";
+export const deriveSongAudioState = (
+  record: SongAudioRecord | null | undefined,
+  hasDriveCopy = false,
+): SongAudioState =>
+  record === undefined ? "checking" : record ? "ready" : hasDriveCopy ? "drive" : "missing";
 
 /**
  * Stitch one recording session's segments into a single audio blob, in

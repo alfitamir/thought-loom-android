@@ -13,6 +13,7 @@ import { resolveEngine } from "@/lib/ai-engine";
 import type { Engine } from "@/lib/article-ai";
 import { formatElapsed, joinTranscript, transcribeFinished } from "@/lib/voice-session";
 import { recoverPendingSongs, saveRecordedSong } from "@/lib/songs";
+import { syncSongAudio } from "@/lib/song-drive";
 import { autoExtractSongLyrics } from "@/lib/song-lyrics";
 
 export const Route = createFileRoute("/")({
@@ -155,6 +156,7 @@ function Index() {
         const made = await recoverPendingSongs({ store: songVoiceStore() });
         if (made.length) {
           made.forEach((idea) => pushIdea(idea));
+          void syncSongAudio().catch(() => {});
           setMsg("تمت استعادة أغنية مسجلة على هاتفك ✓");
           // A recovered song is a saved song: same background lyrics pass.
           made.forEach((idea) => {
@@ -239,6 +241,7 @@ function Index() {
       sessionRef.current = "";
       if (idea) {
         pushIdea(idea);
+        void syncSongAudio().catch(() => {});
         setOpen(false);
         setMsg("حُفظت أغنيتك بصوتك ✓ — ستجدها في المكتبة، ويمكنك إضافة كلماتها من هناك");
         // Background bonus: with his own Gemini key configured, the sung

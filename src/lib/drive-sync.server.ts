@@ -17,6 +17,11 @@ const idea = z.object({
   updatedAt: z.number().optional(),
   aiPolishedAt: z.number().optional(),
   mergedFrom: z.array(z.string().max(100)).max(1000).optional(),
+  topic: z.string().max(500).optional(),
+  topicManual: z.boolean().optional(),
+  song: z.boolean().optional(),
+  songDuration: z.number().optional(),
+  driveFileId: z.string().max(200).optional(),
 });
 const inputSchema = z.object({
   ideas: z.array(idea).max(10000),
