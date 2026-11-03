@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   clearDriveMarks, loadDeleted, loadDriveDeleted, loadDriveRevived, loadIdeas, markDeleted, mergeIdeas, replaceIdeas, type Idea,
 } from "./ideas";
+import { syncSongAudio } from "./song-drive";
 
 const SYNCED_AT = "afkari.driveSyncedAt";
 export type DriveResult = { ok: true; restored: number } | { ok: false; message: string };
@@ -51,6 +52,9 @@ async function run(): Promise<DriveResult> {
   const removed = before.filter((i) => !kept.has(i.id)).map((i) => i.id);
   if (removed.length) markDeleted(removed);
   replaceIdeas(merged);
+  // A successful Drive sync is also the song recordings' cue: back up any
+  // recording that has no Drive copy yet (coalesced, silently retried).
+  void syncSongAudio().catch(() => {});
   localStorage.setItem(SYNCED_AT, String(Date.now()));
   window.dispatchEvent(new Event("afkari:ideas-changed"));
   window.dispatchEvent(new Event("afkari:drive-synced"));
