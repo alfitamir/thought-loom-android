@@ -1,10 +1,16 @@
 // Turns saved voice recordings into text. Each finished piece keeps its text, so a
 // recording is never sent twice and an interrupted job continues where it stopped.
 import type { Engine } from "./article-ai";
-import { SILENCE, TRANSCRIBE_INSTRUCTIONS } from "./ai-prompts";
+import { SILENCE, SONG_TRANSCRIBE_INSTRUCTIONS, TRANSCRIBE_INSTRUCTIONS } from "./ai-prompts";
 import type { Segment, VoiceStore } from "./voice-store";
 
 const clean = (t: string) => t.replace(SILENCE, "").replace(/\s+/g, " ").trim();
+
+/** Lyrics cleaning: unlike dictation, line breaks ARE the structure — one line
+ *  per sung phrase — so they are preserved; only the silence marker, ragged
+ *  line edges and empty lines are dropped. */
+export const cleanSongLyrics = (t: string): string =>
+  t.replaceAll(SILENCE, "").split("\n").map((line) => line.trim()).filter(Boolean).join("\n");
 
 async function toBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -44,21 +50,40 @@ export async function readTranscriptStream(response: Response): Promise<string> 
   return done;
 }
 
-export async function transcribeAudio(blob: Blob, mime: string, engine: Engine, signal: AbortSignal): Promise<string> {
+/** One transcription call, shared by dictation and song lyrics: the personal
+ *  Gemini key in the browser, otherwise the signed-in /api/voice/transcribe
+ *  route. `song` swaps in the sung-lyrics prompt on both paths (the route
+ *  picks its own song prompt from the flag) and keeps line breaks. */
+async function transcribeRaw(
+  blob: Blob, mime: string, engine: Engine, signal: AbortSignal,
+  song: boolean, instructions: string, userText: string,
+): Promise<string> {
   const type = mime.startsWith("audio/") ? mime : "audio/webm";
   if (engine.kind === "gemini") {
     const { geminiStream } = await import("./gemini");
     const data = await toBase64(blob);
-    const text = await geminiStream(engine.key, TRANSCRIBE_INSTRUCTIONS, [{ inlineData: { mimeType: type, data } }, { text: "فرّغ هذا التسجيل كاملًا." }], signal);
-    return clean(text);
+    return geminiStream(engine.key, instructions, [{ inlineData: { mimeType: type, data } }, { text: userText }], signal);
   }
   const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
   const form = new FormData();
   form.append("file", new File([blob], `voice.${ext}`, { type }));
+  if (song) form.append("song", "1");
   const response = await fetch("/api/voice/transcribe", {
     method: "POST", signal, body: form, headers: { Authorization: `Bearer ${engine.token}` },
   });
-  return clean(await readTranscriptStream(response));
+  return readTranscriptStream(response);
+}
+
+export async function transcribeAudio(blob: Blob, mime: string, engine: Engine, signal: AbortSignal): Promise<string> {
+  return clean(await transcribeRaw(blob, mime, engine, signal, false, TRANSCRIBE_INSTRUCTIONS, "فرّغ هذا التسجيل كاملًا."));
+}
+
+/** Transcribe a SONG recording into its written lyrics: same transport as
+ *  dictation, with the song prompt, and the sung phrases kept as lines. Only
+ *  ever called deliberately for a song (editor button / post-save pass) —
+ *  the dictation drain above never sees song audio. */
+export async function transcribeSongAudio(blob: Blob, mime: string, engine: Engine, signal: AbortSignal): Promise<string> {
+  return cleanSongLyrics(await transcribeRaw(blob, mime, engine, signal, true, SONG_TRANSCRIBE_INSTRUCTIONS, "فرّغ كلمات هذه الأغنية كما غُنّيت."));
 }
 
 const bySeq = (a: Segment, b: Segment) => a.seq - b.seq;
