@@ -75,7 +75,9 @@ const SCHEMA = MERGE_SUGGEST_SCHEMA;
 
 export async function findMerges(ideas: Idea[], engine: Engine, signal: AbortSignal): Promise<MergeSuggestion[]> {
   const sourced = mergedSources(ideas);
-  const candidates = ideas.filter((i) => !sourced.has(i.id));
+  // Liked articles are never suggested: merging them is a manual act only, so
+  // their text never reaches the model and no AI merge can consume them.
+  const candidates = ideas.filter((i) => !sourced.has(i.id) && !i.liked);
   if (candidates.length < 2) return [];
   const list = candidates.slice(0, 80).map((i) => {
     const a = getArticle(i);
