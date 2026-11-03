@@ -59,4 +59,14 @@ describe("backup", () => {
     restoreBackup([{ ...mine, topic: "موضوعي", topicManual: true }]);
     expect(loadIdeas().find((i) => i.id === mine.id)).toMatchObject({ topic: "موضوعي", topicManual: true });
   });
+  it("round-trips a liked article with its source and accumulated sources", () => {
+    const liked: Idea[] = [{ id: "l1", text: "نص خارجي", createdAt: 5, liked: true, source: "مجلة الفكر", sources: ["موقع آخر", "كاتب ضيف"] }];
+    expect(parseBackup(buildBackup(liked))).toEqual(liked);
+  });
+  it("drops malformed attribution entries but keeps the liked flag and clean sources", () => {
+    const raw = JSON.stringify([{ id: "l2", text: "نص", createdAt: 5, liked: true, source: 42, sources: ["صالح", 7, "", null] }]);
+    const [parsed] = parseBackup(raw);
+    expect(parsed).toMatchObject({ liked: true, sources: ["صالح"] });
+    expect(parsed).not.toHaveProperty("source");
+  });
 });
