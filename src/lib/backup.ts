@@ -33,6 +33,8 @@ export function parseBackup(raw: string): Idea[] {
     // recording itself never does (audio stays on the recording device).
     if (i.song === true) idea.song = true;
     if (typeof i.songDuration === "number" && i.songDuration > 0) idea.songDuration = i.songDuration;
+    // The Drive file id travels too, so a restored song still knows where its copy lives.
+    if (typeof i.driveFileId === "string" && i.driveFileId.trim()) idea.driveFileId = i.driveFileId;
     return [idea];
   });
   if (list.length && !ideas.length) throw new Error("لم نجد أفكارًا صالحة في هذا الملف.");
