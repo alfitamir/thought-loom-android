@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { cleanFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
-import { articleTopic, getArticle, matchesArticle, needsPolish, sortWithPinnedFirst, updateArticle, type Idea } from "@/lib/ideas";
+import { articleTopic, getArticle, matchesArticle, needsPolish, partitionIdeas, sortWithPinnedFirst, updateArticle, type Idea } from "@/lib/ideas";
 import { pushIdea, syncNow } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -16,7 +16,7 @@ import { LikedDialog } from "@/components/liked-dialog";
 import { AskDialog } from "@/components/ask-dialog";
 import { InsightsDialog } from "@/components/insights-dialog";
 import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
-import { ArrowRight, ChevronDown, ChevronUp, Feather, Heart, Lightbulb, MessageCircleQuestion, MoreHorizontal, Search, Sparkles, Square, Tags, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronUp, Feather, Heart, Lightbulb, MessageCircleQuestion, MoreHorizontal, Search, Sparkles, Square, Stethoscope, Tags, X } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
 
 export const Route = createFileRoute("/library")({
@@ -33,8 +33,12 @@ export const Route = createFileRoute("/library")({
   component: Library,
 });
 
-function Library() {
+export function Library() {
+  // This surface is the MAIN partition only: medical articles live in the
+  // «القسم الطبي» and never appear here — not in the list, the groups,
+  // the counts, the search, or any bulk operation launched from here.
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [medicalCount, setMedicalCount] = useState(0);
   const [openTopic, setOpenTopic] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -59,8 +63,14 @@ function Library() {
   const [labeling, setLabeling] = useState<{ done: number; total: number } | null>(null);
   const [labelError, setLabelError] = useState("");
   // Surfaces read the VISIBLE ideas: anything pending deletion (inside its
-  // undo window) is already gone from here, exactly as if deleted.
-  const refresh = () => { setIdeas(loadVisibleIdeas()); setLabels(loadLabels()); };
+  // undo window) is already gone from here, exactly as if deleted. The
+  // medical partition is split off before anything renders from `ideas`.
+  const refresh = () => {
+    const parts = partitionIdeas(loadVisibleIdeas());
+    setIdeas(parts.main);
+    setMedicalCount(parts.medical.length);
+    setLabels(loadLabels());
+  };
   /** Delete is undoable: the item vanishes now and a toast offers «تراجع»
    *  for the grace window; the real removal runs only when it expires. */
   const handleDelete = (idea: Idea) => {
@@ -84,8 +94,9 @@ function Library() {
     const engine = await resolveEngine();
     if (typeof engine === "string") { setBulkMsg(engine); return; }
     // Songs are never polished: their text is the author's own lyrics, and
-    // no AI pass may rewrite them.
-    const queue = loadVisibleIdeas().filter((i) => !i.song && needsPolish(i));
+    // no AI pass may rewrite them. Medical articles are out too: bulk work
+    // launched from the main library stays inside the main partition.
+    const queue = loadVisibleIdeas().filter((i) => !i.medical && !i.song && needsPolish(i));
     if (!queue.length) { setBulkMsg("كل المقالات مضبوطة ✓"); return; }
     const controller = new AbortController(); bulkAbort.current = controller;
     let done = 0, skipped = 0; setBulk({ done, total: queue.length });
@@ -181,6 +192,16 @@ function Library() {
           <Button asChild variant="ghost" size="icon" className="[&_svg]:size-5"><Link to="/" aria-label="رجوع" title="رجوع"><ArrowRight /></Link></Button>
         </div>
       </header>
+      {/* The medical section is a world of its own: this card is its door
+          from the main library, carrying its article count. */}
+      <Link to="/medical" className="mb-5 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 shadow-sm transition-colors hover:bg-accent">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Stethoscope className="size-6" /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-lg text-foreground">القسم الطبي</span>
+          <span className="block text-sm text-muted-foreground">{medicalCount > 0 ? `${medicalCount} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل` : "قسم مستقل لمقالاتك الطبية"}</span>
+        </span>
+        <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
+      </Link>
       {(bulk || bulkMsg) && <p role="status" className="mb-4 text-sm text-muted-foreground">{bulk ? `جارٍ الضبط… تم ${bulk.done} من ${bulk.total}` : bulkMsg}</p>}
       {ideas.length > 0 && <div className="mb-4 flex flex-wrap gap-2">
         <button onClick={() => setAskOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"><MessageCircleQuestion className="size-5" />اسأل أفكاري</button>
