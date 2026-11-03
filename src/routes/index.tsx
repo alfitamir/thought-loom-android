@@ -12,6 +12,7 @@ import { transcribeAudio } from "@/lib/ai-features";
 import { resolveEngine } from "@/lib/ai-engine";
 import type { Engine } from "@/lib/article-ai";
 import { formatElapsed, joinTranscript, transcribeFinished } from "@/lib/voice-session";
+import { ArchiveCard } from "@/components/archive-card";
 import { recoverPendingSongs, saveRecordedSong } from "@/lib/songs";
 import { syncSongAudio } from "@/lib/song-drive";
 import { autoExtractSongLyrics } from "@/lib/song-lyrics";
@@ -430,6 +431,7 @@ function Index() {
           <button onClick={cancel} className="w-full text-sm text-muted-foreground">إلغاء</button>
         </div>
       )}
+      {!open && <ArchiveCard />}
       {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
       {cloud === "on" ? (
         <p className="text-center text-sm text-muted-foreground">☁️ أفكارك محفوظة في السحابة</p>
