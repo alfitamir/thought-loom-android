@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Mic, Music, Square } from "lucide-react";
-import { saveIdea } from "@/lib/ideas";
+import { ChevronLeft, Mic, Music, Square, Stethoscope } from "lucide-react";
+import { partitionIdeas, saveIdea } from "@/lib/ideas";
+import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { supabase } from "@/integrations/supabase/client";
 import { pushIdea, syncNow } from "@/lib/sync";
 import { createVoiceRecorder, type VoiceRecorder } from "@/lib/voice-recorder";
@@ -20,10 +21,16 @@ import { autoExtractSongLyrics } from "@/lib/song-lyrics";
 export const Route = createFileRoute("/")({
   // `?record=<nonce>` is the bottom navigation's "open the recorder" signal:
   // each tap sends a fresh nonce so repeated taps retrigger the effect below.
-  validateSearch: (search: Record<string, unknown>): { record?: number } => {
+  // `&section=medical` rides along from the «القسم الطبي» capture buttons:
+  // the recorder opens in medical context and everything it saves is born
+  // inside the medical section.
+  validateSearch: (search: Record<string, unknown>): { record?: number; section?: "medical" } => {
     const raw = search["record"];
     const value = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
-    return Number.isFinite(value) && value > 0 ? { record: value } : {};
+    return {
+      ...(Number.isFinite(value) && value > 0 ? { record: value } : {}),
+      ...(search["section"] === "medical" ? { section: "medical" as const } : {}),
+    };
   },
   head: () => ({
     meta: [
@@ -45,7 +52,7 @@ async function engineOrThrow(): Promise<Engine> {
 }
 
 function Index() {
-  const { record } = Route.useSearch();
+  const { record, section } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -61,6 +68,23 @@ function Index() {
   // a recording starts so stop/cancel always route by what was recorded,
   // not by the toggle's current position.
   const [recMode, setRecMode] = useState<"idea" | "song">("idea");
+  // Medical context: set only by the «القسم الطبي» capture deep link. While
+  // it is up, the form shows a «القسم الطبي» chip and an IDEA saved from
+  // this session is created medical. Song mode is unaffected — a song is
+  // never a medical article, whatever context the form was opened in.
+  const [medicalCtx, setMedicalCtx] = useState(false);
+  // The home door to the medical section, with its article count.
+  const [medicalCount, setMedicalCount] = useState(() => partitionIdeas(loadVisibleIdeas()).medical.length);
+  useEffect(() => {
+    const recount = () => setMedicalCount(partitionIdeas(loadVisibleIdeas()).medical.length);
+    recount();
+    window.addEventListener("afkari:ideas-changed", recount);
+    window.addEventListener("storage", recount);
+    return () => {
+      window.removeEventListener("afkari:ideas-changed", recount);
+      window.removeEventListener("storage", recount);
+    };
+  }, []);
   const recKindRef = useRef<"idea" | "song">("idea");
   const elapsedRef = useRef(0);
   const recRef = useRef<VoiceRecorder | null>(null);
@@ -101,15 +125,18 @@ function Index() {
 
   // Bottom-nav «سجّل فكرة» deep link: open the recorder form (never auto-start
   // the mic — that still needs the «ابدأ التسجيل» tap), then clear the param
-  // with replace so re-renders and the back button don't reopen it.
+  // with replace so re-renders and the back button don't reopen it. The
+  // medical capture buttons send the same nonce plus `section=medical`,
+  // which additionally raises the medical context for this session.
   useEffect(() => {
     // The router merges raw URL params into the match search, so a hand-typed
     // junk value can arrive here as a string despite the declared type —
     // only a positive number (the nonce the bottom nav sends) may open it.
     if (typeof record !== "number" || !Number.isFinite(record) || record <= 0) return;
     setOpen(true);
+    setMedicalCtx(section === "medical");
     navigate({ to: "/", search: {}, replace: true });
-  }, [record, navigate]);
+  }, [record, section, navigate]);
 
   // Recording runs until the user presses stop (see createVoiceRecorder).
   const textRef = useRef("");
@@ -341,9 +368,10 @@ function Index() {
     if (listening) await runStop();
     const body = textRef.current.trim();
     if (!body) return;
-    const idea = saveIdea(body);
+    const idea = saveIdea(body, medicalCtx ? { medical: true } : undefined);
     textRef.current = "";
-    setText(""); setOpen(false); setMsg("حُفظت الفكرة ✓");
+    setText(""); setOpen(false); setMedicalCtx(false);
+    setMsg(medicalCtx ? "حُفظت الفكرة في القسم الطبي ✓" : "حُفظت الفكرة ✓");
     pushIdea(idea);
   };
 
@@ -363,7 +391,7 @@ function Index() {
       await rec.cancel().catch(() => {});
       setListening(false);
       sessionRef.current = "";
-      setOpen(false);
+      setOpen(false); setMedicalCtx(false);
       return;
     }
     if (modeRef.current === "media" && audioRef.current) {
@@ -387,14 +415,16 @@ function Index() {
     } else {
       recRef.current?.cancel();
     }
-    setOpen(false);
+    // Leaving the recorder clears the medical context with it: the next
+    // session starts general unless it arrives through the section again.
+    setOpen(false); setMedicalCtx(false);
   };
 
   return (
     <main dir="rtl" className="paper flex min-h-screen flex-col items-center justify-center gap-10 px-6 pb-24">
       <h1 className="font-display text-4xl text-foreground">أفكاري</h1>
       {!open ? (
-        <button onClick={() => setOpen(true)} className="record-btn">سجّل فكرة</button>
+        <button onClick={() => { setMedicalCtx(false); setOpen(true); }} className="record-btn">سجّل فكرة</button>
       ) : (
         <div className="w-full max-w-md space-y-4">
           <div className="flex rounded-lg border border-border bg-muted/30 p-1" role="group" aria-label="وضع التسجيل">
@@ -407,6 +437,11 @@ function Index() {
               <Music className="size-4" />أغنية
             </button>
           </div>
+          {medicalCtx && recMode === "idea" && (
+            <p className="flex items-center justify-center gap-1.5 text-center text-sm font-medium text-primary">
+              <Stethoscope className="size-4" />القسم الطبي — الفكرة دي هتتحفظ في القسم الطبي
+            </p>
+          )}
           {recMode === "idea" ? (
             <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={8}
               placeholder="اكتب أو تكلم..." className="w-full rounded-2xl border border-border bg-card p-4 text-lg leading-relaxed text-card-foreground outline-none focus:ring-2 focus:ring-ring" />
@@ -430,6 +465,16 @@ function Index() {
           </div>
           <button onClick={cancel} className="w-full text-sm text-muted-foreground">إلغاء</button>
         </div>
+      )}
+      {!open && (
+        <Link to="/medical" className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-start shadow-sm transition-colors hover:bg-accent">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Stethoscope className="size-6" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-lg text-foreground">القسم الطبي</span>
+            <span className="block text-sm text-muted-foreground">{medicalCount > 0 ? `${medicalCount} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل` : "قسم مستقل لمقالاتك الطبية"}</span>
+          </span>
+          <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
+        </Link>
       )}
       {!open && <ArchiveCard />}
       {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}

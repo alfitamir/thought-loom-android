@@ -54,6 +54,10 @@ describe("backup", () => {
     const pinned: Idea[] = [{ id: "p9", text: "نص", createdAt: 5, pinned: true }];
     expect(parseBackup(buildBackup(pinned))).toEqual(pinned);
   });
+  it("round-trips medical section membership", () => {
+    const medical: Idea[] = [{ id: "m1", text: "نص طبي", createdAt: 5, medical: true }];
+    expect(parseBackup(buildBackup(medical))).toEqual(medical);
+  });
   it("drops a pin flag that arrives without its topic", () => {
     const raw = JSON.stringify([{ id: "p2", text: "نص", createdAt: 5, topicManual: true }]);
     expect(parseBackup(raw)[0]).not.toHaveProperty("topicManual");

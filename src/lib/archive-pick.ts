@@ -24,11 +24,13 @@ export const archiveLastActivity = (idea: Idea): number => idea.updatedAt ?? ide
  * - at least 30 days untouched;
  * - pinned ideas are OUT — the pin already surfaces them in the library;
  * - songs are OUT — a recording is not reading material;
+ * - medical articles are OUT — home is the general surface; the medical
+ *   section is opened deliberately, never resurfaced into by accident;
  * - liked articles are IN — re-reading them is their whole point.
  */
 export function archivePool(ideas: Idea[], now = Date.now()): Idea[] {
   return ideas
-    .filter((i) => !i.song && !i.pinned && now - archiveLastActivity(i) >= ARCHIVE_MIN_AGE_MS)
+    .filter((i) => !i.song && !i.pinned && !i.medical && now - archiveLastActivity(i) >= ARCHIVE_MIN_AGE_MS)
     .sort((a, b) => archiveLastActivity(a) - archiveLastActivity(b) || a.id.localeCompare(b.id));
 }
 

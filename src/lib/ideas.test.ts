@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { classify, toArticle, OTHER, getArticle, matchesArticle, saveIdea, updateArticle, loadIdeas, mergeIdeas, articleTopic, setArticleTopic, clearArticleTopic, topicOptions, setPinned, sortWithPinnedFirst } from "./ideas";
+import { classify, toArticle, OTHER, getArticle, matchesArticle, saveIdea, updateArticle, loadIdeas, replaceIdeas, mergeIdeas, articleTopic, setArticleTopic, clearArticleTopic, topicOptions, setPinned, sortWithPinnedFirst, setMedical, partitionIdeas, buildSongIdea, saveArticleIdea } from "./ideas";
 
 describe("ideas", () => {
   it("classifies by topic keywords", () => {
@@ -165,5 +165,70 @@ describe("library pinning", () => {
     const [winner] = mergeIdeas([local], [{ ...local, updatedAt: 2, pinned: true }], []);
     expect(winner?.articleBody).toBe("محلي");
     expect(winner?.pinned).toBe(true);
+  });
+});
+
+describe("medical section", () => {
+  beforeEach(() => localStorage.clear());
+  it("moves an article in and out without ever bumping updatedAt", () => {
+    const idea = saveIdea("فكرة طبية");
+    const edited = updateArticle(idea.id, "عنوان", "نص المقال") ?? idea;
+    const stamp = edited.updatedAt;
+    const moved = setMedical(idea.id, true);
+    expect(moved?.medical).toBe(true);
+    expect(moved?.updatedAt).toBe(stamp);
+    expect(loadIdeas().find((i) => i.id === idea.id)?.medical).toBe(true);
+    const back = setMedical(idea.id, false);
+    expect(back).not.toHaveProperty("medical");
+    expect(back?.updatedAt).toBe(stamp);
+  });
+  it("setting the section state the article already has is a no-op", () => {
+    const idea = saveIdea("فكرة عادية");
+    expect(setMedical(idea.id, false)).not.toHaveProperty("medical");
+    setMedical(idea.id, true);
+    expect(setMedical(idea.id, true)?.medical).toBe(true);
+    expect(setMedical("missing-id", true)).toBeUndefined();
+  });
+  it("a song can never become a medical article", () => {
+    const song = buildSongIdea({ title: "أغنية" });
+    expect(song).not.toHaveProperty("medical");
+    replaceIdeas([song]);
+    expect(setMedical(song.id, true)).not.toHaveProperty("medical");
+    expect(loadIdeas().find((i) => i.id === song.id)).not.toHaveProperty("medical");
+  });
+  it("an idea saved in medical context is born medical; a plain one is not", () => {
+    expect(saveIdea("نص طبي", { medical: true }).medical).toBe(true);
+    expect(saveIdea("نص عام")).not.toHaveProperty("medical");
+    expect(saveIdea("نص عام آخر", {})).not.toHaveProperty("medical");
+    expect(saveIdea("نص عام ثالث", { medical: false })).not.toHaveProperty("medical");
+  });
+  it("a newer edition without the flag does not pull the winner out of the section", () => {
+    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 2, articleBody: "محلي", medical: true };
+    const [winner] = mergeIdeas([local], [{ id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "سحابي" }], []);
+    expect(winner?.articleBody).toBe("سحابي");
+    expect(winner?.medical).toBe(true);
+  });
+  it("a general winner adopts the other edition's medical flag", () => {
+    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "محلي" };
+    const [winner] = mergeIdeas([local], [{ ...local, updatedAt: 2, medical: true }], []);
+    expect(winner?.articleBody).toBe("محلي");
+    expect(winner?.medical).toBe(true);
+  });
+  it("partitionIdeas splits the two sections without overlap or loss", () => {
+    const list = [
+      { id: "a", text: "أ", createdAt: 3 },
+      { id: "b", text: "ب", createdAt: 2, medical: true },
+      { id: "c", text: "ج", createdAt: 1 },
+      { id: "d", text: "د", createdAt: 0, medical: true, song: true },
+    ];
+    const { main, medical } = partitionIdeas(list);
+    expect(main.map((i) => i.id)).toEqual(["a", "c"]);
+    expect(medical.map((i) => i.id)).toEqual(["b", "d"]);
+  });
+  it("a merged article can stay in the medical section", () => {
+    const merged = saveArticleIdea("نص مدمج", "عنوان", "متن", undefined, { medical: true });
+    expect(merged.medical).toBe(true);
+    const general = saveArticleIdea("نص مدمج", "عنوان", "متن");
+    expect(general).not.toHaveProperty("medical");
   });
 });

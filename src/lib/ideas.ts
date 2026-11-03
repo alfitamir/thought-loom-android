@@ -39,6 +39,13 @@ export type Idea = {
    *  its topic group in the library. Display metadata only — like the topic
    *  pin it never bumps `updatedAt`, and no AI pass reads or writes it. */
   pinned?: boolean;
+  /** True when the article belongs to the «القسم الطبي» — a section entirely
+   *  its own: the main library never shows it, the medical view shows ONLY
+   *  it, and the home surfaces (archive card, recorder destination) keep the
+   *  two apart. Section membership is metadata, not a text edit — like the
+   *  pins it never bumps `updatedAt`. A song is never a medical article:
+   *  song ideas never carry this flag. */
+  medical?: boolean;
 };
 
 export const TOPICS: Record<string, string[]> = {
@@ -160,6 +167,9 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     // The library pin is metadata too: an edition that lacks it must not
     // silently unpin the winner.
     if (!winner.pinned && loser.pinned) winner = { ...winner, pinned: true };
+    // Section membership is metadata as well: an edition that lacks the
+    // medical flag must not pull the winner out of the medical section.
+    if (!winner.medical && loser.medical) winner = { ...winner, medical: true };
     // As before: a local winner that was never polished adopts the remote polish stamp.
     if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
     merged.set(idea.id, winner);
@@ -205,9 +215,12 @@ export const clearDriveMarks = (deleted: string[], revived: string[]) => {
   writeList(DRIVE_REVIVED_KEY, loadDriveRevived().filter((d) => !revived.includes(d)));
 };
 
-export const saveIdea = (text: string): Idea => {
+export const saveIdea = (text: string, opts?: { medical?: boolean }): Idea => {
   const all = loadIdeas();
   const idea: Idea = { id: crypto.randomUUID(), text, createdAt: Date.now() };
+  // The recorder's medical context: an idea dictated/written while the
+  // «القسم الطبي» chip is up is born inside the medical section.
+  if (opts?.medical) idea.medical = true;
   all.unshift(idea);
   localStorage.setItem(KEY, JSON.stringify(all));
   return idea;
@@ -276,6 +289,35 @@ export function sortWithPinnedFirst(list: Idea[]): Idea[] {
   return [...list].sort((a, b) => Number(b.pinned ?? false) - Number(a.pinned ?? false));
 }
 
+/**
+ * Move an article into or out of the «القسم الطبي». This is section
+ * membership, not a text edit, so `updatedAt` is left alone (exactly like
+ * the pins). Setting the state the article already has is a no-op. A song
+ * is never a medical article — the flag is refused for songs outright.
+ */
+export function setMedical(id: string, medical: boolean): Idea | undefined {
+  const all = loadIdeas();
+  const current = all.find((idea) => idea.id === id);
+  if (!current) return;
+  if (current.song) return current;
+  if (!!current.medical === medical) return current;
+  const updated: Idea = { ...current };
+  if (medical) updated.medical = true; else delete updated.medical;
+  replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
+  return updated;
+}
+
+/** The two library partitions: the medical section and everything else.
+ *  Every surface reads exactly one side — the main library the `main`
+ *  side, the medical view the `medical` side — so an article can never
+ *  appear in both. */
+export function partitionIdeas(ideas: Idea[]): { main: Idea[]; medical: Idea[] } {
+  const main: Idea[] = [];
+  const medical: Idea[] = [];
+  for (const idea of ideas) (idea.medical ? medical : main).push(idea);
+  return { main, medical };
+}
+
 /** Every topic currently in use, with its article count, busiest first — the manual picker's list. */
 export function topicOptions(ideas: Idea[]): { topic: string; count: number }[] {
   const counts = new Map<string, number>();
@@ -292,11 +334,14 @@ export function topicOptions(ideas: Idea[]): { topic: string; count: number }[] 
 export const needsPolish = (idea: Idea) => !idea.liked && (idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0));
 
 /** Save a ready article (e.g. a merge) as a new idea; `text` keeps the combined originals. */
-export const saveArticleIdea = (text: string, title: string, body: string, mergedFrom?: string[], extra?: { liked?: boolean; source?: string; sources?: string[] }): Idea => {
+export const saveArticleIdea = (text: string, title: string, body: string, mergedFrom?: string[], extra?: { liked?: boolean; source?: string; sources?: string[]; medical?: boolean }): Idea => {
   const now = Date.now();
   const idea: Idea = { id: crypto.randomUUID(), text, createdAt: now, articleTitle: title.trim(), articleBody: body.trim(), updatedAt: now, aiPolishedAt: now };
   if (mergedFrom?.length) idea.mergedFrom = [...new Set(mergedFrom)];
   if (extra?.liked) idea.liked = true;
+  // A merge stays in the section its articles lived in (manual-merge
+  // partners are partition-scoped, so the section is unambiguous).
+  if (extra?.medical) idea.medical = true;
   if (extra?.source?.trim()) idea.source = extra.source.trim();
   if (extra?.sources?.length) idea.sources = [...new Set(extra.sources.map((s) => s.trim()).filter(Boolean))];
   replaceIdeas([idea, ...loadIdeas()]);
