@@ -17,6 +17,34 @@ export const VOICES_API_URL = "https://generativelanguage.googleapis.com/v1beta/
  * model; the created voice then works with both). */
 export const MY_VOICE_MODEL = "gemini-3.8-flash-tts";
 
+/**
+ * «صوتي» is TEMPORARILY HIDDEN at the owner's instruction: the replicated
+ * voice is not close enough to his yet, and creation currently fails on
+ * his account — the feature is parked, not abandoned. Everything else in
+ * this module (profile storage, the Voices client, the TTS wiring) stays
+ * in place and untouched; only the entry points gate on this flag.
+ * Restore = set it back to `true` (one line).
+ */
+export const MY_VOICE_PUBLIC = false;
+
+/** Whether the «صوتي» surfaces (settings section, listen voice toggle)
+ * are shown. All gating goes through this so both states are testable. */
+export function isMyVoicePublic(): boolean {
+  return MY_VOICE_PUBLIC;
+}
+
+/**
+ * The voice a listen session may actually speak in. While the feature is
+ * hidden, a «صوتي» choice resolves to the default voice: playback proceeds
+ * normally with the prebuilt voice — never down the replicated-voice path,
+ * never an error. `pub` is injectable so tests can exercise both states.
+ */
+export function effectiveListenVoice(
+  choice: "default" | "mine", pub: boolean = MY_VOICE_PUBLIC,
+): "default" | "mine" {
+  return pub ? choice : "default";
+}
+
 /** Reference-sample length window the Voices API accepts, in seconds. */
 export const MIN_SAMPLE_SECONDS = 10;
 export const MAX_SAMPLE_SECONDS = 30;

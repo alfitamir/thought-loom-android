@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getGeminiKey, setGeminiKey, testGeminiKey } from "@/lib/gemini";
 import { MyVoiceSection } from "@/components/my-voice-section";
+import { isMyVoicePublic } from "@/lib/my-voice";
 import { buildBackup, parseBackup, restoreBackup } from "@/lib/backup";
 import { lastDriveSync, syncDrive } from "@/lib/drive-sync";
 import { loadIdeas } from "@/lib/ideas";
@@ -98,7 +99,9 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         <p className="text-xs text-muted-foreground">تحصل على المفتاح من aistudio.google.com/apikey</p>
         {keyMsg && <p role="status" className="break-words text-sm text-muted-foreground">{keyMsg}</p>}
       </section>
-      <MyVoiceSection />
+      {/* «صوتي» is temporarily hidden (MY_VOICE_PUBLIC) — section and its
+          stored profile stay intact, just unrendered. */}
+      {isMyVoicePublic() && <MyVoiceSection />}
       <section className="space-y-3 border-t border-border pt-4">
         <div className="flex items-center gap-2">
           <CloudUpload className="size-5 text-primary" />

@@ -15,7 +15,7 @@ import { resolveEngine } from "@/lib/ai-engine";
 import { getGeminiKey } from "@/lib/gemini";
 import { blobToBytes, concatPcm, createTtsSession, GEMINI_TTS_VOICE, mapWithConcurrency, modelForVoiceKey, pcmToWav, speakWithDevice, splitForSpeech, synthesizeGeminiChunkWithModel, toSpeechText, type DeviceSpeech, type TtsEngine } from "@/lib/tts";
 import { audioFileName, deleteArticleAudioForVoice, findCachedAudioForVoice, getAudioChunk, getSongAudio, PCM_CHUNK_MIME, saveAudioChunk, saveAudioManifest, type ArticleAudioRecord, type ChunkedAudioManifest, type SongAudioRecord } from "@/lib/article-audio";
-import { getMyVoiceProfile } from "@/lib/my-voice";
+import { effectiveListenVoice, getMyVoiceProfile, isMyVoicePublic } from "@/lib/my-voice";
 import { deriveSongAudioState, songDurationLabel, songRecordedLabel } from "@/lib/songs";
 import { downloadSongAudio } from "@/lib/song-drive";
 import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
@@ -729,6 +729,9 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   // has its own cached generation per article — they never mix.
   const [voiceChoice, setVoiceChoice] = useState<"default" | "mine">("default");
   const [myVoiceId, setMyVoiceId] = useState("");
+  /** «صوتي» is temporarily hidden (MY_VOICE_PUBLIC): while off, the voice
+   * toggle is not rendered and every choice routes to the default voice. */
+  const myVoiceShown = isMyVoicePublic();
   /** The voice half of the cache voice key all cache operations apply to:
    * the prebuilt voice name, or the replicated voice id when «صوتي» is on. */
   const voicePartRef = useRef<string>(GEMINI_TTS_VOICE);
@@ -1094,12 +1097,15 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
   /** Switch the Gemini voice: each voice keeps its own cached generation,
    * so switching reloads the cache scoped to the newly picked voice. */
   const pickVoice = (next: "default" | "mine") => {
-    if (next === voiceChoice) return;
-    if (next === "mine" && !myVoiceId) return;
+    // Route through the feature gate: while «صوتي» is hidden, a "mine"
+    // choice collapses to the default voice instead of erroring.
+    const routed = effectiveListenVoice(next);
+    if (routed === voiceChoice) return;
+    if (routed === "mine" && !myVoiceId) return;
     genAbort.current?.abort();
     audioRef.current?.pause();
-    setVoiceChoice(next);
-    voicePartRef.current = next === "mine" ? myVoiceId : GEMINI_TTS_VOICE;
+    setVoiceChoice(routed);
+    voicePartRef.current = routed === "mine" ? myVoiceId : GEMINI_TTS_VOICE;
     setError(""); setStatus("");
     void loadCache();
   };
@@ -1150,7 +1156,7 @@ function ListenDialog({ open, onOpenChange, articleId, title, body }: {
 
         {engine === "gemini" && (
           <div className="space-y-3">
-            {hasKey && (
+            {hasKey && myVoiceShown && (
               <>
                 <div className="flex rounded-lg border border-border p-1 bg-muted/30">
                   <button type="button" onClick={() => pickVoice("default")}
