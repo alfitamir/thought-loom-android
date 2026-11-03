@@ -77,6 +77,8 @@ export const SUGGEST_INSTRUCTIONS = `أنت مساعد يرتب مقالات ك�
 
 export const TRANSCRIBE_INSTRUCTIONS = `فرّغ التسجيل الصوتي العربي حرفيًا كما قاله المتكلم، بلهجته وكلماته، مع ترقيم بسيط. لا تلخص ولا تحذف ولا تضف ولا تعلق، واحذف فقط أصوات التردد مثل «اممم». إن لم يكن في التسجيل كلام مفهوم فأخرج الكلمة: [صمت]. أخرج النص فقط.`;
 
+export const SONG_TRANSCRIBE_INSTRUCTIONS = `هذا التسجيل أغنية عربية يغنّيها صاحبها بصوته (قد تكون بالفصحى أو بلهجة عربية). فرّغ الكلمات المغناة فقط، كما غُنّيت تمامًا وبكلماتها ولهجتها، سطرًا واحدًا لكل عبارة مغناة. لا تلخص ولا تحذف ولا تضف ولا تعلق، ولا تكتب أي وصف للموسيقى أو الأداء أو توجيهات مسرحية، ولا تخترع علامات ترقيم إلا ما يعين على القراءة. إن لم يكن في التسجيل غناء مفهوم فأخرج الكلمة: [صمت]. أخرج الكلمات فقط.`;
+
 export type AiTask = "improve" | "clean" | "merge" | "suggest" | "ask" | "classify" | "insights" | "evidence" | "enrich" | "facebook";
 // TASK_INSTRUCTIONS is assembled at the end of this file, after the ported Afkari sections define their instructions.
 
