@@ -35,12 +35,11 @@ export function memoryVoiceStore(): VoiceStore {
   };
 }
 
-const DB = "afkari-voice";
 const req = <T,>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 
-function openDb(): Promise<IDBDatabase> {
+function openDb(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const r = indexedDB.open(DB, 1);
+    const r = indexedDB.open(name, 1);
     r.onupgradeneeded = () => {
       const db = r.result;
       db.createObjectStore("segments", { keyPath: "id" });
@@ -52,9 +51,9 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-export function indexedDbVoiceStore(): VoiceStore {
+export function indexedDbVoiceStore(dbName = "afkari-voice"): VoiceStore {
   let dbp: Promise<IDBDatabase> | null = null;
-  const db = () => (dbp ??= openDb());
+  const db = () => (dbp ??= openDb(dbName));
   const tx = async (stores: string[], mode: IDBTransactionMode) => (await db()).transaction(stores, mode);
   const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
   return {
@@ -90,3 +89,13 @@ export function indexedDbVoiceStore(): VoiceStore {
 let shared: VoiceStore | null = null;
 export const voiceStore = (): VoiceStore =>
   (shared ??= typeof indexedDB !== "undefined" ? indexedDbVoiceStore() : memoryVoiceStore());
+
+/**
+ * Song recordings get their OWN store (a separate database): the idea
+ * pipeline's resume pass transcribes everything it finds in `voiceStore()`,
+ * and a song must never be transcribed — its segments are assembled into
+ * one audio file instead.
+ */
+let sharedSong: VoiceStore | null = null;
+export const songVoiceStore = (): VoiceStore =>
+  (sharedSong ??= typeof indexedDB !== "undefined" ? indexedDbVoiceStore("afkari-voice-songs") : memoryVoiceStore());
