@@ -16,7 +16,6 @@ import { formatElapsed, joinTranscript, transcribeFinished } from "@/lib/voice-s
 import { ArchiveCard } from "@/components/archive-card";
 import { recoverPendingSongs, saveRecordedSong } from "@/lib/songs";
 import { syncSongAudio } from "@/lib/song-drive";
-import { autoExtractSongLyrics } from "@/lib/song-lyrics";
 
 export const Route = createFileRoute("/")({
   // `?record=<nonce>` is the bottom navigation's "open the recorder" signal:
@@ -73,10 +72,16 @@ function Index() {
   // this session is created medical. Song mode is unaffected — a song is
   // never a medical article, whatever context the form was opened in.
   const [medicalCtx, setMedicalCtx] = useState(false);
-  // The home door to the medical section, with its article count.
+  // The home doors to the medical section and the songs section, with
+  // their counts — each section is a world of its own off this screen.
   const [medicalCount, setMedicalCount] = useState(() => partitionIdeas(loadVisibleIdeas()).medical.length);
+  const [songsCount, setSongsCount] = useState(() => partitionIdeas(loadVisibleIdeas()).songs.length);
   useEffect(() => {
-    const recount = () => setMedicalCount(partitionIdeas(loadVisibleIdeas()).medical.length);
+    const recount = () => {
+      const parts = partitionIdeas(loadVisibleIdeas());
+      setMedicalCount(parts.medical.length);
+      setSongsCount(parts.songs.length);
+    };
     recount();
     window.addEventListener("afkari:ideas-changed", recount);
     window.addEventListener("storage", recount);
@@ -186,10 +191,8 @@ function Index() {
           made.forEach((idea) => pushIdea(idea));
           void syncSongAudio().catch(() => {});
           setMsg("تمت استعادة أغنية مسجلة على هاتفك ✓");
-          // A recovered song is a saved song: same background lyrics pass.
-          made.forEach((idea) => {
-            void autoExtractSongLyrics(idea.id).then((updated) => { if (updated) pushIdea(updated); });
-          });
+          // No lyrics pass here: words are extracted only when he asks,
+          // from the song's own editor button.
         }
       } catch {
         songResumedRef.current = false; // audio stays on the phone; retried on the next open
@@ -260,8 +263,9 @@ function Index() {
   // After stop in song mode: assemble the session into one audio file and
   // save it as a song. The recording itself is the result; if assembly
   // fails the segments stay in the song store and the recovery pass above
-  // saves the song on a later open. Only afterwards, and only with his own
-  // Gemini key, a background pass writes the sung words onto the song.
+  // saves the song on a later open. Nothing transcribes it — the sung
+  // words are written onto the song only when he asks, from the song's
+  // own editor button in «الأغاني».
   const finishSong = async (session: string, durationSeconds: number) => {
     if (!session) return;
     try {
@@ -271,11 +275,7 @@ function Index() {
         pushIdea(idea);
         void syncSongAudio().catch(() => {});
         setOpen(false);
-        setMsg("حُفظت أغنيتك بصوتك ✓ — ستجدها في المكتبة، ويمكنك إضافة كلماتها من هناك");
-        // Background bonus: with his own Gemini key configured, the sung
-        // words are written onto the song on their own (still-empty lyrics
-        // only). Silent on any failure — the editor button covers it.
-        void autoExtractSongLyrics(idea.id).then((updated) => { if (updated) pushIdea(updated); });
+        setMsg("حُفظت أغنيتك بصوتك ✓ — ستجدها في قسم الأغاني، ويمكنك إضافة كلماتها من هناك");
       } else {
         setMsg("لم يُحفظ من التسجيل شيء.");
       }
@@ -472,6 +472,18 @@ function Index() {
           <span className="min-w-0 flex-1">
             <span className="block font-display text-lg text-foreground">القسم الطبي</span>
             <span className="block text-sm text-muted-foreground">{medicalCount > 0 ? `${medicalCount} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل` : "قسم مستقل لمقالاتك الطبية"}</span>
+          </span>
+          <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
+      {/* The songs door: songs live in their own section now, never in the
+          article library — this card appears once a first song exists. */}
+      {!open && songsCount > 0 && (
+        <Link to="/songs" className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-start shadow-sm transition-colors hover:bg-accent">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Music className="size-6" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-lg text-foreground">الأغاني</span>
+            <span className="block text-sm text-muted-foreground">{`${songsCount} ${songsCount === 1 ? "أغنية مسجلة" : "أغاني مسجلة"} في قسم مستقل`}</span>
           </span>
           <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
         </Link>

@@ -2,7 +2,11 @@
 // in this device's IndexedDB (article-audio's `songs` store); this module
 // uploads a copy of each recording to the «أفكاري — الأغاني» folder in the
 // app owner's Google Drive — a regular, visible My Drive folder, not
-// appData — and stamps the idea with the file's id (`driveFileId`) through
+// appData. The copy is the recording's MP3 export (song-export.ts), never
+// the WebM master, so the file plays everywhere — WhatsApp included —
+// straight from the folder; copies uploaded before the MP3 switch stay
+// as they are and are adopted, not migrated. The pass stamps the idea
+// with the file's id (`driveFileId`) through
 // the normal idea write path, so every serializer carries it like the
 // topic pin and the song flag do. Other devices see the id, and download
 // the recording into their own store only when the user asks to play it.
@@ -16,6 +20,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { saveSongAudio, songAudioStore, type SongAudioRecord, type SongAudioStore } from "./article-audio";
 import { getArticle, loadIdeas, replaceIdeas, type Idea } from "./ideas";
+import { getSongMp3, SONG_MP3_MIME } from "./song-export";
 
 /** The Drive operations the sync pass needs; tests inject a fake. */
 export interface SongDriveClient {
@@ -116,6 +121,12 @@ export interface SongDriveDeps {
   ideas: Idea[];
   audioStore: SongAudioStore;
   client: SongDriveClient;
+  /** The recording's MP3 export (song-export.ts): the Drive copy is
+   *  always MP3, so it plays everywhere — WhatsApp included — straight
+   *  from the folder. A null result (conversion impossible right now)
+   *  skips the upload for this pass; the raw WebM master is never
+   *  uploaded as the Drive copy, and the next pass retries. */
+  toMp3: (rec: SongAudioRecord) => Promise<Blob | null>;
 }
 
 /**
@@ -143,13 +154,17 @@ export async function runSongAudioPass(deps: SongDriveDeps): Promise<number> {
     const rec = local.get(idea.id);
     if (!rec) continue;
     try {
-      const fileId = (await deps.client.findSongFile(idea.id))
-        ?? (await deps.client.uploadSong({
+      let fileId = await deps.client.findSongFile(idea.id);
+      if (!fileId) {
+        const mp3 = await deps.toMp3(rec);
+        if (!mp3) continue; // no MP3, no upload — retried by the next pass
+        fileId = await deps.client.uploadSong({
           songId: idea.id,
-          name: songDriveFileName(idea, rec.mime),
-          blob: rec.blob,
-          mime: rec.mime,
-        }));
+          name: songDriveFileName(idea, SONG_MP3_MIME),
+          blob: mp3,
+          mime: SONG_MP3_MIME,
+        });
+      }
       idea.driveFileId = fileId;
       replaceIdeas(ideas);
       if (typeof window !== "undefined") window.dispatchEvent(new Event("afkari:ideas-changed"));
@@ -186,6 +201,7 @@ async function run(): Promise<number> {
     ideas: loadIdeas(),
     audioStore: songAudioStore(),
     client: serverSongDriveClient(),
+    toMp3: (rec) => getSongMp3(rec),
   }).catch(() => 0);
 }
 

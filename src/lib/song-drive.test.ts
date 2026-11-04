@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSongAudio, memorySongAudioStore, saveSongAudio } from "./article-audio";
 import { buildBackup, parseBackup } from "./backup";
 import { createSongDriveOps, SONGS_FOLDER_NAME, type DriveFetch } from "./drive-song.server";
@@ -26,11 +26,11 @@ function fakeClient(behavior: {
   failUploads?: boolean;
   failDeletes?: boolean;
 } = {}) {
-  const calls = { find: [] as string[], upload: [] as { songId: string; name: string }[], download: [] as string[], remove: [] as string[] };
+  const calls = { find: [] as string[], upload: [] as { songId: string; name: string; mime: string }[], download: [] as string[], remove: [] as string[] };
   const client: SongDriveClient = {
     async findSongFile(songId) { calls.find.push(songId); return behavior.existing?.[songId] ?? null; },
     async uploadSong(input) {
-      calls.upload.push({ songId: input.songId, name: input.name });
+      calls.upload.push({ songId: input.songId, name: input.name, mime: input.mime });
       if (behavior.failUploads) throw new Error("drive busy");
       return `drive-${input.songId}`;
     },
@@ -48,6 +48,9 @@ const seedAudio = async (store = memorySongAudioStore(), id = "song-1") => {
   return store;
 };
 
+/** The pass's MP3 converter double: hands back an MP3-typed blob. */
+const fakeToMp3 = async (rec: { blob: Blob }) => new Blob([rec.blob], { type: "audio/mpeg" });
+
 describe("runSongAudioPass", () => {
   beforeEach(() => localStorage.clear());
 
@@ -62,10 +65,13 @@ describe("runSongAudioPass", () => {
       { id: "plain", text: "فكرة", createdAt: 5 },                   // not a song
     ];
     replaceIdeas(ideas);
-    const gained = await runSongAudioPass({ ideas, audioStore: store, client });
+    const gained = await runSongAudioPass({ ideas, audioStore: store, client, toMp3: fakeToMp3 });
     expect(gained).toBe(1);
     expect(calls.upload.map((u) => u.songId)).toEqual(["song-1"]);
-    expect(calls.upload[0]?.name).toBe(songDriveFileName(songIdea(), "audio/webm"));
+    // The Drive copy is the MP3 export, never the WebM master.
+    expect(calls.upload[0]?.name).toBe(songDriveFileName(songIdea(), "audio/mpeg"));
+    expect(calls.upload[0]?.name.endsWith(".mp3")).toBe(true);
+    expect(calls.upload[0]?.mime).toBe("audio/mpeg");
     // The id is stamped on the idea in local storage, the normal write path.
     expect(loadIdeas().find((i) => i.id === "song-1")?.driveFileId).toBe("drive-song-1");
   });
@@ -75,9 +81,13 @@ describe("runSongAudioPass", () => {
     const { client, calls } = fakeClient({ existing: { "song-1": "found-in-drive" } });
     const ideas = [songIdea()];
     replaceIdeas(ideas);
-    const gained = await runSongAudioPass({ ideas, audioStore: store, client });
+    const toMp3 = vi.fn(fakeToMp3);
+    const gained = await runSongAudioPass({ ideas, audioStore: store, client, toMp3 });
     expect(gained).toBe(1);
     expect(calls.upload).toEqual([]);
+    // Adoption never converts: the existing copy (possibly a pre-MP3
+    // WebM one) is taken as it is, not migrated.
+    expect(toMp3).not.toHaveBeenCalled();
     expect(loadIdeas()[0]?.driveFileId).toBe("found-in-drive");
   });
 
@@ -86,21 +96,34 @@ describe("runSongAudioPass", () => {
     const { client } = fakeClient({ failUploads: true });
     const ideas = [songIdea()];
     replaceIdeas(ideas);
-    expect(await runSongAudioPass({ ideas, audioStore: store, client })).toBe(0);
+    expect(await runSongAudioPass({ ideas, audioStore: store, client, toMp3: fakeToMp3 })).toBe(0);
     expect(loadIdeas()[0]?.driveFileId).toBeUndefined();
+  });
+
+  it("skips the upload when the recording cannot be converted to MP3 — the raw master never becomes the Drive copy", async () => {
+    const store = await seedAudio();
+    const { client, calls } = fakeClient();
+    const ideas = [songIdea()];
+    replaceIdeas(ideas);
+    expect(await runSongAudioPass({ ideas, audioStore: store, client, toMp3: async () => null })).toBe(0);
+    expect(calls.upload).toEqual([]);
+    expect(loadIdeas()[0]?.driveFileId).toBeUndefined();
+    // And the next pass, with conversion working again, lands the copy.
+    expect(await runSongAudioPass({ ideas, audioStore: store, client, toMp3: fakeToMp3 })).toBe(1);
+    expect(calls.upload[0]?.mime).toBe("audio/mpeg");
   });
 
   it("retries tombstoned Drive deletions and clears only the ones that succeed", async () => {
     queueSongDriveDelete("dead-1");
     queueSongDriveDelete("dead-2");
     const ok = fakeClient();
-    await runSongAudioPass({ ideas: [], audioStore: memorySongAudioStore(), client: ok.client });
+    await runSongAudioPass({ ideas: [], audioStore: memorySongAudioStore(), client: ok.client, toMp3: fakeToMp3 });
     expect(ok.calls.remove.sort()).toEqual(["dead-1", "dead-2"]);
     expect(loadSongDriveTombstones()).toEqual([]);
 
     queueSongDriveDelete("dead-3");
     const failing = fakeClient({ failDeletes: true });
-    await runSongAudioPass({ ideas: [], audioStore: memorySongAudioStore(), client: failing.client });
+    await runSongAudioPass({ ideas: [], audioStore: memorySongAudioStore(), client: failing.client, toMp3: fakeToMp3 });
     expect(loadSongDriveTombstones()).toEqual(["dead-3"]);
   });
 });

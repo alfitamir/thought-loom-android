@@ -19,6 +19,7 @@ import { audioFileName, deleteArticleAudioForVoice, findCachedAudioForVoice, get
 import { effectiveListenVoice, getMyVoiceProfile, isMyVoicePublic } from "@/lib/my-voice";
 import { deriveSongAudioState, songDurationLabel, songRecordedLabel } from "@/lib/songs";
 import { downloadSongAudio } from "@/lib/song-drive";
+import { getSongMp3, songMp3FileName, SONG_MP3_MIME } from "@/lib/song-export";
 import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
 import { deliverCardImage, renderShareCardPng, shareCardModel } from "@/lib/share-card";
 import { composeXPost, xCharCount, X_POST_LIMIT } from "@/lib/x-post";
@@ -800,18 +801,17 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
 }
 
 /**
- * A song in the library: the recording IS the content. On the device that
- * recorded it there is a native player and a share button for the real
- * A song in the library: the recording IS the content. On the device that
- * recorded it there is a native player and a share button for the real
- * audio file; on any other device the recording waits in the «أفكاري —
- * الأغاني» folder on Google Drive and one tap downloads it into this
- * device's store and plays it — only when no Drive copy exists either
- * does a calm note say the recording lives on the device that made it.
+ * A song: the recording IS the content. On the device that recorded it
+ * there is a native player and a share button for the recording (shared
+ * as its MP3 export — the WebM master never leaves the app); on any
+ * other device the recording waits in the «أفكاري — الأغاني» folder on
+ * Google Drive and one tap downloads it into this device's store and
+ * plays it — only when no Drive copy exists either does a calm note say
+ * the recording lives on the device that made it.
  * No smart tools and no «استمع»: the voice is already the author's own.
- * The one deliberate AI touch is lyrics extraction (here and as a
- * background post-save pass): the sung words written onto the song,
- * never a rewrite. The lyrics are the idea's text, edited plainly.
+ * The one deliberate AI touch is lyrics extraction, and it happens here
+ * only, when he presses the button: the sung words written onto the
+ * song, never a rewrite. The lyrics are the idea's text, edited plainly.
  */
 function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart, currentMatchIndex }: {
   idea: Idea; onChange: () => void; onDeleteRequest: () => void;
@@ -830,13 +830,14 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
   const [title, setTitle] = useState("");
   const [lyrics, setLyrics] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [extracting, setExtracting] = useState(() => isSongLyricsPending(idea.id));
   const [preview, setPreview] = useState<string | null>(null);
   const state = deriveSongAudioState(record, !!idea.driveFileId);
   const recordedLabel = songRecordedLabel(idea);
 
-  // The background post-save pass also extracts: mirror the shared pending
-  // registry so its run shows here (and its finish re-renders the lyrics).
+  // Mirror the shared pending registry so a running extraction shows
+  // here (and its finish re-renders the lyrics).
   useEffect(() => onSongLyricsPendingChange(() => setExtracting(isSongLyricsPending(idea.id))), [idea.id]);
 
   /** Pull the Drive copy into this device's store; the player takes over. */
@@ -902,25 +903,40 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
     return () => { alive = false; if (objUrl) URL.revokeObjectURL(objUrl); };
   }, [idea.id]);
 
-  /** Share the real recording file, exactly like generated article audio:
-   *  the system share sheet when files are shareable, a download otherwise. */
+  /** Share the recording as a file — always its MP3 export (song-export
+   *  .ts), never the WebM master: WhatsApp refuses WebM audio outright.
+   *  The system share sheet when files are shareable, a download
+   *  otherwise, exactly like generated article audio. If this one
+   *  recording cannot be converted, the master goes out instead and the
+   *  status says so plainly — never a silent swap. */
   const shareSong = async () => {
-    if (!record) return;
+    if (!record || sharing) return;
     setStatus("");
-    const file = new File([record.blob], audioFileName(article.title, record.mime), { type: record.mime });
-    let canFiles = false;
-    try { canFiles = !!navigator.canShare?.({ files: [file] }); } catch { canFiles = false; }
-    if (canFiles) {
-      try { await navigator.share({ files: [file], title: article.title }); return; }
-      catch (e) { if (e instanceof Error && e.name === "AbortError") return; }
+    setSharing(true);
+    try {
+      const mp3 = await getSongMp3(record);
+      const file = mp3
+        ? new File([mp3], songMp3FileName(article.title), { type: SONG_MP3_MIME })
+        : new File([record.blob], audioFileName(article.title, record.mime), { type: record.mime });
+      let canFiles = false;
+      try { canFiles = !!navigator.canShare?.({ files: [file] }); } catch { canFiles = false; }
+      if (canFiles) {
+        try {
+          await navigator.share({ files: [file], title: article.title });
+          if (!mp3) setStatus("تعذّر تحويل الأغنية إلى MP3 هذه المرة — شاركنا التسجيل الأصلي كما هو.");
+          return;
+        } catch (e) { if (e instanceof Error && e.name === "AbortError") return; }
+      }
+      const objUrl = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = file.name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+      setStatus(mp3 ? "نُزّل ملف الأغنية ✓" : "تعذّر تحويل الأغنية إلى MP3 هذه المرة — نُزّل التسجيل الأصلي كما هو.");
+    } finally {
+      setSharing(false);
     }
-    const objUrl = URL.createObjectURL(record.blob);
-    const a = document.createElement("a");
-    a.href = objUrl;
-    a.download = file.name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
-    setStatus("نُزّل ملف الأغنية ✓");
   };
 
   /** «مشاركة كصورة» for a song: the branded card (title + «أغنية» chip
@@ -970,7 +986,7 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
         the article header got): no scrolling past the lyrics to share. */}
     <div className="flex flex-wrap items-center gap-2">
       {state === "ready" && (
-        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الصوت" title="مشاركة الصوت" onClick={() => void shareSong()}><Share2 /></Button>
+        <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الصوت" title="مشاركة الصوت" disabled={sharing} onClick={() => void shareSong()}><Share2 /></Button>
       )}
       <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة الأغنية كصورة" title="مشاركة الأغنية كصورة" onClick={() => void shareImage()}><ImageDown /></Button>
     </div>

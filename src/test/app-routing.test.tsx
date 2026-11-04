@@ -24,6 +24,15 @@ describe("App routing", () => {
     expect(matches.at(-1)?.routeId).toBe("/medical");
   });
 
+  it("matches a page for /songs instead of falling back to not found", () => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+
+    const matches = router.matchRoutes("/songs");
+
+    expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
+    expect(matches.at(-1)?.routeId).toBe("/songs");
+  });
+
   it("parses the medical-section context on / and ignores junk values", () => {
     const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
 

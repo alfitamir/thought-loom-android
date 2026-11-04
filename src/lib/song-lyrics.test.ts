@@ -1,11 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { memorySongAudioStore, saveSongAudio, type SongAudioStore } from "./article-audio";
 import { buildSongIdea, loadIdeas, replaceIdeas } from "./ideas";
+import * as songLyrics from "./song-lyrics";
 import {
-  applySongLyrics, autoExtractSongLyrics, decideLyricsApplication, isSongLyricsPending,
+  applySongLyrics, decideLyricsApplication, isSongLyricsPending,
   transcribeSong, type TranscribeSongFn,
 } from "./song-lyrics";
+import { recoverPendingSongs, saveRecordedSong } from "./songs";
 import { cleanSongLyrics, transcribeSongAudio } from "./transcribe";
+import { memoryVoiceStore, type VoiceStore } from "./voice-store";
+
+// The song transcription transport is spied (the real one still runs
+// where a test calls it directly): the on-request-only suite below
+// asserts that saving a song NEVER reaches it.
+vi.mock("./transcribe", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./transcribe")>();
+  return { ...actual, transcribeSongAudio: vi.fn(actual.transcribeSongAudio) };
+});
 
 const ENGINE = { kind: "gemini", key: "K" } as const;
 
@@ -111,50 +122,53 @@ describe("transcribeSong", () => {
   });
 });
 
-describe("autoExtractSongLyrics", () => {
-  beforeEach(() => localStorage.clear());
+describe("lyrics are extracted on request only (owner's rule)", () => {
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
 
-  it("does nothing at all without a Gemini key", async () => {
-    const { id, audio } = await seedSong("");
-    const transcribe = vi.fn<TranscribeSongFn>(async () => "كلمات");
-    expect(await autoExtractSongLyrics(id, { key: "", audioStore: audio, transcribe })).toBeNull();
-    expect(transcribe).not.toHaveBeenCalled();
-    expect(lyricsOf(id)).toBe("");
+  it("the module exposes no automatic extraction entry point at all", () => {
+    expect("autoExtractSongLyrics" in songLyrics).toBe(false);
   });
 
-  it("with a key, fills a fresh song's empty lyrics in the background", async () => {
+  /** Seed one recording session into a voice store, as the recorder left it. */
+  const seedSession = async (store: VoiceStore, session: string, parts: string[]) => {
+    for (let i = 0; i < parts.length; i++) {
+      const id = `${session}-seg-${i}`;
+      await store.addSegment({ id, session, seq: i, mime: "audio/webm", createdAt: 1_700_000_000_000 + i * 60_000 });
+      await store.appendChunk(id, new Blob([parts[i] ?? ""], { type: "audio/webm" }));
+    }
+  };
+
+  it("saving a song with a personal Gemini key present triggers NO extraction call", async () => {
+    // The old automatic pass fired in exactly this situation: a fresh
+    // song saved while his own key was configured.
+    localStorage.setItem("afkari.geminiKey", "K");
+    const voice = memoryVoiceStore();
+    const audio = memorySongAudioStore();
+    await seedSession(voice, "s1", ["hello ", "world"]);
+    const idea = await saveRecordedSong({ store: voice, session: "s1", durationSeconds: 30, audioStore: audio });
+    expect(idea?.song).toBe(true);
+    expect(vi.mocked(transcribeSongAudio)).not.toHaveBeenCalled();
+    expect(idea?.text).toBe("");
+    expect(isSongLyricsPending(idea?.id ?? "")).toBe(false);
+  });
+
+  it("recovering an interrupted song save triggers NO extraction call either", async () => {
+    localStorage.setItem("afkari.geminiKey", "K");
+    const voice = memoryVoiceStore();
+    const audio = memorySongAudioStore();
+    await seedSession(voice, "s2", ["sung words"]);
+    const made = await recoverPendingSongs({ store: voice, audioStore: audio });
+    expect(made).toHaveLength(1);
+    expect(vi.mocked(transcribeSongAudio)).not.toHaveBeenCalled();
+    expect(made[0]?.text).toBe("");
+  });
+
+  it("the manual path still works end-to-end: the editor's request fills empty lyrics", async () => {
     const { id, audio } = await seedSong("");
-    const updated = await autoExtractSongLyrics(id, {
-      key: "K", audioStore: audio, transcribe: async () => "غنّيتها\nمن قلبي",
-    });
+    const text = await transcribeSong(id, { audioStore: audio, engine: ENGINE, transcribe: async () => "غنّيتها\nمن قلبي" });
+    const updated = applySongLyrics(id, text, "fill-if-empty");
     expect(updated?.text).toBe("غنّيتها\nمن قلبي");
     expect(lyricsOf(id)).toBe("غنّيتها\nمن قلبي");
-    expect(isSongLyricsPending(id)).toBe(false);
-  });
-
-  it("never overwrites lyrics typed while extraction was running", async () => {
-    const { id, audio } = await seedSong("");
-    const transcribe: TranscribeSongFn = async () => {
-      // The user writes the words himself mid-extraction — his text wins.
-      applySongLyrics(id, "كتبتها بنفسي أثناء الاستخراج", "replace");
-      return "كلمات مستخرجة";
-    };
-    expect(await autoExtractSongLyrics(id, { key: "K", audioStore: audio, transcribe })).toBeNull();
-    expect(lyricsOf(id)).toBe("كتبتها بنفسي أثناء الاستخراج");
-  });
-
-  it("stays silent on failure: no lyrics, no throw, pending cleared", async () => {
-    const { id, audio } = await seedSong("");
-    const transcribe: TranscribeSongFn = async () => { throw new Error("quota"); };
-    expect(await autoExtractSongLyrics(id, { key: "K", audioStore: audio, transcribe })).toBeNull();
-    expect(lyricsOf(id)).toBe("");
-    expect(isSongLyricsPending(id)).toBe(false);
-  });
-
-  it("an extraction with no words fills nothing", async () => {
-    const { id, audio } = await seedSong("");
-    expect(await autoExtractSongLyrics(id, { key: "K", audioStore: audio, transcribe: async () => "" })).toBeNull();
-    expect(lyricsOf(id)).toBe("");
   });
 });
 
