@@ -69,7 +69,9 @@ export function pickArchiveIdea(ideas: Idea[], now = Date.now(), offset = 0): Id
 }
 
 const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-const arabicNumber = (n: number): string => String(n).replace(/\d/g, (d) => AR_DIGITS.charAt(Number(d)));
+/** A number in Arabic-Indic digits — the app's display convention for
+ *  counts (shared with the stats section). */
+export const arabicNumber = (n: number): string => String(n).replace(/\d/g, (d) => AR_DIGITS.charAt(Number(d)));
 
 /**
  * The warm age line on the card, e.g. «منذ ٣ شهور». Months are 30-day

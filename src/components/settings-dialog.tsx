@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getGeminiKey, setGeminiKey, testGeminiKey } from "@/lib/gemini";
 import { THEME_MODES, useTheme, type ThemeMode } from "@/lib/theme";
 import { MyVoiceSection } from "@/components/my-voice-section";
+import { StatsSection } from "@/components/stats-section";
 import { isMyVoicePublic } from "@/lib/my-voice";
 import { buildBackup, parseBackup, restoreBackup } from "@/lib/backup";
 import { lastDriveSync, syncDrive } from "@/lib/drive-sync";
@@ -100,6 +101,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           })}
         </div>
       </section>
+      <StatsSection />
       <section className="space-y-3 border-t border-border pt-4">
         <div className="flex items-center gap-2">
           <KeyRound className="size-5 text-primary" />
