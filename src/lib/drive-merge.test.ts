@@ -36,6 +36,14 @@ describe("Google Drive backup merge", () => {
     const back = parseDriveFile(buildDriveFile({ ideas: [pinned], deleted: [] }));
     expect(back.ideas[0]).toMatchObject({ pinned: true });
   });
+  it("round-trips version history through the Drive file", () => {
+    const withVersions: Idea = {
+      ...idea("a"),
+      versions: [{ at: 7, text: "نص مجمّد قبل التحسين", title: "عنوان قديم", source: "improve" }],
+    };
+    const back = parseDriveFile(buildDriveFile({ ideas: [withVersions], deleted: [] }));
+    expect(back.ideas[0]?.versions).toEqual(withVersions.versions);
+  });
   it("round-trips medical section membership through the Drive file", () => {
     const medical: Idea = { ...idea("a"), medical: true };
     const back = parseDriveFile(buildDriveFile({ ideas: [medical], deleted: [] }));
