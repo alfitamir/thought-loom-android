@@ -69,18 +69,96 @@ export function splitChunks(body: string, maxWords = 1500): string[] {
 
 export const INCOMPLETE = "النسخة المقترحة ناقصة، لم نغير مقالك.";
 
-const norm = (w: string) => w.replace(/[أإآ]/g, "ا").replace(/^(ال|و|ف|ب)/, "");
+/**
+ * Thrown when an AI merge proposal dropped source content. Carries the parsed
+ * proposal and the exact source units that are missing from it, so the UI can
+ * show the owner precisely what would be lost and let HIM decide — the merge
+ * is never applied silently in this state.
+ */
+export class MergeIncompleteError extends Error {
+  proposal: { title: string; body: string };
+  missing: string[];
+  constructor(proposal: { title: string; body: string }, missing: string[]) {
+    super(INCOMPLETE);
+    this.name = "MergeIncompleteError";
+    this.proposal = proposal;
+    this.missing = missing;
+  }
+}
 
-/** A merged article must keep most words of every source and each source's ending. */
+/**
+ * Normalize text for COMPARISON ONLY (never for storage): unify Arabic letter
+ * variants (hamza forms, ة/ه, ى/ي, ؤ/و, ئ/ي), drop diacritics and tatweel,
+ * strip markdown markers, and turn punctuation into spaces — so a line that
+ * survives with light rewording or different spelling conventions still
+ * counts as present, while a genuinely absent line still fails.
+ */
+export const normalizeForCompare = (s: string): string => s
+  .replace(/[\u064B-\u065F\u0670]/g, "")
+  .replace(/\u0640/g, "")
+  .replace(/[أإآٱ]/g, "ا")
+  .replace(/ة/g, "ه")
+  .replace(/ى/g, "ي")
+  .replace(/ؤ/g, "و")
+  .replace(/ئ/g, "ي")
+  .replace(/ء/g, "")
+  .replace(/[*_#`>]/g, " ")
+  .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const compareTokens = (s: string): string[] => normalizeForCompare(s).split(" ").filter((w) => w.length > 1);
+
+/**
+ * Split a body into the units the merge guard checks: paragraphs first, then
+ * sentences inside each paragraph. A unit is checked only when it carries
+ * real content (3+ tokens) — tiny fragments are ignored so they can neither
+ * fail a good merge nor hide inside a bad one. Returns the ORIGINAL texts.
+ */
+export function mergeUnits(body: string): string[] {
+  const units: string[] = [];
+  for (const para of body.split(/\n+/)) {
+    for (const piece of para.split(/(?<=[.!؟…])\s+/)) {
+      const unit = piece.trim();
+      if (unit && compareTokens(unit).length >= 3) units.push(unit);
+    }
+  }
+  return units;
+}
+
+/**
+ * The source units (sentences/paragraph lines, in order, de-duplicated) that
+ * do NOT survive in the merge output. A unit survives when its normalized
+ * form appears in the normalized output, or when (nearly) all of its tokens
+ * are present there — light rephrasing passes, a dropped sentence does not.
+ */
+export function missingMergeLines(sources: string[], output: string): string[] {
+  const outText = normalizeForCompare(output);
+  const outCounts = new Map<string, number>();
+  for (const t of compareTokens(output)) outCounts.set(t, (outCounts.get(t) ?? 0) + 1);
+  const missing: string[] = [];
+  const seen = new Set<string>();
+  for (const source of sources) {
+    for (const unit of mergeUnits(source)) {
+      const key = normalizeForCompare(unit);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (outText.includes(key)) continue;
+      const needed = compareTokens(unit);
+      const tally = new Map<string, number>();
+      for (const t of needed) tally.set(t, (tally.get(t) ?? 0) + 1);
+      let matched = 0;
+      for (const [t, n] of tally) matched += Math.min(n, outCounts.get(t) ?? 0);
+      const ratio = needed.length ? matched / needed.length : 1;
+      if (needed.length <= 3 ? ratio < 1 : ratio < 0.8) missing.push(unit);
+    }
+  }
+  return missing;
+}
+
+/** A merged article is complete only when NO checkable source unit is missing. */
 export function isMergeComplete(sources: string[], output: string): boolean {
-  const out = new Set(words(output).map(norm));
-  return sources.every((source) => {
-    const src = [...new Set(words(source).filter((w) => w.length > 2).map(norm))];
-    if (!src.length) return true;
-    if (src.filter((w) => out.has(w)).length < src.length * 0.7) return false;
-    const tail = words(source).slice(-6).filter((w) => w.length > 2).map(norm);
-    return !tail.length || tail.filter((w) => out.has(w)).length >= Math.ceil(tail.length / 2);
-  });
+  return missingMergeLines(sources, output).length === 0;
 }
 
 export type Engine = { kind: "gemini"; key: string } | { kind: "cloud"; token: string };
