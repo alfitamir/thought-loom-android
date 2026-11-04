@@ -1,5 +1,5 @@
 import { getArticle, type Idea } from "./ideas";
-import { INCOMPLETE, isMergeComplete, parseImprovedArticle, runAi, type Engine } from "./article-ai";
+import { MergeIncompleteError, missingMergeLines, parseImprovedArticle, runAi, type Engine } from "./article-ai";
 import { MERGE_SUGGEST_SCHEMA } from "./ai-prompts";
 
 export type MergeSuggestion = { ids: string[]; title: string; reason: string; thesis?: string; strength?: number };
@@ -94,6 +94,7 @@ export async function mergeArticles(
 ): Promise<{ title: string; body: string }> {
   const text = await runAi(engine, "merge", JSON.stringify(sources), signal, onText);
   const out = parseImprovedArticle(text);
-  if (!isMergeComplete(sources.map((s) => s.body), out.body)) throw new Error(INCOMPLETE);
+  const missing = missingMergeLines(sources.map((s) => s.body), out.body);
+  if (missing.length) throw new MergeIncompleteError(out, missing);
   return out;
 }
