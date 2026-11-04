@@ -20,7 +20,7 @@ import { LikedDialog } from "@/components/liked-dialog";
 import { AskDialog } from "@/components/ask-dialog";
 import { InsightsDialog } from "@/components/insights-dialog";
 import { labelAll, labelFor, loadLabels, unlabeled } from "@/lib/ai-labels";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronUp, Feather, Heart, Lightbulb, ListChecks, MessageCircleQuestion, MoreHorizontal, Search, Sparkles, Square, Stethoscope, Tags, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronUp, Feather, Heart, Lightbulb, ListChecks, MessageCircleQuestion, MoreHorizontal, Music, Search, Sparkles, Square, Stethoscope, Tags, X } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
 
 export const Route = createFileRoute("/library")({
@@ -39,10 +39,12 @@ export const Route = createFileRoute("/library")({
 
 export function Library() {
   // This surface is the MAIN partition only: medical articles live in the
-  // «القسم الطبي» and never appear here — not in the list, the groups,
-  // the counts, the search, or any bulk operation launched from here.
+  // «القسم الطبي» and songs in «الأغاني», and neither ever appears here —
+  // not in the list, the groups, the counts, the search, or any bulk
+  // operation launched from here.
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [medicalCount, setMedicalCount] = useState(0);
+  const [songsCount, setSongsCount] = useState(0);
   const [openTopic, setOpenTopic] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -80,6 +82,7 @@ export function Library() {
     const parts = partitionIdeas(loadVisibleIdeas());
     setIdeas(parts.main);
     setMedicalCount(parts.medical.length);
+    setSongsCount(parts.songs.length);
     setLabels(loadLabels());
   };
   /** Delete is undoable: the item vanishes now and a toast offers «تراجع»
@@ -213,6 +216,19 @@ export function Library() {
         </span>
         <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
       </Link>
+      {/* Songs are a section of their own too: this card is its door from
+          the main library, carrying the song count, present once a first
+          song exists. Songs never render in this list itself. */}
+      {songsCount > 0 && (
+        <Link to="/songs" className="mb-5 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 shadow-sm transition-colors hover:bg-accent">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Music className="size-6" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-lg text-foreground">الأغاني</span>
+            <span className="block text-sm text-muted-foreground">{`${songsCount} ${songsCount === 1 ? "أغنية مسجلة" : "أغاني مسجلة"} في قسم مستقل`}</span>
+          </span>
+          <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
       {/* Projects of the MAIN partition (general books, series, files) —
           rendered only when at least one exists here. */}
       <ProjectsStrip ideas={ideas} />

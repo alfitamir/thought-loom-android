@@ -143,17 +143,19 @@ export function memoryArticleAudioStore(): ArticleAudioStore {
 const DB = "thought-loom-audio";
 const STORE = "article-audio";
 const SONGS_STORE = "songs";
+const SONG_EXPORTS_STORE = "song-exports";
 const req = <T,>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 
 /**
- * One shared open for both stores in this database. Version 2 added the
- * `songs` store (the user's own singing recordings); the TTS cache store
- * is untouched by the upgrade.
+ * One shared open for every store in this database. Version 2 added the
+ * `songs` store (the user's own singing recordings); version 3 added
+ * `song-exports` (cached MP3 conversions of those recordings, see
+ * song-export.ts). The TTS cache store is untouched by the upgrades.
  */
 let sharedDbp: Promise<IDBDatabase> | null = null;
 function openDb(): Promise<IDBDatabase> {
   sharedDbp ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const r = indexedDB.open(DB, 2);
+    const r = indexedDB.open(DB, 3);
     r.onupgradeneeded = () => {
       const db = r.result;
       if (!db.objectStoreNames.contains(STORE)) {
@@ -162,6 +164,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(SONGS_STORE)) {
         db.createObjectStore(SONGS_STORE, { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains(SONG_EXPORTS_STORE)) {
+        db.createObjectStore(SONG_EXPORTS_STORE, { keyPath: "key" });
       }
     };
     r.onsuccess = () => resolve(r.result);
@@ -505,10 +510,75 @@ export async function getSongAudio(
   return store.get(ideaId);
 }
 
-/** Delete one song's recording from this device. */
+/** Delete one song's recording from this device — and its cached MP3
+ *  export with it, so a deleted song leaves nothing behind. */
 export async function deleteSongAudio(
   ideaId: string,
   store: SongAudioStore = songAudioStore(),
+): Promise<void> {
+  await store.remove(ideaId);
+  await deleteSongExport(ideaId).catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Song MP3 exports: the shareable conversion of one song recording, cached
+// so a song is re-encoded only when its recording changes. An export is
+// derived data — it lives in its own store of the same database, is never
+// synced or backed up, and `song-export.ts` owns the conversion itself;
+// this section is only the shelf it sits on. The record carries the
+// fingerprint of the song recording it was converted from; a mismatch
+// means the recording was replaced and the export is stale.
+// ---------------------------------------------------------------------------
+
+export type SongExportRecord = {
+  /** The song idea's id (also the record key). */
+  key: string;
+  ideaId: string;
+  /** Fingerprint of the source recording at conversion time. */
+  fingerprint: string;
+  mime: "audio/mpeg";
+  blob: Blob;
+  createdAt: number;
+};
+
+export interface SongExportStore {
+  get(ideaId: string): Promise<SongExportRecord | null>;
+  put(rec: SongExportRecord): Promise<void>;
+  remove(ideaId: string): Promise<void>;
+}
+
+/** In-memory store (tests, or browsers without IndexedDB). */
+export function memorySongExportStore(): SongExportStore {
+  const map = new Map<string, SongExportRecord>();
+  return {
+    async get(ideaId) { return map.get(ideaId) ?? null; },
+    async put(rec) { map.set(rec.key, rec); },
+    async remove(ideaId) { map.delete(ideaId); },
+  };
+}
+
+export function indexedDbSongExportStore(): SongExportStore {
+  const db = () => openDb();
+  const tx = async (mode: IDBTransactionMode) => (await db()).transaction(SONG_EXPORTS_STORE, mode);
+  const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+  return {
+    async get(ideaId) {
+      const t = await tx("readonly");
+      return ((await req(t.objectStore(SONG_EXPORTS_STORE).get(ideaId))) as SongExportRecord | undefined) ?? null;
+    },
+    async put(rec) { const t = await tx("readwrite"); t.objectStore(SONG_EXPORTS_STORE).put(rec); await done(t); },
+    async remove(ideaId) { const t = await tx("readwrite"); t.objectStore(SONG_EXPORTS_STORE).delete(ideaId); await done(t); },
+  };
+}
+
+let sharedExportStore: SongExportStore | null = null;
+export const songExportStore = (): SongExportStore =>
+  (sharedExportStore ??= typeof indexedDB !== "undefined" ? indexedDbSongExportStore() : memorySongExportStore());
+
+/** Drop one song's cached MP3 export, if any. */
+export async function deleteSongExport(
+  ideaId: string,
+  store: SongExportStore = songExportStore(),
 ): Promise<void> {
   await store.remove(ideaId);
 }

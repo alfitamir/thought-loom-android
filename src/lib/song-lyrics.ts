@@ -1,22 +1,23 @@
 // Written lyrics for a song, extracted from the singing itself. The song
 // recording stays the content; this only fills the idea's `text` (the
 // lyrics field every serializer and sync already carries) with the words
-// as sung. It runs in exactly two deliberate places — automatically after
-// a save when the user's own Gemini key is configured, and from the
-// editor's «استخرج الكلمات من الغنا» button — and it NEVER overwrites
-// lyrics that already exist without the user's explicit say-so. The
+// as sung. It runs in exactly ONE deliberate place — the editor's
+// «استخرج الكلمات من الغنا» button, when the user asks for the words —
+// and it NEVER overwrites lyrics that already exist without the user's
+// explicit say-so. (An automatic post-save pass existed until the owner
+// ruled lyrics are wanted only on request; it is gone, and nothing may
+// call the transcription of a song behind his back again.) The
 // dictation drain is untouched: it cannot see song audio at all.
 import type { Engine } from "./article-ai";
 import { getSongAudio, songAudioStore, type SongAudioStore } from "./article-audio";
 import { resolveEngine } from "./ai-engine";
-import { getGeminiKey } from "./gemini";
 import { loadIdeas, updateSong, type Idea } from "./ideas";
 import { transcribeSongAudio } from "./transcribe";
 
 // ---------- pending registry ----------
 // One extraction at a time per song; the editor derives its «جارٍ استخراج
-// الكلمات…» state from here (the auto pass starts off-screen, so local
-// component state alone could never show it).
+// الكلمات…» state from here, shared with any other mounted card of the
+// same song.
 const pending = new Set<string>();
 const listeners = new Set<() => void>();
 
@@ -38,7 +39,7 @@ const setPending = (ideaId: string, on: boolean) => {
 /** What may happen to extracted words, given the lyrics already on the song:
  *  fill an empty song outright, ask before replacing written words, or do
  *  nothing when the singing yielded no words at all. Pure — the editor's
- *  confirm panel and the auto pass both decide through here. */
+ *  extraction flow decides through here. */
 export type LyricsDecision = "fill" | "confirm" | "none";
 export const decideLyricsApplication = (currentLyrics: string, extracted: string): LyricsDecision => {
   if (!extracted.trim()) return "none";
@@ -50,7 +51,8 @@ export const decideLyricsApplication = (currentLyrics: string, extracted: string
  * (`updateSong`), so they sync and back up like hand-written ones.
  * `"fill-if-empty"` re-checks the CURRENT stored lyrics at write time —
  * words the user typed while extraction was running are never clobbered.
- * Returns the updated idea, or undefined when nothing was written.
+ * Returns the updated idea, or undefined when nothing was written. Only
+ * the editor's extraction flow calls this — extraction is on request.
  */
 export function applySongLyrics(ideaId: string, lyrics: string, mode: "fill-if-empty" | "replace"): Idea | undefined {
   const current = loadIdeas().find((i) => i.id === ideaId);
@@ -95,25 +97,5 @@ export async function transcribeSong(ideaId: string, deps: SongLyricsDeps = {}):
     return await (deps.transcribe ?? defaultTranscribe)(record.blob, record.mime, engine);
   } finally {
     setPending(ideaId, false);
-  }
-}
-
-/**
- * The post-save pass: extract a fresh song's lyrics in the background, but
- * ONLY with the user's own Gemini key (a song saved offline or keyless
- * waits for the editor button instead). Silent by design — success fills
- * still-empty lyrics, every failure is swallowed, and words typed in the
- * meantime always win. Returns the updated idea when lyrics were filled,
- * so the caller can push it to the cloud like any other edit.
- */
-export async function autoExtractSongLyrics(ideaId: string, deps: SongLyricsDeps & { key?: string } = {}): Promise<Idea | null> {
-  const key = deps.key ?? getGeminiKey();
-  if (!key || isSongLyricsPending(ideaId)) return null;
-  try {
-    const lyrics = await transcribeSong(ideaId, { ...deps, engine: deps.engine ?? { kind: "gemini", key } });
-    if (!lyrics.trim()) return null;
-    return applySongLyrics(ideaId, lyrics, "fill-if-empty") ?? null;
-  } catch {
-    return null;
   }
 }

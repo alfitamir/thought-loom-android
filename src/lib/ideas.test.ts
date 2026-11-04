@@ -225,6 +225,21 @@ describe("medical section", () => {
     expect(main.map((i) => i.id)).toEqual(["a", "c"]);
     expect(medical.map((i) => i.id)).toEqual(["b", "d"]);
   });
+  it("partitionIdeas gives songs a section of their own, out of the main library", () => {
+    const list = [
+      { id: "a", text: "أ", createdAt: 4 },
+      { id: "s1", text: "كلمات", createdAt: 3, song: true },
+      { id: "b", text: "ب", createdAt: 2, medical: true },
+      { id: "s2", text: "", createdAt: 1, song: true },
+      { id: "c", text: "ج", createdAt: 0 },
+    ];
+    const { main, medical, songs } = partitionIdeas(list);
+    expect(main.map((i) => i.id)).toEqual(["a", "c"]);
+    expect(medical.map((i) => i.id)).toEqual(["b"]);
+    expect(songs.map((i) => i.id)).toEqual(["s1", "s2"]);
+    // No loss, no overlap: every idea lands in exactly one partition.
+    expect(main.length + medical.length + songs.length).toBe(list.length);
+  });
   it("a merged article can stay in the medical section", () => {
     const merged = saveArticleIdea("نص مدمج", "عنوان", "متن", undefined, { medical: true });
     expect(merged.medical).toBe(true);

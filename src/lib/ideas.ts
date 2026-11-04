@@ -530,15 +530,23 @@ export function clearProject(medical: boolean, name: string): number {
   return n;
 }
 
-/** The two library partitions: the medical section and everything else.
- *  Every surface reads exactly one side — the main library the `main`
- *  side, the medical view the `medical` side — so an article can never
- *  appear in both. */
-export function partitionIdeas(ideas: Idea[]): { main: Idea[]; medical: Idea[] } {
+/** The three library partitions: the medical section, the songs section,
+ *  and everything else (the main library). Every surface reads exactly
+ *  one side — the main library the `main` side, the medical view the
+ *  `medical` side, the songs view the `songs` side — so an item can never
+ *  appear in two. Medical keeps its precedence (a song is never medical:
+ *  the recorder ignores the medical context in song mode and `setMedical`
+ *  refuses songs), so the song check only sees non-medical ideas. */
+export function partitionIdeas(ideas: Idea[]): { main: Idea[]; medical: Idea[]; songs: Idea[] } {
   const main: Idea[] = [];
   const medical: Idea[] = [];
-  for (const idea of ideas) (idea.medical ? medical : main).push(idea);
-  return { main, medical };
+  const songs: Idea[] = [];
+  for (const idea of ideas) {
+    if (idea.medical) medical.push(idea);
+    else if (idea.song) songs.push(idea);
+    else main.push(idea);
+  }
+  return { main, medical, songs };
 }
 
 /** Every topic currently in use, with its article count, busiest first — the manual picker's list. */

@@ -5,9 +5,9 @@
 // the «أفكاري — الأغاني» folder on Google Drive (`driveFileId`), which is
 // how other devices fetch it on demand. Nothing here transcribes or sends
 // audio to any AI: no engine, no key, no network. (Written lyrics are
-// extracted from the singing only deliberately — the editor's button or
-// the post-save pass in song-lyrics.ts — and never by the dictation
-// pipeline.)
+// extracted from the singing only deliberately — from the editor's
+// «استخرج الكلمات من الغنا» button in song-lyrics.ts, when the user
+// asks — and never by the dictation pipeline or any automatic pass.)
 import { saveSongAudio, songAudioStore, type SongAudioRecord, type SongAudioStore } from "./article-audio";
 import { buildSongIdea, loadIdeas, replaceIdeas, type Idea } from "./ideas";
 import { formatElapsed } from "./voice-session";
