@@ -21,6 +21,7 @@ import { deriveSongAudioState, songDurationLabel, songRecordedLabel } from "@/li
 import { downloadSongAudio } from "@/lib/song-drive";
 import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
 import { deliverCardImage, renderShareCardPng, shareCardModel } from "@/lib/share-card";
+import { composeXPost, xCharCount, X_POST_LIMIT } from "@/lib/x-post";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -71,6 +72,11 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   const [fbVariation, setFbVariation] = useState(0);
   const [fbError, setFbError] = useState("");
   const [fbStatus, setFbStatus] = useState("");
+  // X post state: composed on-device by the pure composer (no network, the
+  // 280-char limit guaranteed by construction), copy-only like Facebook.
+  const [xOpen, setXOpen] = useState(false);
+  const [xPost, setXPost] = useState("");
+  const [xStatus, setXStatus] = useState("");
   const [listenOpen, setListenOpen] = useState(false);
   // Manual topic picker state (the new-topic draft lives here, not in the dialog)
   const [topicOpen, setTopicOpen] = useState(false);
@@ -218,6 +224,28 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     }
   };
 
+  /** «منشور X»: the Facebook chip's sibling — same copy-only contract, but
+   *  the post is composed locally and instantly (no internet, no AI), so
+   *  the menu item never waits on a connection. Eligibility mirrors the
+   *  Facebook item exactly by living in the same smart-tools dropdown,
+   *  which renders only for the author's own articles (never liked/songs). */
+  const openXPost = () => {
+    setMessage("");
+    setXStatus("");
+    setXPost(composeXPost({ title: article.title, body: article.body, medical: isMedical, topic: topic ?? articleTopic(idea) }));
+    setXOpen(true);
+  };
+
+  const copyXPost = async () => {
+    if (!xPost) return;
+    try {
+      if (navigator.clipboard) { await navigator.clipboard.writeText(xPost); setMessage("نُسخ المنشور ✓"); setXStatus("نُسخ المنشور ✓"); }
+      else setXStatus("النسخ غير متاح هنا؛ يمكنك تحديد نص المنشور ونسخه.");
+    } catch {
+      setXStatus("تعذّرت النسخ الآن.");
+    }
+  };
+
   const insertTextIntoArticle = (textToAppend: string, notice: string) => {
     const updatedBody = `${article.body.trim()}\n\n${textToAppend.trim()}`;
     save(article.title, updatedBody);
@@ -318,6 +346,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
             <DropdownMenuItem aria-label="شواهد من القرآن والسنة" title={online ? "شواهد من القرآن والسنة وكتب العلماء مع التحقق من النص" : "الشواهد تحتاج الإنترنت"} disabled={!online} onSelect={() => setEvidenceOpen(true)} className="[&>svg]:size-5"><BookOpen className="text-emerald-600" />شواهد</DropdownMenuItem>
             <DropdownMenuItem aria-label="اقتراحات واقتباسات للإثراء" title={online ? "اقتراحات واقتباسات من كبار المفكرين لتطوير المقال" : "الإثراء يحتاج الإنترنت"} disabled={!online || enrichBusy} onSelect={openEnrichment} className="[&>svg]:size-5"><ListPlus className="text-amber-500" />إثراء</DropdownMenuItem>
             <DropdownMenuItem aria-label="منشور فيسبوك" title={online ? "اقتراح منشور فيسبوك من هذا المقال" : "المنشور يحتاج الإنترنت"} disabled={!online || fbBusy} onSelect={openFacebook} className="[&>svg]:size-5"><Facebook className="text-[#1877F2]" />منشور فيسبوك</DropdownMenuItem>
+            <DropdownMenuItem aria-label="منشور X" title="صياغة منشور X من هذا المقال — على جهازك، بلا إنترنت" onSelect={openXPost} className="[&>svg]:size-5"><span aria-hidden="true" className="flex size-5 items-center justify-center text-base font-black leading-none">X</span>منشور X</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>}
@@ -513,6 +542,34 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
           <Button disabled={!fbPost || fbBusy} onClick={copyFacebookPost}><Copy />نسخ المنشور</Button>
           <Button variant="outline" disabled={fbBusy} onClick={() => void loadFacebookPost(fbPost ? fbVariation + 1 : fbVariation)}><RefreshCw />اقتراح آخر</Button>
           <Button variant="ghost" onClick={() => setFbOpen(false)}>إغلاق</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    {/* X post dialog: one short post in the author's voice, composed on this
+        device by the pure composer (never over X's 280 characters), copy-only —
+        the app never posts to X; the author pastes the text himself. */}
+    <Dialog open={xOpen} onOpenChange={setXOpen}>
+      <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
+        <DialogTitle className="text-start font-display flex items-center gap-2">
+          <span aria-hidden="true" className="flex size-5 items-center justify-center text-lg font-black leading-none">X</span>
+          <span>منشور X مقترح</span>
+        </DialogTitle>
+        <p className="text-xs text-muted-foreground">
+          منشور واحد قصير بصوتك، مأخوذ من هذا المقال وحده ومضبوط على حد X — يُصاغ هنا على جهازك بلا إنترنت. انسخه والصقه في X بنفسك — التطبيق لا ينشر نيابة عنك.
+        </p>
+
+        {xPost && (
+          <div className="space-y-2">
+            <div className="whitespace-pre-wrap break-words rounded-xl border border-border bg-card p-4 font-article text-lg leading-relaxed text-foreground">{xPost}</div>
+            <p className="text-xs text-muted-foreground">عدد الحروف: <span dir="ltr">{xCharCount(xPost)} / {X_POST_LIMIT}</span></p>
+          </div>
+        )}
+
+        {xStatus && <p role="status" className="text-sm text-muted-foreground">{xStatus}</p>}
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Button disabled={!xPost} onClick={copyXPost}><Copy />نسخ المنشور</Button>
+          <Button variant="ghost" onClick={() => setXOpen(false)}>إغلاق</Button>
         </div>
       </DialogContent>
     </Dialog>
