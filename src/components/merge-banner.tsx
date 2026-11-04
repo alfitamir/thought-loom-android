@@ -3,7 +3,7 @@ import { BookOpen, Check, Copy, Layers, Lightbulb, Square, TriangleAlert, X } fr
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EvidenceDialog } from "@/components/evidence-dialog";
-import { deleteIdea, getArticle, loadIdeas, mergeAttributions, saveArticleIdea, type Idea } from "@/lib/ideas";
+import { deleteIdea, getArticle, loadIdeas, mergeAttributions, mergeSourceVersions, saveArticleIdea, type Idea } from "@/lib/ideas";
 import { MergeIncompleteError, missingMergeLines } from "@/lib/article-ai";
 import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { deleteSongAudio } from "@/lib/article-audio";
@@ -122,7 +122,15 @@ function MergeDialog({ suggestion, online, onClose }: { suggestion: MergeSuggest
     });
     if (changed) { setMessage("تغيرت إحدى المقالات أثناء الدمج. لم نغير شيئًا."); return; }
     const origins = [...new Set(sources.flatMap((s) => [s.id, ...(s.mergedFrom ?? [])]))];
-    const merged = saveArticleIdea(sources.map((s) => s.text).join("\n\n"), proposal.title, proposal.body, origins);
+    // When the originals are about to be consumed, their full texts are
+    // frozen onto the merged article as 'merge' versions first (read from
+    // the freshest records) — the merge can never make a text vanish.
+    // When the originals stay, they ARE the record; no copies are made.
+    const frozenSources = removeOriginals
+      ? mergeSourceVersions(sources.map((s) => latest.find((i) => i.id === s.id) ?? s))
+      : undefined;
+    const merged = saveArticleIdea(sources.map((s) => s.text).join("\n\n"), proposal.title, proposal.body, origins,
+      frozenSources ? { versions: frozenSources } : undefined);
     if (removeOriginals) sources.forEach((s) => { deleteIdea(s.id); if (s.song) { void deleteSongAudio(s.id).catch(() => {}); void deleteSongDriveCopy(s).catch(() => {}); } });
     dismissSuggestion(suggestion.ids);
     void pushIdea(merged).catch(() => {});

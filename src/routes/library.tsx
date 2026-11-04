@@ -117,7 +117,7 @@ export function Library() {
           const result = await cleanFull(getArticle(idea), engine, controller.signal, () => {});
           const latest = loadVisibleIdeas().find((i) => i.id === idea.id);
           if (latest && (latest.updatedAt ?? 0) === (idea.updatedAt ?? 0)) {
-            const updated = updateArticle(idea.id, result.title, result.body, true);
+            const updated = updateArticle(idea.id, result.title, result.body, true, "clean");
             if (updated) void pushIdea(updated).catch(() => {});
           }
         } catch (error) {

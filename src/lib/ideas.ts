@@ -1,3 +1,22 @@
+/** Why a text snapshot was taken: the AI (or restore) operation that was
+ *  about to replace the article's text. */
+export type VersionSource = "improve" | "clean" | "merge" | "restore";
+
+/**
+ * One frozen copy of an article's text, taken automatically BEFORE an AI
+ * operation replaced it — the safety net for essays that exist nowhere
+ * else. `text` is the article body as it read at that moment; `title` is
+ * the title it carried (for 'merge' entries: the consumed source article's
+ * title — the entry IS that source's full text, kept on the merged
+ * article). Versions are stored NEWEST FIRST and capped at MAX_VERSIONS.
+ */
+export type IdeaVersion = {
+  at: number;
+  text: string;
+  title?: string;
+  source: VersionSource;
+};
+
 export type Idea = {
   id: string;
   text: string;
@@ -46,7 +65,56 @@ export type Idea = {
    *  pins it never bumps `updatedAt`. A song is never a medical article:
    *  song ideas never carry this flag. */
   medical?: boolean;
+  /** Frozen pre-AI copies of this article's text, newest first (see
+   *  IdeaVersion). Own articles only: a song's text is its lyrics and a
+   *  liked article is never AI-touched, so neither ever grows a history. */
+  versions?: IdeaVersion[];
 };
+
+/** At most this many snapshots are kept per article — the newest ones. */
+export const MAX_VERSIONS = 5;
+
+const VERSION_SOURCES: readonly string[] = ["improve", "clean", "merge", "restore"];
+
+/** Newest first, capped at MAX_VERSIONS. */
+export function capVersions(versions: IdeaVersion[]): IdeaVersion[] {
+  return [...versions].sort((a, b) => b.at - a.at).slice(0, MAX_VERSIONS);
+}
+
+/**
+ * Prepend a snapshot (storage is newest-first). A snapshot identical to
+ * the newest existing one — same text and title — is skipped: that exact
+ * state is already frozen, and a duplicate would only push older, still
+ * distinct snapshots out of the cap.
+ */
+export function addVersion(versions: IdeaVersion[] | undefined, entry: IdeaVersion): IdeaVersion[] {
+  const list = versions ?? [];
+  const newest = list[0];
+  if (newest && newest.text === entry.text && (newest.title ?? "") === (entry.title ?? "")) return list;
+  return capVersions([entry, ...list]);
+}
+
+/**
+ * Validate untrusted version data (backup files, cloud rows, Drive files)
+ * into clean IdeaVersion entries. Anything malformed — bad timestamp,
+ * non-string or empty text, unknown source — is dropped, never guessed.
+ */
+export function parseVersions(raw: unknown): IdeaVersion[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: IdeaVersion[] = [];
+  for (const v of raw) {
+    if (!v || typeof v !== "object") continue;
+    const e = v as { at?: unknown; text?: unknown; title?: unknown; source?: unknown };
+    if (typeof e.at !== "number" || !Number.isFinite(e.at)) continue;
+    if (typeof e.text !== "string" || !e.text) continue;
+    if (typeof e.source !== "string" || !VERSION_SOURCES.includes(e.source)) continue;
+    out.push({
+      at: e.at, text: e.text, source: e.source as VersionSource,
+      ...(typeof e.title === "string" && e.title.trim() ? { title: e.title } : {}),
+    });
+  }
+  return out.length ? capVersions(out) : undefined;
+}
 
 export const TOPICS: Record<string, string[]> = {
   "الإيمان والروح": ["الله", "صلاة", "دين", "إيمان", "قرآن", "دعاء", "رمضان", "الجنة", "روح"],
@@ -116,7 +184,16 @@ export function matchesArticle(idea: Idea, query: string): boolean {
   return !normalized || strip(`${article.title}\n${article.body}\n${idea.text}`).toLocaleLowerCase().includes(normalized);
 }
 
-export function updateArticle(id: string, title: string, body: string, polished = false): Idea | undefined {
+/**
+ * The single write point where an existing article's text is replaced.
+ * When `snapshotSource` names the AI (or restore) operation doing the
+ * replacing, the article's CURRENT text is frozen into its version
+ * history first — atomically, in the same write — so no AI pass can ever
+ * destroy a text that exists nowhere else. Manual saves pass no source
+ * and are never snapshotted. Songs and liked articles are ineligible:
+ * their text is never AI-replaced in the first place.
+ */
+export function updateArticle(id: string, title: string, body: string, polished = false, snapshotSource?: VersionSource): Idea | undefined {
   if (!title.trim() || !body.trim()) return;
   const all = loadIdeas();
   const current = all.find((idea) => idea.id === id);
@@ -127,9 +204,53 @@ export function updateArticle(id: string, title: string, body: string, polished 
     articleBody: body.trim(),
     updatedAt: Math.max(Date.now(), (current.updatedAt ?? 0) + 1),
   };
+  if (snapshotSource && !current.song && !current.liked) {
+    const before = getArticle(current);
+    // Nothing to protect when the "replacement" changes neither title nor body.
+    if (before.title !== title.trim() || before.body !== body.trim()) {
+      updated.versions = addVersion(current.versions, {
+        // Strictly increasing timestamps keep same-millisecond snapshots distinct.
+        at: Math.max(Date.now(), (current.versions?.[0]?.at ?? 0) + 1),
+        text: before.body,
+        title: before.title,
+        source: snapshotSource,
+      });
+    }
+  }
   if (polished && updated.updatedAt !== undefined) updated.aiPolishedAt = updated.updatedAt; else delete updated.aiPolishedAt;
   replaceIdeas(all.map((idea) => idea.id === id ? updated : idea));
   return updated;
+}
+
+/**
+ * Bring back a frozen version: the article's text (and title, when the
+ * entry carries one) becomes the version's. The pre-restore text is
+ * itself snapshotted first (source 'restore') through the same write
+ * point, so a restore is never a one-way door either.
+ */
+export function restoreVersion(id: string, at: number): Idea | undefined {
+  const current = loadIdeas().find((idea) => idea.id === id);
+  if (!current || current.song || current.liked) return;
+  const entry = (current.versions ?? []).find((v) => v.at === at);
+  if (!entry || !entry.text.trim()) return;
+  const title = entry.title?.trim() ? entry.title : getArticle(current).title;
+  return updateArticle(id, title, entry.text, false, "restore");
+}
+
+/**
+ * The safety net an AI merge leaves behind: each consumed source's full
+ * article text, frozen as a 'merge' version on the merged article and
+ * labelled with the source's title — built BEFORE the sources are
+ * deleted. Storage is newest-first, so the first source lists first.
+ */
+export function mergeSourceVersions(sources: Idea[], now = Date.now()): IdeaVersion[] {
+  const entries: IdeaVersion[] = [];
+  sources.forEach((s, idx) => {
+    const a = getArticle(s);
+    if (!a.body.trim()) return;
+    entries.push({ at: now - idx, text: a.body, title: a.title, source: "merge" });
+  });
+  return capVersions(entries);
 }
 
 /** Merge editions without overwriting newer local work; deletion always wins. */
@@ -170,6 +291,16 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     // Section membership is metadata as well: an edition that lacks the
     // medical flag must not pull the winner out of the medical section.
     if (!winner.medical && loser.medical) winner = { ...winner, medical: true };
+    // Version history is a union, never a contest: snapshots frozen on
+    // EITHER edition survive (deduped by timestamp), the cap applied
+    // after the union — a sync must never throw away a frozen text.
+    if (winner.versions?.length || loser.versions?.length) {
+      const byAt = new Map<number, IdeaVersion>();
+      for (const v of loser.versions ?? []) byAt.set(v.at, v);
+      for (const v of winner.versions ?? []) byAt.set(v.at, v);
+      const union = capVersions([...byAt.values()]);
+      if (JSON.stringify(union) !== JSON.stringify(winner.versions ?? [])) winner = { ...winner, versions: union };
+    }
     // As before: a local winner that was never polished adopts the remote polish stamp.
     if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
     merged.set(idea.id, winner);
@@ -334,10 +465,13 @@ export function topicOptions(ideas: Idea[]): { topic: string; count: number }[] 
 export const needsPolish = (idea: Idea) => !idea.liked && (idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0));
 
 /** Save a ready article (e.g. a merge) as a new idea; `text` keeps the combined originals. */
-export const saveArticleIdea = (text: string, title: string, body: string, mergedFrom?: string[], extra?: { liked?: boolean; source?: string; sources?: string[]; medical?: boolean }): Idea => {
+export const saveArticleIdea = (text: string, title: string, body: string, mergedFrom?: string[], extra?: { liked?: boolean; source?: string; sources?: string[]; medical?: boolean; versions?: IdeaVersion[] }): Idea => {
   const now = Date.now();
   const idea: Idea = { id: crypto.randomUUID(), text, createdAt: now, articleTitle: title.trim(), articleBody: body.trim(), updatedAt: now, aiPolishedAt: now };
   if (mergedFrom?.length) idea.mergedFrom = [...new Set(mergedFrom)];
+  // An AI merge that consumes its sources carries their frozen texts as
+  // its version history (built by mergeSourceVersions before deletion).
+  if (extra?.versions?.length) idea.versions = capVersions(extra.versions);
   if (extra?.liked) idea.liked = true;
   // A merge stays in the section its articles lived in (manual-merge
   // partners are partition-scoped, so the section is unambiguous).

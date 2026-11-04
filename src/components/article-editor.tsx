@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ImageDown, Library, ListPlus, Lock, Merge, Music, Pencil, Pin, PinOff, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Stethoscope, Trash2, Volume2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, History, ImageDown, Library, ListPlus, Lock, Merge, Music, Pencil, Pin, PinOff, Play, PlusCircle, Quote, RefreshCw, RotateCcw, Share2, ShieldAlert, Sparkles, Square, Stethoscope, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -8,7 +8,7 @@ import { ManualMergeDialog } from "@/components/manual-merge-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
 import { countOccurrences } from "@/lib/search-highlight";
-import { articleTopic, clearArticleTopic, getArticle, loadIdeas, setArticleTopic, setMedical, setPinned, topicOptions, updateArticle, updateSong, type Idea } from "@/lib/ideas";
+import { articleTopic, clearArticleTopic, getArticle, loadIdeas, restoreVersion, setArticleTopic, setMedical, setPinned, topicOptions, updateArticle, updateSong, type Idea, type VersionSource } from "@/lib/ideas";
 import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
@@ -25,6 +25,14 @@ import { composeXPost, xCharCount, X_POST_LIMIT } from "@/lib/x-post";
 import { FONT_SIZE_STEPS, LINE_HEIGHT_STEPS, readingStyleVars, useReadingPrefs } from "@/lib/reading-prefs";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
+
+/** Arabic labels for why a version snapshot was frozen (see IdeaVersion). */
+const VERSION_SOURCE_LABELS: Record<VersionSource, string> = {
+  improve: "تحسين",
+  clean: "ضبط",
+  merge: "دمج",
+  restore: "استرجاع",
+};
 
 /** Arabic reading-time label at ~180 words per minute, with plural agreement. */
 const readingTimeLabel = (text: string) => {
@@ -90,12 +98,27 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   const version = useRef(idea.updatedAt ?? 0);
   useEffect(() => () => abort.current?.abort(), []);
 
-  const save = (newTitle: string, newBody: string, polished = false) => {
-    const updated = updateArticle(idea.id, newTitle, newBody, polished);
+  const save = (newTitle: string, newBody: string, polished = false, snapshotSource?: VersionSource) => {
+    const updated = updateArticle(idea.id, newTitle, newBody, polished, snapshotSource);
     if (!updated) return;
     onChange();
     void pushIdea(updated).catch(() => {});
     setEditing(false); setPreviewOpen(false); setSuggestion(null); setMessage("حُفظ المقال ✓");
+  };
+  // Version history (own articles only — the entry never renders for
+  // liked articles or songs, whose texts are never AI-replaced).
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [confirmRestoreAt, setConfirmRestoreAt] = useState<number | null>(null);
+  /** Restore a frozen version; the pre-restore text is snapshotted by
+   *  restoreVersion itself, so the way back stays open too. */
+  const doRestore = (at: number) => {
+    const updated = restoreVersion(idea.id, at);
+    setConfirmRestoreAt(null);
+    if (!updated) return;
+    setVersionsOpen(false);
+    onChange();
+    void pushIdea(updated).catch(() => {});
+    setMessage("استُرجعت النسخة السابقة ✓ — وحُفظت نسختك الحالية في الإصدارات أيضًا");
   };
   const chooseTopic = (name: string) => {
     const before = topic;
@@ -304,6 +327,12 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* Version history: the frozen pre-AI texts. Own articles only —
+              a liked article is never AI-touched and a song's text is its
+              lyrics, so neither has anything to restore. */}
+          {!isSong && !isLiked && (
+            <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="الإصدارات السابقة" title="الإصدارات السابقة" onClick={() => { setConfirmRestoreAt(null); setVersionsOpen(true); }}><History /></Button>
+          )}
           {!isSong && (<>
             <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
             <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال كصورة" title="مشاركة المقال كصورة" disabled={imageBusy} onClick={() => void shareImage()}><ImageDown /></Button>
@@ -641,6 +670,46 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         </div>
       </DialogContent>
     </Dialog>
+    {/* Version history: every text an AI pass replaced is frozen here,
+        newest first, and any of them can be brought back. Restoring
+        snapshots the current text first, so it is never a one-way door. */}
+    <Dialog open={versionsOpen} onOpenChange={(open) => { setVersionsOpen(open); if (!open) setConfirmRestoreAt(null); }}>
+      <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
+        <DialogTitle className="text-start font-display flex items-center gap-2">
+          <History className="size-5" />
+          <span>الإصدارات السابقة</span>
+        </DialogTitle>
+        {(idea.versions ?? []).length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground">لا إصدارات سابقة بعد — ستُحفظ نسخة تلقائيًا قبل أي تعديل بالذكاء الاصطناعي</p>
+        ) : (
+          <div className="space-y-2">
+            {(idea.versions ?? []).map((v) => (
+              <div key={v.at} className="rounded-xl border border-border bg-card p-3.5">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{VERSION_SOURCE_LABELS[v.source]}</span>
+                  <span className="text-muted-foreground">{new Date(v.at).toLocaleString("ar")}</span>
+                  <span className="text-xs text-muted-foreground">· {countWords(v.text)} كلمة</span>
+                </div>
+                {v.title && <p className="mt-1.5 break-words text-sm font-medium text-foreground">{v.title}</p>}
+                <p className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground">{v.text.replace(/\s+/g, " ").trim()}</p>
+                {confirmRestoreAt === v.at ? (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-foreground">استرجاع هذه النسخة؟ ستُحفظ نسختك الحالية هنا أيضًا.</span>
+                    <Button size="sm" onClick={() => doRestore(v.at)}><RotateCcw />تأكيد الاسترجاع</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmRestoreAt(null)}>إلغاء</Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" className="mt-2.5" onClick={() => setConfirmRestoreAt(v.at)}><RotateCcw />استرجاع</Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-end pt-1">
+          <Button variant="ghost" onClick={() => setVersionsOpen(false)}>إغلاق</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
     <Dialog open={previewOpen} onOpenChange={(open) => { if (!open) abort.current?.abort(); setPreviewOpen(open); }}>
       <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
         <DialogTitle className="text-start font-display">مراجعة التحسين</DialogTitle>
@@ -651,7 +720,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
           {busy ? <Button variant="outline" onClick={() => abort.current?.abort()}><Square />إيقاف</Button> : <Button disabled={!suggestion} onClick={() => {
             const latest = loadIdeas().find((i) => i.id === idea.id);
             if (!latest || (latest.updatedAt ?? 0) !== version.current) { setMessage("تغير المقال أثناء التحسين. لم نستبدل تعديلاتك."); setSuggestion(null); return; }
-            if (suggestion) save(suggestion.title, suggestion.body, true);
+            if (suggestion) save(suggestion.title, suggestion.body, true, "improve");
           }}><Check />اعتماد التحسين</Button>}
           <Button variant="ghost" onClick={() => { abort.current?.abort(); setPreviewOpen(false); }}>إلغاء</Button>
         </div>

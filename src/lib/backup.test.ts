@@ -27,6 +27,29 @@ describe("backup", () => {
     const raw = JSON.stringify({ app: "afkari", version: 1, ideas: [...sample, { nope: true }] });
     expect(parseBackup(raw)).toHaveLength(1);
   });
+  it("round-trips version history, dropping malformed version entries", () => {
+    const withVersions: Idea[] = [{
+      ...sample[0]!,
+      versions: [
+        { at: 10, text: "قديم", title: "ع قديم", source: "improve" },
+        { at: 9, text: "أقدم", source: "merge" },
+      ],
+    }];
+    expect(parseBackup(buildBackup(withVersions))).toEqual(withVersions);
+    const dirty = JSON.stringify({
+      app: "afkari", version: 1,
+      ideas: [{
+        ...sample[0],
+        versions: [
+          { at: "x", text: "تالف", source: "improve" },
+          { at: 3, text: "", source: "clean" },
+          { at: 2, text: "مصدر مجهول", source: "bogus" },
+          { at: 1, text: "سليم", source: "restore" },
+        ],
+      }],
+    });
+    expect(parseBackup(dirty)[0]?.versions).toEqual([{ at: 1, text: "سليم", source: "restore" }]);
+  });
   it("restore adds only missing ideas and reports the count", () => {
     const before = loadIdeas().length;
     expect(restoreBackup(sample)).toBe(1);

@@ -200,3 +200,55 @@ describe("X post chip (feature 5)", () => {
     expect(screen.queryByRole("menuitem", { name: "منشور X" })).toBeNull();
   });
 });
+
+describe("version history (الإصدارات السابقة)", () => {
+  it("the entry sits beside the title for the author's own articles", () => {
+    localStorage.setItem("afkari.ideas", JSON.stringify([article]));
+    renderEditor(article);
+    const entry = screen.getByRole("button", { name: "الإصدارات السابقة" });
+    const body = screen.getAllByText(/متن المقال الطويل/).at(-1)!;
+    expect(before(entry, body)).toBe(true);
+  });
+
+  it("never renders for liked articles or songs — their texts are never AI-replaced", () => {
+    const liked: Idea = { ...article, id: "l5", liked: true, source: "مجلة الفكر" };
+    localStorage.setItem("afkari.ideas", JSON.stringify([liked]));
+    const { unmount } = renderEditor(liked);
+    expect(screen.queryByRole("button", { name: "الإصدارات السابقة" })).toBeNull();
+    unmount();
+    const song: Idea = { id: "s5", text: "كلمات الأغنية", createdAt: 1000, updatedAt: 5000, articleTitle: "أغنية", song: true };
+    localStorage.setItem("afkari.ideas", JSON.stringify([song]));
+    renderEditor(song);
+    expect(screen.queryByRole("button", { name: "الإصدارات السابقة" })).toBeNull();
+  });
+
+  it("an article with no history shows the calm empty state", () => {
+    localStorage.setItem("afkari.ideas", JSON.stringify([article]));
+    renderEditor(article);
+    fireEvent.click(screen.getByRole("button", { name: "الإصدارات السابقة" }));
+    expect(screen.getByText(/لا إصدارات سابقة بعد/)).toBeTruthy();
+  });
+
+  it("lists frozen versions and restores one — freezing the current text in turn", async () => {
+    const withHistory: Idea = {
+      ...article,
+      versions: [{ at: 4000, text: "النص القديم المجمد قبل التحسين", title: "العنوان القديم", source: "improve" }],
+    };
+    localStorage.setItem("afkari.ideas", JSON.stringify([withHistory]));
+    const onChange = vi.fn();
+    renderEditor(withHistory, onChange);
+    fireEvent.click(screen.getByRole("button", { name: "الإصدارات السابقة" }));
+    // The row names the operation that froze it and the title it carried.
+    expect(screen.getByText("تحسين")).toBeTruthy();
+    expect(screen.getByText("العنوان القديم")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "استرجاع" }));
+    fireEvent.click(screen.getByRole("button", { name: "تأكيد الاسترجاع" }));
+    expect(onChange).toHaveBeenCalled();
+    const saved = loadIdeas().find((i) => i.id === withHistory.id)!;
+    expect(saved.articleTitle).toBe("العنوان القديم");
+    expect(saved.articleBody).toBe("النص القديم المجمد قبل التحسين");
+    // The pre-restore text was frozen as a 'restore' version — no one-way door.
+    expect(saved.versions?.[0]).toMatchObject({ text: article.articleBody, source: "restore" });
+    expect(await screen.findByText(/استُرجعت النسخة السابقة/)).toBeTruthy();
+  });
+});

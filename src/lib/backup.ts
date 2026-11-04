@@ -1,4 +1,4 @@
-import { clearDeleted, loadDeleted, loadIdeas, markRevived, mergeIdeas, replaceIdeas, type Idea } from "./ideas";
+import { clearDeleted, loadDeleted, loadIdeas, markRevived, mergeIdeas, parseVersions, replaceIdeas, type Idea } from "./ideas";
 
 export function buildBackup(ideas: Idea[], exportedAt = Date.now()): string {
   return JSON.stringify({ app: "afkari", version: 1, exportedAt, ideas }, null, 2);
@@ -49,6 +49,11 @@ export function parseBackup(raw: string): Idea[] {
     // Section membership travels too — a restore must not drop a medical
     // article back into the general library.
     if (i.medical === true) idea.medical = true;
+    // Version history travels too — a restore must not strip the safety
+    // net of frozen pre-AI texts. Malformed entries are dropped by the
+    // validator, never guessed back into shape.
+    const versions = parseVersions(i.versions);
+    if (versions) idea.versions = versions;
     return [idea];
   });
   if (list.length && !ideas.length) throw new Error("لم نجد أفكارًا صالحة في هذا الملف.");

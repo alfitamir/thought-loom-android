@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
-  clearCloudRevived, clearDeleted, loadCloudRevived, loadDeleted, loadIdeas, markDriveDeleted, mergeIdeas, replaceIdeas, type Idea,
+  clearCloudRevived, clearDeleted, loadCloudRevived, loadDeleted, loadIdeas, markDriveDeleted, mergeIdeas, parseVersions, replaceIdeas, type Idea,
 } from "./ideas";
 import { syncDrive } from "./drive-sync";
 
@@ -16,6 +16,7 @@ const cloudRow = (idea: Idea, userId: string) => ({
   liked: idea.liked ?? false, source: idea.source ?? null, sources: idea.sources ?? null,
   pinned: idea.pinned ?? false,
   medical: idea.medical ?? false,
+  versions: idea.versions ?? null,
 });
 
 /** Push one idea to the cloud backup (silently skipped when offline or signed out). */
@@ -74,7 +75,7 @@ async function run(): Promise<number> {
 
   const [{ data: gone, error: goneError }, { data, error }] = await Promise.all([
     supabase.from("idea_deletions").select("idea_id").eq("user_id", uid),
-    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration,drive_file_id,liked,source,sources,pinned,medical").eq("user_id", uid),
+    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration,drive_file_id,liked,source,sources,pinned,medical,versions").eq("user_id", uid),
   ]);
   if (goneError || error || !gone || !data) return 0;
   if (deleted.length) clearDeleted(deleted);
@@ -83,23 +84,28 @@ async function run(): Promise<number> {
   const revivedNow = new Set(loadCloudRevived());
   const local = loadIdeas();
   const localIds = new Set(local.map((i) => i.id));
-  const remote: Idea[] = data.filter((r) => !cloudDeleted.has(r.id) || revivedNow.has(r.id)).map((r) => ({
-    id: r.id, text: r.text, createdAt: Number(r.created_at),
-    ...(r.article_title === null ? {} : { articleTitle: r.article_title }),
-    ...(r.article_body === null ? {} : { articleBody: r.article_body }),
-    ...(r.merged_from?.length ? { mergedFrom: r.merged_from } : {}),
-    ...(r.topic ? { topic: r.topic } : {}),
-    ...(r.topic_manual ? { topicManual: true } : {}),
-    ...(r.song ? { song: true } : {}),
-    ...(typeof r.song_duration === "number" ? { songDuration: r.song_duration } : {}),
-    ...(r.drive_file_id ? { driveFileId: r.drive_file_id } : {}),
-    ...(r.liked ? { liked: true } : {}),
-    ...(r.source ? { source: r.source } : {}),
-    ...(r.sources?.length ? { sources: r.sources } : {}),
-    ...(r.pinned ? { pinned: true } : {}),
-    ...(r.medical ? { medical: true } : {}),
-    updatedAt: Number(r.updated_at),
-  }));
+  const remote: Idea[] = data.filter((r) => !cloudDeleted.has(r.id) || revivedNow.has(r.id)).map((r) => {
+    // The jsonb history is untrusted until validated into clean entries.
+    const versions = parseVersions(r.versions);
+    return {
+      id: r.id, text: r.text, createdAt: Number(r.created_at),
+      ...(r.article_title === null ? {} : { articleTitle: r.article_title }),
+      ...(r.article_body === null ? {} : { articleBody: r.article_body }),
+      ...(r.merged_from?.length ? { mergedFrom: r.merged_from } : {}),
+      ...(r.topic ? { topic: r.topic } : {}),
+      ...(r.topic_manual ? { topicManual: true } : {}),
+      ...(r.song ? { song: true } : {}),
+      ...(typeof r.song_duration === "number" ? { songDuration: r.song_duration } : {}),
+      ...(r.drive_file_id ? { driveFileId: r.drive_file_id } : {}),
+      ...(r.liked ? { liked: true } : {}),
+      ...(r.source ? { source: r.source } : {}),
+      ...(r.sources?.length ? { sources: r.sources } : {}),
+      ...(r.pinned ? { pinned: true } : {}),
+      ...(r.medical ? { medical: true } : {}),
+      ...(versions ? { versions } : {}),
+      updatedAt: Number(r.updated_at),
+    };
+  });
   // Read again after network awaits so edits/deletions made during sync are preserved.
   const tombstones = [...new Set([...cloudDeleted, ...loadDeleted()])].filter((id) => !revivedNow.has(id));
   const merged = mergeIdeas(loadIdeas(), remote, tombstones);
@@ -125,7 +131,11 @@ async function run(): Promise<number> {
       // The library pin is metadata that does not bump updatedAt either, so it is compared directly.
       || (i.pinned ?? false) !== (cloud.pinned ?? false)
       // Section membership rides along the same way (a move never edits the text).
-      || (i.medical ?? false) !== (cloud.medical ?? false);
+      || (i.medical ?? false) !== (cloud.medical ?? false)
+      // Version history rides along too: editions reconcile by union in
+      // mergeIdeas, and a union that grew must reach the cloud even when
+      // no timestamp moved.
+      || JSON.stringify(i.versions ?? null) !== JSON.stringify(cloud.versions ?? null);
   });
   if (changed.length) await supabase.from("ideas").upsert(changed.map((i) => cloudRow(i, uid)));
   window.dispatchEvent(new Event("afkari:ideas-changed"));
