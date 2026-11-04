@@ -74,6 +74,7 @@ export type Database = {
           topic_manual: boolean
           updated_at: number
           user_id: string
+          versions: Json | null
         }
         Insert: {
           article_body?: string | null
@@ -95,6 +96,7 @@ export type Database = {
           topic_manual?: boolean
           updated_at?: number
           user_id: string
+          versions?: Json | null
         }
         Update: {
           article_body?: string | null
@@ -116,6 +118,7 @@ export type Database = {
           topic_manual?: boolean
           updated_at?: number
           user_id?: string
+          versions?: Json | null
         }
         Relationships: []
       }

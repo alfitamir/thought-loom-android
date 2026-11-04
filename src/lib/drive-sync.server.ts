@@ -24,6 +24,15 @@ const idea = z.object({
   driveFileId: z.string().max(200).optional(),
   pinned: z.boolean().optional(),
   medical: z.boolean().optional(),
+  // Frozen pre-AI texts ride along like every other field (capped at 5
+  // per article by the writer; the schema allows headroom, the backup
+  // parser re-caps on read).
+  versions: z.array(z.object({
+    at: z.number(),
+    text: z.string().max(400000),
+    title: z.string().max(5000).optional(),
+    source: z.enum(["improve", "clean", "merge", "restore"]),
+  })).max(20).optional(),
 });
 const inputSchema = z.object({
   ideas: z.array(idea).max(10000),
