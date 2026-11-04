@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, ImageDown, Library, ListPlus, Lock, Merge, Music, Pencil, Pin, PinOff, Play, PlusCircle, Quote, RefreshCw, Share2, ShieldAlert, Sparkles, Square, Stethoscope, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EvidenceDialog } from "@/components/evidence-dialog";
 import { ManualMergeDialog } from "@/components/manual-merge-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
@@ -22,6 +22,7 @@ import { downloadSongAudio } from "@/lib/song-drive";
 import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
 import { deliverCardImage, renderShareCardPng, shareCardModel } from "@/lib/share-card";
 import { composeXPost, xCharCount, X_POST_LIMIT } from "@/lib/x-post";
+import { FONT_SIZE_STEPS, LINE_HEIGHT_STEPS, readingStyleVars, useReadingPrefs } from "@/lib/reading-prefs";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -78,6 +79,9 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   const [xPost, setXPost] = useState("");
   const [xStatus, setXStatus] = useState("");
   const [listenOpen, setListenOpen] = useState(false);
+  // Reading comfort: device-local text size / line spacing (see
+  // @/lib/reading-prefs) — display only, never touches the article.
+  const { prefs: readingPrefs, setPrefs: setReadingPrefs } = useReadingPrefs();
   // Manual topic picker state (the new-topic draft lives here, not in the dialog)
   const [topicOpen, setTopicOpen] = useState(false);
   const [newTopic, setNewTopic] = useState("");
@@ -253,10 +257,10 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     setEnrichOpen(false);
   };
 
-  return <article className="border-b border-border py-6 last:border-0">
+  return <article className="border-b border-border py-6 last:border-0" style={readingStyleVars(readingPrefs)}>
     {editing ? <div className="space-y-3">
       <input aria-label="عنوان المقال" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
-      <textarea aria-label="نص المقال" value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="w-full rounded-md border border-input bg-card p-3 font-article text-xl leading-loose outline-none focus:ring-2 focus:ring-ring" />
+      <textarea aria-label="نص المقال" value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="w-full rounded-md border border-input bg-card p-3 font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] outline-none focus:ring-2 focus:ring-ring" />
       <p className="text-xs text-muted-foreground">عدد الكلمات: {countWords(body)}</p>
       <div className="flex gap-2">
         <Button onClick={() => save(title, body)} disabled={!title.trim() || !body.trim()}><Check />حفظ</Button>
@@ -272,12 +276,39 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         <h2 className="min-w-0 flex-1 break-words font-display text-xl text-primary">{hlQuery
           ? <HighlightedText text={article.title} query={hlQuery} startIndex={matchStartIndex} currentIndex={currentMatchIndex} />
           : article.title}</h2>
-        {!isSong && (
-          <div className="flex shrink-0 items-center gap-1 pt-0.5">
+        <div className="flex shrink-0 items-center gap-1 pt-0.5">
+          {/* Reading comfort: one compact menu (text size + line spacing)
+              instead of a row of steppers crowding the title. Display-only,
+              so it serves every kind — articles, songs and liked alike. */}
+          <DropdownMenu dir="rtl">
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="راحة القراءة" title="حجم النص وتباعد الأسطر">
+                <span aria-hidden="true" className="flex size-5 items-center justify-center text-lg font-black leading-none">أ</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              <DropdownMenuLabel>حجم النص</DropdownMenuLabel>
+              {FONT_SIZE_STEPS.map(({ step, label }) => (
+                <DropdownMenuItem key={step} aria-label={`حجم النص: ${label}`} onSelect={() => setReadingPrefs({ ...readingPrefs, fontSize: step })}>
+                  {label}
+                  {readingPrefs.fontSize === step && <Check className="ms-auto" />}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>تباعد الأسطر</DropdownMenuLabel>
+              {LINE_HEIGHT_STEPS.map(({ step, label }) => (
+                <DropdownMenuItem key={step} aria-label={`تباعد الأسطر: ${label}`} onSelect={() => setReadingPrefs({ ...readingPrefs, lineHeight: step })}>
+                  {label}
+                  {readingPrefs.lineHeight === step && <Check className="ms-auto" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {!isSong && (<>
             <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال" title="مشاركة المقال" onClick={share}><Share2 /></Button>
             <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="مشاركة المقال كصورة" title="مشاركة المقال كصورة" disabled={imageBusy} onClick={() => void shareImage()}><ImageDown /></Button>
-          </div>
-        )}
+          </>)}
+        </div>
       </div>
       {(topic || hasAudio || isSong || isLiked || isMedical || idea.sources?.length || idea.pinned || !isSong) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -364,7 +395,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
           ? <HighlightedText text={preview} query={hlQuery} />
           : preview}</p>;
       })()}
-      <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{hlQuery
+      <p className="whitespace-pre-wrap break-words font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] text-foreground">{hlQuery
         ? <HighlightedText text={article.body} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
         : article.body}</p>
       <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
@@ -788,7 +819,7 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
   if (editing) {
     return <div className="space-y-3">
       <input aria-label="عنوان الأغنية" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
-      <textarea aria-label="كلمات الأغنية" value={lyrics} onChange={(e) => setLyrics(e.target.value)} rows={10} placeholder="اكتب كلمات الأغنية هنا…" className="w-full rounded-md border border-input bg-card p-3 font-article text-xl leading-loose outline-none focus:ring-2 focus:ring-ring" />
+      <textarea aria-label="كلمات الأغنية" value={lyrics} onChange={(e) => setLyrics(e.target.value)} rows={10} placeholder="اكتب كلمات الأغنية هنا…" className="w-full rounded-md border border-input bg-card p-3 font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] outline-none focus:ring-2 focus:ring-ring" />
       <div className="flex gap-2">
         <Button onClick={saveLyrics} disabled={!title.trim()}><Check />حفظ</Button>
         <Button variant="ghost" onClick={() => setEditing(false)}><X />إلغاء</Button>
@@ -835,7 +866,7 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
       </div>
     )}
     {idea.text.trim() ? (
-      <p className="whitespace-pre-wrap break-words font-article text-xl leading-loose text-foreground">{hlQuery
+      <p className="whitespace-pre-wrap break-words font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] text-foreground">{hlQuery
         ? <HighlightedText text={idea.text} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
         : idea.text}</p>
     ) : (
