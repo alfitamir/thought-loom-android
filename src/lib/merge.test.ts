@@ -3,7 +3,7 @@
 // Thought Loom's upgraded merge.ts; the mergeArticles suite is adapted to Loom's Engine API.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dismissSuggestion, excerptForMatching, fingerprint, findMerges, liveSuggestions, mergeArticles, sanitizeSuggestions } from "./merge";
-import { INCOMPLETE } from "./article-ai";
+import { INCOMPLETE, MergeIncompleteError } from "./article-ai";
 import type { Idea } from "./ideas";
 
 const ideas: Idea[] = ["a", "b", "c", "d"].map((id, n) => ({ id, text: id, createdAt: n, updatedAt: n }));
@@ -105,6 +105,15 @@ describe("mergeArticles (cloud engine)", () => {
   it("REGRESSION: rejects a merge that silently dropped a source", async () => {
     stub(`مدمج\n\n${A}`);
     await expect(run()).rejects.toThrow(INCOMPLETE);
+  });
+  it("the rejection carries the proposal and the exact missing lines for the dialog", async () => {
+    stub(`مدمج\n\n${A}`);
+    const err = await run().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(MergeIncompleteError);
+    const incomplete = err as MergeIncompleteError;
+    expect(incomplete.message).toBe(INCOMPLETE);
+    expect(incomplete.proposal).toEqual({ title: "مدمج", body: A });
+    expect(incomplete.missing).toEqual([B]);
   });
 });
 
