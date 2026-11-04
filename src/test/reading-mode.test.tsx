@@ -90,11 +90,11 @@ describe("reading comfort (وضع القراءة المريح)", () => {
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "حجم النص: أكبر" }));
     expect(varOf(root, "--reading-font-size")).toBe("1.75rem");
-    expect(JSON.parse(localStorage.getItem(READING_PREFS_KEY)!)).toEqual({ fontSize: 2, lineHeight: 0 });
+    expect(JSON.parse(localStorage.getItem(READING_PREFS_KEY)!)).toEqual({ fontSize: 2, lineHeight: 0, bgTint: 0 });
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "تباعد الأسطر: واسعة" }));
     expect(varOf(root, "--reading-line-height")).toBe("2.4");
-    expect(JSON.parse(localStorage.getItem(READING_PREFS_KEY)!)).toEqual({ fontSize: 2, lineHeight: 1 });
+    expect(JSON.parse(localStorage.getItem(READING_PREFS_KEY)!)).toEqual({ fontSize: 2, lineHeight: 1, bgTint: 0 });
   });
 
   it("a stored choice applies on open, without touching the article data", () => {

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { CloudUpload, Database, Download, KeyRound, Trash2, Upload } from "lucide-react";
+import { CloudUpload, Database, Download, KeyRound, MonitorSmartphone, Moon, Palette, Sun, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getGeminiKey, setGeminiKey, testGeminiKey } from "@/lib/gemini";
+import { THEME_MODES, useTheme, type ThemeMode } from "@/lib/theme";
 import { MyVoiceSection } from "@/components/my-voice-section";
 import { isMyVoicePublic } from "@/lib/my-voice";
 import { buildBackup, parseBackup, restoreBackup } from "@/lib/backup";
@@ -10,7 +11,10 @@ import { lastDriveSync, syncDrive } from "@/lib/drive-sync";
 import { loadIdeas } from "@/lib/ideas";
 import { syncNow } from "@/lib/sync";
 
+const THEME_ICONS: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, system: MonitorSmartphone };
+
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const [saved, setSaved] = useState(false);
   const [draft, setDraft] = useState("");
   const [keyMsg, setKeyMsg] = useState("");
@@ -83,6 +87,20 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
       <DialogTitle className="text-start font-display">الإعدادات</DialogTitle>
       <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Palette className="size-5 text-primary" />
+          <h3 className="font-display text-lg">المظهر</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">فاتح، ليلي، أو حسب إعداد جهازك — يُطبَّق فورًا على التطبيق كله ويُحفظ على هذا الجهاز فقط.</p>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="وضع المظهر">
+          {THEME_MODES.map(({ mode, label }) => {
+            const Icon = THEME_ICONS[mode];
+            const active = themeMode === mode;
+            return <Button key={mode} variant={active ? "default" : "outline"} className="[&_svg]:size-5" aria-pressed={active} onClick={() => setThemeMode(mode)}><Icon />{label}</Button>;
+          })}
+        </div>
+      </section>
+      <section className="space-y-3 border-t border-border pt-4">
         <div className="flex items-center gap-2">
           <KeyRound className="size-5 text-primary" />
           <h3 className="font-display text-lg">مفتاح Gemini الخاص بك</h3>
