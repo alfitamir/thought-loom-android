@@ -9,6 +9,7 @@ import { requestDelete, undoDelete } from "@/lib/delete-flow";
 import { toast } from "sonner";
 import { ArticleEditor } from "@/components/article-editor";
 import { CompileBar } from "@/components/compile-bar";
+import { RecordFab } from "@/components/record-fab";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isSelectable, selectedIdeas, toggleSelected } from "@/lib/document";
 import { ArrowRight, ChevronDown, ChevronUp, ListChecks, Mic, PenLine, Search, Stethoscope, X } from "lucide-react";
@@ -201,6 +202,10 @@ export function MedicalSection() {
         ))}
       </div>
       {selecting && <CompileBar ideas={chosen} onCancel={exitSelection} />}
+      {/* The bottom navigation (and its record button) never reaches this
+          route, so the section carries its own floating record action —
+          same deep link as the capture buttons above, medical context on. */}
+      <RecordFab section="medical" />
     </div></main>
   );
 }
