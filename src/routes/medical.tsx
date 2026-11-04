@@ -9,6 +9,7 @@ import { requestDelete, undoDelete } from "@/lib/delete-flow";
 import { toast } from "sonner";
 import { ArticleEditor } from "@/components/article-editor";
 import { CompileBar } from "@/components/compile-bar";
+import { ProjectsStrip } from "@/components/projects-strip";
 import { RecordFab } from "@/components/record-fab";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isSelectable, selectedIdeas, toggleSelected } from "@/lib/document";
@@ -144,6 +145,9 @@ export function MedicalSection() {
         <Button asChild variant="outline" className="rounded-full px-4"><Link to="/" search={captureSearch}><PenLine />اكتب فكرة طبية</Link></Button>
         <Button variant={selecting ? "default" : "outline"} className="rounded-full px-4" aria-pressed={selecting} onClick={() => (selecting ? exitSelection() : setSelecting(true))}><ListChecks />اختيار</Button>
       </div>
+      {/* Projects of the MEDICAL partition only — rendered when at least
+          one medical project exists. */}
+      <ProjectsStrip ideas={ideas} medical />
       {searchOpen && <div className="mb-6">
         <div className="flex items-center gap-2 border-b border-border pb-3">
           <Search className="size-5 shrink-0 text-muted-foreground" />

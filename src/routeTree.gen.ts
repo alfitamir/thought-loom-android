@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as MedicalRouteImport } from './routes/medical'
+import { Route as ProjectRouteImport } from './routes/project'
 import { Route as ApiArticlesImproveRouteImport } from './routes/api/articles/improve'
 import { Route as ApiDriveSongAudioRouteImport } from './routes/api/drive/song-audio'
 import { Route as ApiDriveSyncRouteImport } from './routes/api/drive/sync'
@@ -36,6 +37,11 @@ const LibraryRoute = LibraryRouteImport.update({
 const MedicalRoute = MedicalRouteImport.update({
   id: '/medical',
   path: '/medical',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectRoute = ProjectRouteImport.update({
+  id: '/project',
+  path: '/project',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiArticlesImproveRoute = ApiArticlesImproveRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/medical': typeof MedicalRoute
+  '/project': typeof ProjectRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
   '/api/drive/song-audio': typeof ApiDriveSongAudioRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/medical': typeof MedicalRoute
+  '/project': typeof ProjectRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
   '/api/drive/song-audio': typeof ApiDriveSongAudioRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/library': typeof LibraryRoute
   '/medical': typeof MedicalRoute
+  '/project': typeof ProjectRoute
   '/api/articles/improve': typeof ApiArticlesImproveRoute
   '/api/drive/song-audio': typeof ApiDriveSongAudioRoute
   '/api/drive/sync': typeof ApiDriveSyncRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/library'
     | '/medical'
+    | '/project'
     | '/api/articles/improve'
     | '/api/drive/song-audio'
     | '/api/drive/sync'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/library'
     | '/medical'
+    | '/project'
     | '/api/articles/improve'
     | '/api/drive/song-audio'
     | '/api/drive/sync'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/library'
     | '/medical'
+    | '/project'
     | '/api/articles/improve'
     | '/api/drive/song-audio'
     | '/api/drive/sync'
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   LibraryRoute: typeof LibraryRoute
   MedicalRoute: typeof MedicalRoute
+  ProjectRoute: typeof ProjectRoute
   ApiArticlesImproveRoute: typeof ApiArticlesImproveRoute
   ApiDriveSongAudioRoute: typeof ApiDriveSongAudioRoute
   ApiDriveSyncRoute: typeof ApiDriveSyncRoute
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/medical'
       fullPath: '/medical'
       preLoaderRoute: typeof MedicalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/project': {
+      id: '/project'
+      path: '/project'
+      fullPath: '/project'
+      preLoaderRoute: typeof ProjectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/articles/improve': {
@@ -200,6 +220,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   LibraryRoute: LibraryRoute,
   MedicalRoute: MedicalRoute,
+  ProjectRoute: ProjectRoute,
   ApiArticlesImproveRoute: ApiArticlesImproveRoute,
   ApiDriveSongAudioRoute: ApiDriveSongAudioRoute,
   ApiDriveSyncRoute: ApiDriveSyncRoute,

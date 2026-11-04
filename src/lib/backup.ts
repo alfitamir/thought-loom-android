@@ -49,6 +49,9 @@ export function parseBackup(raw: string): Idea[] {
     // Section membership travels too — a restore must not drop a medical
     // article back into the general library.
     if (i.medical === true) idea.medical = true;
+    // Project assignment travels too — a restore must not un-file an
+    // article from the book or series it belongs to.
+    if (typeof i.project === "string" && i.project.trim()) idea.project = i.project;
     // Version history travels too — a restore must not strip the safety
     // net of frozen pre-AI texts. Malformed entries are dropped by the
     // validator, never guessed back into shape.
