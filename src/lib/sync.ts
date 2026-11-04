@@ -16,6 +16,7 @@ const cloudRow = (idea: Idea, userId: string) => ({
   liked: idea.liked ?? false, source: idea.source ?? null, sources: idea.sources ?? null,
   pinned: idea.pinned ?? false,
   medical: idea.medical ?? false,
+  project: idea.project ?? null,
   versions: idea.versions ?? null,
 });
 
@@ -75,7 +76,7 @@ async function run(): Promise<number> {
 
   const [{ data: gone, error: goneError }, { data, error }] = await Promise.all([
     supabase.from("idea_deletions").select("idea_id").eq("user_id", uid),
-    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration,drive_file_id,liked,source,sources,pinned,medical,versions").eq("user_id", uid),
+    supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,merged_from,topic,topic_manual,song,song_duration,drive_file_id,liked,source,sources,pinned,medical,project,versions").eq("user_id", uid),
   ]);
   if (goneError || error || !gone || !data) return 0;
   if (deleted.length) clearDeleted(deleted);
@@ -102,6 +103,7 @@ async function run(): Promise<number> {
       ...(r.sources?.length ? { sources: r.sources } : {}),
       ...(r.pinned ? { pinned: true } : {}),
       ...(r.medical ? { medical: true } : {}),
+      ...(r.project ? { project: r.project } : {}),
       ...(versions ? { versions } : {}),
       updatedAt: Number(r.updated_at),
     };
@@ -132,6 +134,8 @@ async function run(): Promise<number> {
       || (i.pinned ?? false) !== (cloud.pinned ?? false)
       // Section membership rides along the same way (a move never edits the text).
       || (i.medical ?? false) !== (cloud.medical ?? false)
+      // Project assignment is hand-set metadata too (filing never edits the text).
+      || (i.project ?? null) !== (cloud.project ?? null)
       // Version history rides along too: editions reconcile by union in
       // mergeIdeas, and a union that grew must reach the cloud even when
       // no timestamp moved.

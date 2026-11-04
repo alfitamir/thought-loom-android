@@ -64,6 +64,7 @@ export type Database = {
           medical: boolean
           merged_from: string[] | null
           pinned: boolean
+          project: string | null
           song: boolean
           song_duration: number | null
           source: string | null
@@ -86,6 +87,7 @@ export type Database = {
           medical?: boolean
           merged_from?: string[] | null
           pinned?: boolean
+          project?: string | null
           song?: boolean
           song_duration?: number | null
           source?: string | null
@@ -108,6 +110,7 @@ export type Database = {
           medical?: boolean
           merged_from?: string[] | null
           pinned?: boolean
+          project?: string | null
           song?: boolean
           song_duration?: number | null
           source?: string | null

@@ -65,6 +65,16 @@ export type Idea = {
    *  pins it never bumps `updatedAt`. A song is never a medical article:
    *  song ideas never carry this flag. */
   medical?: boolean;
+  /** Name of the project this article belongs to (a book, a lecture
+   *  series, a topic file) — organizational metadata the user assigns by
+   *  hand, exactly like the topic pin: it never bumps `updatedAt` and no
+   *  AI pass reads or writes it. Projects are DERIVED from assignments
+   *  (there is no project registry) and are partition-scoped: a project
+   *  is identified by (section, name), so the same name in the general
+   *  library and in the medical section names two different projects.
+   *  Optional — most articles belong to no project. Songs never carry
+   *  one (a recording is not project material). */
+  project?: string;
   /** Frozen pre-AI copies of this article's text, newest first (see
    *  IdeaVersion). Own articles only: a song's text is its lyrics and a
    *  liked article is never AI-touched, so neither ever grows a history. */
@@ -291,6 +301,11 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     // Section membership is metadata as well: an edition that lacks the
     // medical flag must not pull the winner out of the medical section.
     if (!winner.medical && loser.medical) winner = { ...winner, medical: true };
+    // Project assignment is hand-set metadata too: an edition that lacks
+    // a project must not silently un-file the winner. When BOTH editions
+    // carry a project the winner keeps its own — assignments are never
+    // merged across names.
+    if (!winner.project && loser.project) winner = { ...winner, project: loser.project };
     // Version history is a union, never a contest: snapshots frozen on
     // EITHER edition survive (deduped by timestamp), the cap applied
     // after the union — a sync must never throw away a frozen text.
@@ -436,6 +451,83 @@ export function setMedical(id: string, medical: boolean): Idea | undefined {
   if (medical) updated.medical = true; else delete updated.medical;
   replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
   return updated;
+}
+
+/**
+ * File an article under a project (or take it out with `null`). This is
+ * organizational metadata, not a text edit, so `updatedAt` is left alone
+ * (exactly like the pins). Names are trimmed; an empty name clears the
+ * assignment. Setting the assignment the article already has is a no-op.
+ */
+export function setProject(id: string, name: string | null): Idea | undefined {
+  const all = loadIdeas();
+  const current = all.find((idea) => idea.id === id);
+  if (!current) return;
+  const next = (name ?? "").trim();
+  if ((current.project ?? "") === next) return current;
+  const updated: Idea = { ...current };
+  if (next) updated.project = next; else delete updated.project;
+  replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
+  return updated;
+}
+
+/** Every project currently in use in the given list, with its article
+ *  count, busiest first — derived from assignments, like topicOptions.
+ *  Callers pass ONE partition's ideas, so the list is that section's
+ *  projects only. */
+export function projectOptions(ideas: Idea[]): { project: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const idea of ideas) {
+    const name = idea.project?.trim();
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([project, count]) => ({ project, count }))
+    .sort((a, b) => b.count - a.count || a.project.localeCompare(b.project, "ar"));
+}
+
+/**
+ * Rename a project inside ONE partition: every member's assignment moves
+ * to the new name (bulk setProject over that section's members only —
+ * the other section's same-named project is a different project and is
+ * never touched). Renaming onto a name that already exists in the
+ * partition merges the two projects, exactly as assigning an article to
+ * an existing project would. Metadata only — no `updatedAt` moves.
+ * Returns how many articles were renamed (0 for a no-op).
+ */
+export function renameProject(medical: boolean, from: string, to: string): number {
+  const target = to.trim();
+  if (!target || target === from) return 0;
+  const all = loadIdeas();
+  let n = 0;
+  const next = all.map((idea) => {
+    if (!!idea.medical === medical && idea.project === from) { n++; return { ...idea, project: target }; }
+    return idea;
+  });
+  if (n) replaceIdeas(next);
+  return n;
+}
+
+/**
+ * Dissolve a project inside ONE partition: all its members are simply
+ * unassigned — the articles themselves are never touched. Returns how
+ * many articles were unassigned.
+ */
+export function clearProject(medical: boolean, name: string): number {
+  const all = loadIdeas();
+  let n = 0;
+  const next = all.map((idea) => {
+    if (!!idea.medical === medical && idea.project === name) {
+      n++;
+      const updated = { ...idea };
+      delete updated.project;
+      return updated;
+    }
+    return idea;
+  });
+  if (n) replaceIdeas(next);
+  return n;
 }
 
 /** The two library partitions: the medical section and everything else.

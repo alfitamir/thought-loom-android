@@ -12,6 +12,7 @@ import { requestDelete, undoDelete } from "@/lib/delete-flow";
 import { toast } from "sonner";
 import { ArticleEditor } from "@/components/article-editor";
 import { CompileBar } from "@/components/compile-bar";
+import { ProjectsStrip } from "@/components/projects-strip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isSelectable, selectedIdeas, toggleSelected } from "@/lib/document";
 import { MergeBanner } from "@/components/merge-banner";
@@ -212,6 +213,9 @@ export function Library() {
         </span>
         <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
       </Link>
+      {/* Projects of the MAIN partition (general books, series, files) —
+          rendered only when at least one exists here. */}
+      <ProjectsStrip ideas={ideas} />
       {(bulk || bulkMsg) && <p role="status" className="mb-4 text-sm text-muted-foreground">{bulk ? `جارٍ الضبط… تم ${bulk.done} من ${bulk.total}` : bulkMsg}</p>}
       {ideas.length > 0 && <div className="mb-4 flex flex-wrap gap-2">
         <button onClick={() => setAskOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"><MessageCircleQuestion className="size-5" />اسأل أفكاري</button>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, Heart, HelpCircle, History, ImageDown, Library, ListPlus, Lock, Merge, Music, Pencil, Pin, PinOff, Play, PlusCircle, Quote, RefreshCw, RotateCcw, Share2, ShieldAlert, Sparkles, Square, Stethoscope, Trash2, Volume2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Copy, Download, Facebook, FolderOpen, Heart, HelpCircle, History, ImageDown, Library, ListPlus, Lock, Merge, Music, Pencil, Pin, PinOff, Play, PlusCircle, Quote, RefreshCw, RotateCcw, Share2, ShieldAlert, Sparkles, Square, Stethoscope, Trash2, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -8,7 +8,7 @@ import { ManualMergeDialog } from "@/components/manual-merge-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
 import { countOccurrences } from "@/lib/search-highlight";
-import { articleTopic, clearArticleTopic, getArticle, loadIdeas, restoreVersion, setArticleTopic, setMedical, setPinned, topicOptions, updateArticle, updateSong, type Idea, type VersionSource } from "@/lib/ideas";
+import { articleTopic, clearArticleTopic, getArticle, loadIdeas, projectOptions, restoreVersion, setArticleTopic, setMedical, setPinned, setProject, topicOptions, updateArticle, updateSong, type Idea, type VersionSource } from "@/lib/ideas";
 import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
@@ -93,6 +93,9 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   // Manual topic picker state (the new-topic draft lives here, not in the dialog)
   const [topicOpen, setTopicOpen] = useState(false);
   const [newTopic, setNewTopic] = useState("");
+  // Project picker state — the same pattern (a draft name + an open dialog)
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [newProject, setNewProject] = useState("");
   const [mergeOpen, setMergeOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const version = useRef(idea.updatedAt ?? 0);
@@ -153,6 +156,16 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
     onChange();
     void pushIdea(updated).catch(() => {});
     setMessage(updated.medical ? "نُقل المقال إلى القسم الطبي ✓" : "أُخرج المقال إلى المكتبة العامة ✓");
+  };
+  /** File under a project / take out of it: organizational metadata, not
+   *  a text edit (no updatedAt bump), synced like the pins. */
+  const chooseProject = (name: string | null) => {
+    const updated = setProject(idea.id, name);
+    setProjectOpen(false);
+    if (!updated) return;
+    onChange();
+    void pushIdea(updated).catch(() => {});
+    setMessage(updated.project ? `أُضيف المقال إلى مشروع «${updated.project}» ✓` : "أُخرج المقال من المشروع ✓");
   };
   const share = async () => {
     setMessage("");
@@ -372,6 +385,15 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
               className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80">
               التصنيف: {topic}
               {idea.topicManual && <Lock className="size-3" />}
+              <Pencil className="size-3" />
+            </button>
+          )}
+          {!isSong && (
+            <button type="button" aria-label={idea.project ? `المشروع: ${idea.project} — تغيير المشروع` : "إضافة المقال إلى مشروع"} title="المشروع"
+              onClick={() => { setNewProject(""); setProjectOpen(true); }}
+              className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80">
+              <FolderOpen className="size-3" />
+              {idea.project ? `المشروع: ${idea.project}` : "بدون مشروع"}
               <Pencil className="size-3" />
             </button>
           )}
@@ -667,6 +689,41 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
         </div>
         <div className="flex justify-end pt-1">
           <Button variant="ghost" onClick={() => setTopicOpen(false)}>إغلاق</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    {/* Project picker: file this article under a project (a book, a lecture
+        series, a topic file) or take it out — projects are optional, unlike
+        topics. The list counts projects inside the article's own section
+        only: the same name in the other section is a different project. */}
+    <Dialog open={projectOpen} onOpenChange={setProjectOpen}>
+      <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
+        <DialogTitle className="text-start font-display">مشروع المقال</DialogTitle>
+        <div className="space-y-1.5">
+          <button type="button" onClick={() => chooseProject(null)}
+            className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-start hover:bg-accent">
+            <span className="text-sm font-medium text-foreground">بدون مشروع</span>
+            {!idea.project && <Check className="size-4 text-primary" />}
+          </button>
+          {projectOpen && projectOptions(loadVisibleIdeas().filter((i) => !!i.medical === !!idea.medical)).map(({ project: name, count }) => (
+            <button key={name} type="button" onClick={() => chooseProject(name)}
+              className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-start hover:bg-accent">
+              <span className="text-sm font-medium text-foreground">{name}</span>
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                {count}
+                {name === idea.project && <Check className="size-4 text-primary" />}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input aria-label="مشروع جديد" value={newProject} onChange={(e) => setNewProject(e.target.value)} placeholder="مشروع جديد…"
+            onKeyDown={(e) => { if (e.key === "Enter" && newProject.trim()) chooseProject(newProject); }}
+            className="min-w-0 flex-1 rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          <Button disabled={!newProject.trim()} onClick={() => chooseProject(newProject)}>حفظ</Button>
+        </div>
+        <div className="flex justify-end pt-1">
+          <Button variant="ghost" onClick={() => setProjectOpen(false)}>إغلاق</Button>
         </div>
       </DialogContent>
     </Dialog>

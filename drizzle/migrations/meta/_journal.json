@@ -71,6 +71,13 @@
       "when": 1794172800000,
       "tag": "0009_idea_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794259200000,
+      "tag": "0010_idea_project",
+      "breakpoints": true
     }
   ]
 }
