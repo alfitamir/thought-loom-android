@@ -42,6 +42,7 @@ vi.mock("@/components/evidence-dialog", () => ({ EvidenceDialog: () => null }));
 vi.mock("@/components/manual-merge-dialog", () => ({ ManualMergeDialog: () => null }));
 
 import { ArticleEditor } from "@/components/article-editor";
+import { composeXPost, xCharCount, X_DISCLAIMER, X_POST_LIMIT } from "@/lib/x-post";
 
 const FOLLOWS = 4; // Node.DOCUMENT_POSITION_FOLLOWING
 const before = (a: Element, b: Element) => (a.compareDocumentPosition(b) & FOLLOWS) !== 0;
@@ -134,5 +135,68 @@ describe("section move action (Part A)", () => {
     localStorage.setItem("afkari.ideas", JSON.stringify([song]));
     renderEditor(song);
     expect(screen.queryByRole("button", { name: "نقل إلى القسم الطبي" })).toBeNull();
+  });
+});
+
+describe("X post chip (feature 5)", () => {
+  beforeEach(() => {
+    // Radix menus/dialogs reach for pointer capture and scrollIntoView,
+    // which jsdom does not implement.
+    const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
+    proto["hasPointerCapture"] ??= () => false;
+    proto["setPointerCapture"] ??= () => {};
+    proto["releasePointerCapture"] ??= () => {};
+    proto["scrollIntoView"] ??= () => {};
+  });
+
+  const openToolsMenu = () => {
+    // Radix opens its menu on ArrowDown; pointer gestures are not
+    // recognised under jsdom (no real pointer capture).
+    fireEvent.keyDown(screen.getByRole("button", { name: "أدوات ذكية" }), { key: "ArrowDown" });
+  };
+
+  it("sits beside the Facebook item in the smart-tools menu and copies a locally composed post, offline", async () => {
+    localStorage.setItem("afkari.ideas", JSON.stringify([article]));
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(window.navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderEditor(article); // online={false}: the X item must still work — it composes on-device
+    openToolsMenu();
+    expect(screen.getByRole("menuitem", { name: "منشور فيسبوك" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: "منشور X" }));
+    // The dialog previews exactly what the pure composer builds, with its count.
+    const expected = composeXPost({ title: article.articleTitle!, body: article.articleBody!, medical: false, topic: "متفرقات" });
+    expect(screen.getByText("منشور X مقترح")).toBeTruthy();
+    expect(screen.getByText((_, el) => el?.tagName === "DIV" && el.textContent === expected)).toBeTruthy();
+    expect(xCharCount(expected)).toBeLessThanOrEqual(X_POST_LIMIT);
+    expect(screen.getByText(/عدد الحروف/).textContent).toContain(`/ ${X_POST_LIMIT}`);
+    // Copy mirrors the Facebook chip's confirmation, in the dialog and the editor.
+    fireEvent.click(screen.getByRole("button", { name: "نسخ المنشور" }));
+    expect(await screen.findAllByText("نُسخ المنشور ✓")).not.toHaveLength(0);
+    expect(writeText).toHaveBeenCalledWith(expected);
+  });
+
+  it("a medical article's preview closes with the disclaimer", () => {
+    const med: Idea = { ...article, id: "m9", medical: true };
+    localStorage.setItem("afkari.ideas", JSON.stringify([med]));
+    renderEditor(med);
+    openToolsMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "منشور X" }));
+    const expected = composeXPost({ title: med.articleTitle!, body: med.articleBody!, medical: true, topic: "متفرقات" });
+    expect(expected.endsWith(X_DISCLAIMER)).toBe(true);
+    expect(screen.getByText((_, el) => el?.tagName === "DIV" && el.textContent === expected)).toBeTruthy();
+  });
+
+  it("mirrors the Facebook chip's exclusions: liked articles and songs never reach it", () => {
+    const liked: Idea = { ...article, id: "l9", liked: true, source: "مجلة الفكر" };
+    localStorage.setItem("afkari.ideas", JSON.stringify([liked]));
+    const { unmount } = renderEditor(liked);
+    expect(screen.queryByRole("button", { name: "أدوات ذكية" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "منشور X" })).toBeNull();
+    unmount();
+    const song: Idea = { id: "s9", text: "كلمات الأغنية", createdAt: 1000, updatedAt: 5000, articleTitle: "أغنية", song: true };
+    localStorage.setItem("afkari.ideas", JSON.stringify([song]));
+    renderEditor(song);
+    expect(screen.queryByRole("button", { name: "أدوات ذكية" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "منشور X" })).toBeNull();
   });
 });
