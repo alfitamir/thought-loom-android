@@ -130,9 +130,16 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+  /* Warm reading tint under dark: a warm brown surface above the dark
+   * card tone, so a tinted reading block stays visibly warm at night. */
+  --reading-bg-warm: oklch(0.27 0.04 60);
 }
 
-:root {
+/* The app's warm light palette. Scoped to :root:not(.dark): this block
+ * sits AFTER the .dark block above at equal specificity, so unscoped it
+ * would override the dark tokens on <html class="dark"> and dark mode
+ * could never apply. Light rendering is unchanged by the scoping. */
+:root:not(.dark) {
   --background: oklch(0.96 0.02 80);
   --foreground: oklch(0.28 0.05 50);
   --card: oklch(0.985 0.012 85);
@@ -146,6 +153,10 @@
   --muted-foreground: oklch(0.52 0.04 55);
   --border: oklch(0.87 0.03 75);
   --ring: oklch(0.6 0.09 50);
+  /* Warm reading tint (reading-prefs bgTint step 1): one step deeper
+   * than the already-warm page background, so the reading block reads
+   * as a parchment sheet rather than vanishing into the page. */
+  --reading-bg-warm: oklch(0.935 0.05 76);
 }
 
 @theme inline {
@@ -164,6 +175,14 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
+}
+
+/* Reading tint for the edit boxes: they already carry bg-card, and this
+ * unlayered rule overrides the layered utility deterministically when
+ * the warm tint is on. The value flows from --reading-bg, set inline on
+ * the editor root by readingStyleVars. */
+.reading-tinted {
+  background-color: var(--reading-bg);
 }
 
 @utility paper {

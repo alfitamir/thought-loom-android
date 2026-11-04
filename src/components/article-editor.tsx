@@ -22,7 +22,7 @@ import { downloadSongAudio } from "@/lib/song-drive";
 import { applySongLyrics, decideLyricsApplication, isSongLyricsPending, onSongLyricsPendingChange, transcribeSong } from "@/lib/song-lyrics";
 import { deliverCardImage, renderShareCardPng, shareCardModel } from "@/lib/share-card";
 import { composeXPost, xCharCount, X_POST_LIMIT } from "@/lib/x-post";
-import { FONT_SIZE_STEPS, LINE_HEIGHT_STEPS, readingStyleVars, useReadingPrefs } from "@/lib/reading-prefs";
+import { BG_TINT_STEPS, FONT_SIZE_STEPS, LINE_HEIGHT_STEPS, readingStyleVars, useReadingPrefs } from "@/lib/reading-prefs";
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -296,7 +296,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
   return <article className="border-b border-border py-6 last:border-0" style={readingStyleVars(readingPrefs)}>
     {editing ? <div className="space-y-3">
       <input aria-label="عنوان المقال" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
-      <textarea aria-label="نص المقال" value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="w-full rounded-md border border-input bg-card p-3 font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] outline-none focus:ring-2 focus:ring-ring" />
+      <textarea aria-label="نص المقال" value={body} onChange={(e) => setBody(e.target.value)} rows={10} className={`w-full rounded-md border border-input bg-card p-3 font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] outline-none focus:ring-2 focus:ring-ring${readingPrefs.bgTint === 1 ? " reading-tinted" : ""}`} />
       <p className="text-xs text-muted-foreground">عدد الكلمات: {countWords(body)}</p>
       <div className="flex gap-2">
         <Button onClick={() => save(title, body)} disabled={!title.trim() || !body.trim()}><Check />حفظ</Button>
@@ -318,7 +318,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
               so it serves every kind — articles, songs and liked alike. */}
           <DropdownMenu dir="rtl">
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="راحة القراءة" title="حجم النص وتباعد الأسطر">
+              <Button variant="ghost" size="icon" className="[&_svg]:size-5" aria-label="راحة القراءة" title="حجم النص وتباعد الأسطر وخلفية القراءة">
                 <span aria-hidden="true" className="flex size-5 items-center justify-center text-lg font-black leading-none">أ</span>
               </Button>
             </DropdownMenuTrigger>
@@ -336,6 +336,14 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
                 <DropdownMenuItem key={step} aria-label={`تباعد الأسطر: ${label}`} onSelect={() => setReadingPrefs({ ...readingPrefs, lineHeight: step })}>
                   {label}
                   {readingPrefs.lineHeight === step && <Check className="ms-auto" />}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>خلفية القراءة</DropdownMenuLabel>
+              {BG_TINT_STEPS.map(({ step, label }) => (
+                <DropdownMenuItem key={step} aria-label={`خلفية القراءة: ${label}`} onSelect={() => setReadingPrefs({ ...readingPrefs, bgTint: step })}>
+                  {label}
+                  {readingPrefs.bgTint === step && <Check className="ms-auto" />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -446,7 +454,7 @@ export function ArticleEditor({ idea, topic, online, onChange, onDelete, searchQ
           ? <HighlightedText text={preview} query={hlQuery} />
           : preview}</p>;
       })()}
-      <p className="whitespace-pre-wrap break-words font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] text-foreground">{hlQuery
+      <p className={`whitespace-pre-wrap break-words font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] text-foreground${readingPrefs.bgTint === 1 ? " rounded-xl bg-[var(--reading-bg)] px-4 py-3" : ""}`}>{hlQuery
         ? <HighlightedText text={article.body} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
         : article.body}</p>
       <p className="mt-2 text-xs text-muted-foreground">عدد الكلمات: {countWords(article.body)}</p>
@@ -812,6 +820,9 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
   hlQuery?: string; bodyMatchStart?: number; currentMatchIndex?: number | null | undefined;
 }) {
   const article = getArticle(idea);
+  // Reading comfort applies to the lyrics too; the hook syncs through
+  // the same window event the article editor's menu dispatches.
+  const { prefs: readingPrefs } = useReadingPrefs();
   const [record, setRecord] = useState<SongAudioRecord | null | undefined>(undefined);
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState("");
@@ -945,7 +956,7 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
   if (editing) {
     return <div className="space-y-3">
       <input aria-label="عنوان الأغنية" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-input bg-card px-3 py-2 font-display text-lg outline-none focus:ring-2 focus:ring-ring" />
-      <textarea aria-label="كلمات الأغنية" value={lyrics} onChange={(e) => setLyrics(e.target.value)} rows={10} placeholder="اكتب كلمات الأغنية هنا…" className="w-full rounded-md border border-input bg-card p-3 font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] outline-none focus:ring-2 focus:ring-ring" />
+      <textarea aria-label="كلمات الأغنية" value={lyrics} onChange={(e) => setLyrics(e.target.value)} rows={10} placeholder="اكتب كلمات الأغنية هنا…" className={`w-full rounded-md border border-input bg-card p-3 font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] outline-none focus:ring-2 focus:ring-ring${readingPrefs.bgTint === 1 ? " reading-tinted" : ""}`} />
       <div className="flex gap-2">
         <Button onClick={saveLyrics} disabled={!title.trim()}><Check />حفظ</Button>
         <Button variant="ghost" onClick={() => setEditing(false)}><X />إلغاء</Button>
@@ -992,7 +1003,7 @@ function SongSection({ idea, onChange, onDeleteRequest, hlQuery, bodyMatchStart,
       </div>
     )}
     {idea.text.trim() ? (
-      <p className="whitespace-pre-wrap break-words font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] text-foreground">{hlQuery
+      <p className={`whitespace-pre-wrap break-words font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] text-foreground${readingPrefs.bgTint === 1 ? " rounded-xl bg-[var(--reading-bg)] px-4 py-3" : ""}`}>{hlQuery
         ? <HighlightedText text={idea.text} query={hlQuery} startIndex={bodyMatchStart} currentIndex={currentMatchIndex} />
         : idea.text}</p>
     ) : (
