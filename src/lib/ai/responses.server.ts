@@ -9,7 +9,7 @@ import {
 
 export function createResponsesCall(
   request: Request,
-  config: { baseURL: string; apiKey: string; model: string },
+  config: { baseURL: string; apiKey: string; model: string; maxOutputTokens?: number },
   messages: ModelMessage[],
   instructions?: string,
   observeResponse?: (response: Response) => Promise<void>,
@@ -31,6 +31,7 @@ export function createResponsesCall(
     // AI SDK 6 lacks `instructions`: rename this key to `system` there.
     ...(instructions ? { instructions } : {}),
     messages,
+    ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
     abortSignal: request.signal,
     maxRetries: 0,
     providerOptions: {
