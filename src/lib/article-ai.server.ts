@@ -20,7 +20,10 @@ export async function improveArticle(request: Request): Promise<Response> {
   let upstreamMessage = "تعذّر تحسين المقال الآن. مقالك الأصلي محفوظ.";
   let upstreamHeaders = new Headers();
   const call = createResponsesCall(request,
-    { baseURL: "https://ai.gateway.lovable.dev/v1", apiKey: caller.aiKey, model: "openai/gpt-6-astra" },
+    // A merge must return the near-sum of its sources in one answer, so it gets
+    // the same 65536 output budget the personal Gemini path already uses
+    // (gemini.ts); other tasks keep the gateway default.
+    { baseURL: "https://ai.gateway.lovable.dev/v1", apiKey: caller.aiKey, model: "openai/gpt-6-astra", ...(parsed.data.task === "merge" ? { maxOutputTokens: 65536 } : {}) },
     [{ role: "user", content: parsed.data.payload }], TASK_INSTRUCTIONS[parsed.data.task],
     async (response) => {
       upstreamHeaders = response.headers;
