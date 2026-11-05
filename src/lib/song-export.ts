@@ -27,6 +27,7 @@ export const songExportFingerprint = (rec: SongAudioRecord): string =>
  *  with an `.mp3` extension whatever the master was recorded as. */
 export function songMp3FileName(title: string): string {
   const clean = title
+    // eslint-disable-next-line no-control-regex -- intentional: strips C0 control characters so the title is safe as a file name
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
     .replace(/\s+/g, " ")
     .trim()

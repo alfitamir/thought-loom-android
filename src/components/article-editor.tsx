@@ -382,8 +382,8 @@ export function ArticleEditor({
     try {
       const data = await getArticleEnrichment(article);
       setEnrichment(data);
-    } catch (err: any) {
-      setMessage(err?.message || "تعذّر جلب مقترحات الإثراء.");
+    } catch (err) {
+      setMessage(err instanceof Error && err.message ? err.message : "تعذّر جلب مقترحات الإثراء.");
       setEnrichOpen(false);
     } finally {
       setEnrichBusy(false);
@@ -398,8 +398,10 @@ export function ArticleEditor({
       const post = await getFacebookPost(article, { variation });
       setFbPost(post);
       setFbVariation(variation);
-    } catch (err: any) {
-      setFbError(err?.message || "تعذّر إعداد المنشور المقترح.");
+    } catch (err) {
+      setFbError(
+        err instanceof Error && err.message ? err.message : "تعذّر إعداد المنشور المقترح.",
+      );
     } finally {
       setFbBusy(false);
     }

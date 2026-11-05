@@ -300,6 +300,7 @@ function googleErrorReasons(details: unknown): string[] {
  * single line, whitespace collapsed, capped at 140 characters. */
 function sanitizeGoogleErrorText(message: string): string {
   const clean = message
+    // eslint-disable-next-line no-control-regex -- intentional: strips C0/DEL control characters from the provider's error text before display
     .replace(/[\u0000-\u001f\u007f]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();

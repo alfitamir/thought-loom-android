@@ -128,11 +128,13 @@ export const ASK_SCHEMA = {
 export function sanitizeAsk(raw: unknown, known: Set<string>): AskAnswer {
   const r = (raw ?? {}) as { answer?: unknown; sources?: unknown };
   const seen = new Set<string>();
-  const sources = (Array.isArray(r.sources) ? r.sources : []).flatMap((s: any) => {
-    if (!s || typeof s.id !== "string" || !known.has(s.id) || seen.has(s.id)) return [];
-    seen.add(s.id);
-    return [{ id: s.id, note: String(s.note ?? "").trim() }];
-  });
+  const sources = (Array.isArray(r.sources) ? r.sources : []).flatMap(
+    (s: { id?: unknown; note?: unknown } | null) => {
+      if (!s || typeof s.id !== "string" || !known.has(s.id) || seen.has(s.id)) return [];
+      seen.add(s.id);
+      return [{ id: s.id, note: String(s.note ?? "").trim() }];
+    },
+  );
   const answer = typeof r.answer === "string" ? r.answer.trim() : "";
   if (!answer) throw new Error("لم يصل جواب من Gemini. حاول مرة أخرى.");
   return { answer, sources };
@@ -229,23 +231,27 @@ export const INSIGHTS_SCHEMA = {
 export function sanitizeInsights(raw: unknown, ids: string[]): Insights {
   const known = new Set(ids);
   const r = (raw ?? {}) as { themes?: unknown; prompts?: unknown };
-  const themes = (Array.isArray(r.themes) ? r.themes : []).flatMap((t: any) => {
-    const tid = [
-      ...new Set(
-        (Array.isArray(t?.ids) ? t.ids : []).filter(
-          (id: unknown): id is string => typeof id === "string" && known.has(id),
+  const themes = (Array.isArray(r.themes) ? r.themes : []).flatMap(
+    (t: { ids?: unknown; name?: unknown; summary?: unknown } | null) => {
+      const tid = [
+        ...new Set(
+          (Array.isArray(t?.ids) ? t.ids : []).filter(
+            (id: unknown): id is string => typeof id === "string" && known.has(id),
+          ),
         ),
-      ),
-    ] as string[];
-    const name = String(t?.name ?? "").trim();
-    return name && tid.length >= 2
-      ? [{ name, summary: String(t?.summary ?? "").trim(), ids: tid }]
-      : [];
-  });
-  const prompts = (Array.isArray(r.prompts) ? r.prompts : []).flatMap((p: any) => {
-    const title = String(p?.title ?? "").trim();
-    return title ? [{ title, angle: String(p?.angle ?? "").trim() }] : [];
-  });
+      ] as string[];
+      const name = String(t?.name ?? "").trim();
+      return name && tid.length >= 2
+        ? [{ name, summary: String(t?.summary ?? "").trim(), ids: tid }]
+        : [];
+    },
+  );
+  const prompts = (Array.isArray(r.prompts) ? r.prompts : []).flatMap(
+    (p: { title?: unknown; angle?: unknown } | null) => {
+      const title = String(p?.title ?? "").trim();
+      return title ? [{ title, angle: String(p?.angle ?? "").trim() }] : [];
+    },
+  );
   if (!themes.length && !prompts.length)
     throw new Error("لم تتوفر رؤى كافية بعد. أضف مقالات أكثر وحاول مجددًا.");
   return { themes, prompts };
@@ -336,7 +342,7 @@ const int = (v: unknown) => (Number.isInteger(Number(v)) ? Number(v) : NaN);
 export function sanitizeEvidence(raw: unknown): EvidenceCandidate[] {
   const out: EvidenceCandidate[] = [];
   const seen = new Set<string>();
-  for (const r of (Array.isArray(raw) ? raw : []) as Record<string, any>[]) {
+  for (const r of (Array.isArray(raw) ? raw : []) as Record<string, unknown>[]) {
     if (!r || out.length >= 8) continue;
     const claim = text(r["claim"]),
       why = text(r["why"]);
@@ -404,7 +410,7 @@ const stringList = (v: unknown, maxItems: number, maxChars: number): string[] =>
 export function sanitizeAdditions(raw: unknown): ArticleAdditions {
   const r = (raw ?? {}) as { additions?: unknown; quotes?: unknown; questions?: unknown };
   const quotes = (Array.isArray(r.quotes) ? r.quotes : [])
-    .flatMap((q: any) => {
+    .flatMap((q: { quote?: unknown; author?: unknown; context?: unknown } | null) => {
       if (!q || typeof q !== "object") return [];
       const quote = typeof q.quote === "string" ? q.quote.trim().slice(0, 500) : "";
       if (!quote) return [];

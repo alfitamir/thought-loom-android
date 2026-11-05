@@ -209,7 +209,9 @@ describe("getEvidence (end to end)", () => {
     route([quran]);
     const { items } = await getEvidence(article);
     expect(items[0]!).toMatchObject({ kind: "quran", status: "verified" });
-    expect((items[0]! as any).text).toContain("ٱلْأَمَانَةَ");
+    const first = items[0]!;
+    if (first.kind !== "quran") throw new Error("expected a quran item");
+    expect(first.text).toContain("ٱلْأَمَانَةَ");
   });
   it("REGRESSION: a hallucinated reference never reaches the user, and the user is told why", async () => {
     route([{ ...quran, opening: "اقرأ باسم ربك الذي خلق" }]);

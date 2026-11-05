@@ -5,7 +5,11 @@ import { partitionIdeas, saveIdea } from "@/lib/ideas";
 import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { supabase } from "@/integrations/supabase/client";
 import { pushIdea, syncNow } from "@/lib/sync";
-import { createVoiceRecorder, type VoiceRecorder } from "@/lib/voice-recorder";
+import {
+  createVoiceRecorder,
+  type SpeechRecognitionCtor,
+  type VoiceRecorder,
+} from "@/lib/voice-recorder";
 import {
   browserRecorderDeps,
   createAudioRecorder,
@@ -414,7 +418,11 @@ function Index() {
       return;
     }
     // Fallback: the browser's speech recognition, as before.
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const speechWindow = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const SR = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SR) {
       setMsg("التسجيل الصوتي غير متاح على هذا الجهاز، اكتب فكرتك.");
       return;

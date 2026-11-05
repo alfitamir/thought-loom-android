@@ -80,9 +80,9 @@ export function sanitizeSuggestions(raw: unknown, ideas: Idea[]): MergeSuggestio
   const known = new Set(ideas.map((i) => i.id));
   const used = new Set<string>();
   const out: MergeSuggestion[] = [];
-  const given = (s: any) =>
+  const given = (s: { strength?: unknown } | null | undefined) =>
     Number.isInteger(Number(s?.strength)) && s?.strength !== null && s?.strength !== ""
-      ? Math.min(5, Math.max(1, Number(s.strength)))
+      ? Math.min(5, Math.max(1, Number(s?.strength)))
       : undefined;
   // A missing strength counts as an average link (3) for ranking, but is not reported as if the model had said so.
   const ranked = raw

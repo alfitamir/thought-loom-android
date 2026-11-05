@@ -18,10 +18,36 @@ type Timers = {
 
 const defaultTimers: Timers = {
   setTimeout: (fn, ms) => setTimeout(fn, ms),
-  clearTimeout: (id) => clearTimeout(id as any),
+  clearTimeout: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
   setInterval: (fn, ms) => setInterval(fn, ms),
-  clearInterval: (id) => clearInterval(id as any),
+  clearInterval: (id) => clearInterval(id as ReturnType<typeof setInterval>),
 };
+
+/** The slice of the Web Speech recognition API this recorder relies on (vendor-prefixed as webkitSpeechRecognition on Android Chrome, so no DOM lib type covers it). */
+export type RecognitionResultLike = {
+  isFinal: boolean;
+  0: { transcript: string };
+};
+export type RecognitionResultEventLike = {
+  resultIndex: number;
+  results: ArrayLike<RecognitionResultLike>;
+};
+export type RecognitionErrorEventLike = { error?: string };
+export type RecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onaudiostart: (() => void) | null;
+  onresult: ((e: RecognitionResultEventLike) => void) | null;
+  onerror: ((e: RecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+export type SpeechRecognitionCtor = new () => RecognitionLike;
 
 export const MIC_DENIED = "اسمح للتطبيق باستخدام المايكروفون من إعدادات الهاتف.";
 export const LANG_MISSING = "نزّل اللغة العربية للتعرف على الصوت من إعدادات الهاتف.";
@@ -33,13 +59,13 @@ export function restartDelay(fails: number) {
 }
 
 export function createVoiceRecorder(
-  SR: any,
+  SR: SpeechRecognitionCtor,
   ev: RecorderEvents,
   lang = "ar-SA",
   timers: Timers = defaultTimers,
 ) {
   let want = false;
-  let current: any = null;
+  let current: RecognitionLike | null = null;
   let active = false;
   let everStarted = false;
   let fails = 0;
@@ -94,11 +120,12 @@ export function createVoiceRecorder(
     rec.onaudiostart = () => {
       everStarted = true;
     };
-    rec.onresult = (e: any) => {
+    rec.onresult = (e) => {
       let finals = "";
       let pending = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
+        if (!r) continue;
         if (r.isFinal) finals += r[0].transcript + " ";
         else pending += r[0].transcript + " ";
       }
@@ -108,7 +135,7 @@ export function createVoiceRecorder(
         fails = 0;
       } else interim = pending;
     };
-    rec.onerror = (e: any) => {
+    rec.onerror = (e) => {
       if (rec !== current) return;
       const err = e?.error;
       if (err === "language-not-supported") {

@@ -123,6 +123,7 @@ const EXTENSIONS: Record<string, string> = {
 /** A share/download-safe file name from the article title. */
 export function audioFileName(title: string, mime: string): string {
   const clean = title
+    // eslint-disable-next-line no-control-regex -- intentional: strips C0 control characters so the title is safe as a file name
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
     .replace(/\s+/g, " ")
     .trim()

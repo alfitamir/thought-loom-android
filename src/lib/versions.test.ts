@@ -119,7 +119,7 @@ describe("snapshots at the updateArticle write point", () => {
 
   it("the cap holds through the write path: the sixth snapshot pushes the oldest out", () => {
     const idea = seedArticle();
-    let current: Idea = {
+    const current: Idea = {
       ...idea,
       versions: [v(50, "هـ"), v(40, "د"), v(30, "ج"), v(20, "ب"), v(10, "أ")],
     };

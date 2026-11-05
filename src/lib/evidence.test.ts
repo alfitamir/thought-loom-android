@@ -9,9 +9,21 @@ import {
   stripBasmala,
   verifyAll,
   verifyCandidate,
+  type EvidenceItem,
+  type Verdict,
 } from "./evidence";
 
 beforeEach(() => clearEvidenceCache());
+
+/** Narrows a Verdict to the item kind a test expects, failing loudly on a drop or a different kind. */
+function itemOf<K extends EvidenceItem["kind"]>(
+  v: Verdict,
+  kind: K,
+): Extract<EvidenceItem, { kind: K }> {
+  if (typeof v === "string" || v.kind !== kind)
+    throw new Error(`expected a ${kind} item, got ${typeof v === "string" ? v : v.kind}`);
+  return v as Extract<EvidenceItem, { kind: K }>;
+}
 
 const ayahJson = (surah: number, n: number, text: string, name = "سُورَةُ البَقَرَةِ") => ({
   data: { text, numberInSurah: n, surah: { number: surah, name } },
@@ -198,8 +210,8 @@ describe("verifyCandidate", () => {
       status: "verified",
       ref: "البَقَرَةِ".length ? expect.stringContaining("الآية 255") : "",
     });
-    expect((v as any).text.startsWith("﴿")).toBe(true);
-    expect((v as any).text).toContain("ٱلْقَيُّومُ");
+    expect(itemOf(v, "quran").text.startsWith("﴿")).toBe(true);
+    expect(itemOf(v, "quran").text).toContain("ٱلْقَيُّومُ");
   });
   it("REGRESSION: a wrong reference (text does not match the claimed opening) is dropped, not shown", async () => {
     const f = mockFetch({ "/2:255/": ayahJson(2, 255, "ذلك الكتاب لا ريب فيه هدى للمتقين") });
@@ -213,7 +225,7 @@ describe("verifyCandidate", () => {
         [{ name: "Al-Albani", grade: "Sahih" }],
       ),
     });
-    const v = (await verifyCandidate(hadith, undefined, f)) as any;
+    const v = itemOf(await verifyCandidate(hadith, undefined, f), "hadith");
     expect(v).toMatchObject({ kind: "hadith", status: "verified", grade: "Sahih (Al-Albani)" });
     expect(v.ref).toContain("صحيح البخاري");
   });
@@ -222,9 +234,10 @@ describe("verifyCandidate", () => {
       "/ara-bukhari/1.json": hadithJson(1, "إنما الأعمال بالنيات"),
       "/ara-tirmidhi/1.json": hadithJson(1, "إنما الأعمال بالنيات"),
     });
-    expect(((await verifyCandidate(hadith, undefined, f)) as any).grade).toBe("من الصحيحين");
+    expect(itemOf(await verifyCandidate(hadith, undefined, f), "hadith").grade).toBe("من الصحيحين");
     expect(
-      ((await verifyCandidate({ ...hadith, collection: "tirmidhi" }, undefined, f)) as any).grade,
+      itemOf(await verifyCandidate({ ...hadith, collection: "tirmidhi" }, undefined, f), "hadith")
+        .grade,
     ).toContain("راجع التخريج");
   });
   it("REGRESSION: a hadith number that resolves to a different hadith is dropped", async () => {
@@ -237,7 +250,7 @@ describe("verifyCandidate", () => {
     expect(await verifyCandidate(quran, undefined, mockFetch({ "/2:255/": 404 }))).toBe("dropped");
   });
   it("source unreachable: keeps the reference, shows NO text, marks unverified", async () => {
-    const v = (await verifyCandidate(quran, undefined, mockFetch({}))) as any;
+    const v = itemOf(await verifyCandidate(quran, undefined, mockFetch({})), "quran");
     expect(v).toMatchObject({ kind: "quran", status: "unverified", text: "" });
   });
   it("multi-ayah ranges are fetched in parallel and joined", async () => {
@@ -245,11 +258,14 @@ describe("verifyCandidate", () => {
       "/2:1/": ayahJson(2, 1, "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ الم"),
       "/2:2/": ayahJson(2, 2, "ذلك الكتاب لا ريب فيه"),
     });
-    const v = (await verifyCandidate(
-      { ...quran, from: 1, to: 2, opening: "ذلك الكتاب لا ريب" },
-      undefined,
-      f,
-    )) as any;
+    const v = itemOf(
+      await verifyCandidate(
+        { ...quran, from: 1, to: 2, opening: "ذلك الكتاب لا ريب" },
+        undefined,
+        f,
+      ),
+      "quran",
+    );
     expect(v.text).toBe("﴿الم ذلك الكتاب لا ريب فيه﴾");
     expect(v.ref).toContain("1-2");
   });

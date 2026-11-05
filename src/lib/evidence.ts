@@ -119,7 +119,7 @@ const abortable = <T>(p: Promise<T>, signal?: AbortSignal): Promise<T> =>
         p.then(resolve, reject);
       });
 
-function getJSON(url: string, signal: AbortSignal | undefined, f: Fetch): Promise<any> {
+function getJSON(url: string, signal: AbortSignal | undefined, f: Fetch): Promise<unknown> {
   let p = cache.get(url);
   if (!p) {
     // Portable timeout (AbortSignal.timeout/any are missing on older Safari). Independent of any one caller.
@@ -148,27 +148,48 @@ export async function fetchAyah(
     signal,
     f,
   );
-  const d = json?.data;
-  if (typeof d?.text !== "string" || d.surah?.number !== surah || d.numberInSurah !== ayah)
+  const d = (
+    json as {
+      data?: {
+        text?: unknown;
+        surah?: { number?: unknown; name?: unknown };
+        numberInSurah?: unknown;
+      };
+    } | null
+  )?.data;
+  const ayahText = d?.text;
+  const surahObj = d?.surah;
+  if (typeof ayahText !== "string" || surahObj?.number !== surah || d?.numberInSurah !== ayah)
     throw new Error("bad ayah response");
   return {
-    text: stripBasmala(d.text, surah, ayah).trim(),
-    surahName: String(d.surah.name ?? "").replace(/^سُورَةُ\s*|^سورة\s*/, ""),
+    text: stripBasmala(ayahText, surah, ayah).trim(),
+    surahName: String(surahObj?.name ?? "").replace(/^سُورَةُ\s*|^سورة\s*/, ""),
   };
 }
 
 /** The hadith-api serves either a single object or a `hadiths` array depending on the path; accept both. */
 export function extractHadith(
-  json: any,
+  json: unknown,
   number: number,
 ): { text: string; grades: { name: string; grade: string }[] } | null {
-  const h = Array.isArray(json?.hadiths)
-    ? (json.hadiths.find((x: any) => Number(x?.hadithnumber) === number) ?? json.hadiths[0])
-    : json;
-  if (typeof h?.text !== "string" || !h.text.trim()) return null;
+  const root = (json ?? {}) as { hadiths?: unknown; text?: unknown; grades?: unknown };
+  const h = (
+    Array.isArray(root.hadiths)
+      ? (root.hadiths.find(
+          (x: { hadithnumber?: unknown } | null) => Number(x?.hadithnumber) === number,
+        ) ?? root.hadiths[0])
+      : root
+  ) as { text?: unknown; grades?: unknown } | null | undefined;
+  const text = h?.text;
+  if (typeof text !== "string" || !text.trim()) return null;
   return {
-    text: h.text.trim(),
-    grades: Array.isArray(h.grades) ? h.grades.filter((g: any) => g?.grade) : [],
+    text: text.trim(),
+    grades: Array.isArray(h?.grades)
+      ? (h.grades.filter((g: { grade?: unknown } | null) => g?.grade) as {
+          name: string;
+          grade: string;
+        }[])
+      : [],
   };
 }
 

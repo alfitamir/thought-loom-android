@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { createVoiceRecorder, MIC_DENIED } from "./voice-recorder";
+import {
+  createVoiceRecorder,
+  MIC_DENIED,
+  type RecognitionErrorEventLike,
+  type RecognitionResultEventLike,
+  type RecognitionResultLike,
+} from "./voice-recorder";
 
 class FakeSR {
   static all: FakeSR[] = [];
@@ -7,11 +13,11 @@ class FakeSR {
   continuous = true;
   interimResults = false;
   maxAlternatives = 1;
-  onstart: any;
-  onaudiostart: any;
-  onresult: any;
-  onerror: any;
-  onend: any;
+  onstart!: () => void;
+  onaudiostart!: () => void;
+  onresult!: (e: RecognitionResultEventLike) => void;
+  onerror!: (e: RecognitionErrorEventLike) => void;
+  onend!: () => void;
   started = false;
   constructor() {
     FakeSR.all.push(this);
@@ -27,8 +33,7 @@ class FakeSR {
     this.onend?.();
   }
   say(text: string, final = true) {
-    const r: any = [{ transcript: text }];
-    r.isFinal = final;
+    const r: RecognitionResultLike = { 0: { transcript: text }, isFinal: final };
     this.onresult?.({ resultIndex: 0, results: [r] });
   }
 }
