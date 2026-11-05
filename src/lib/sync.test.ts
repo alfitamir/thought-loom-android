@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadIdeas, replaceIdeas, type Idea } from "./ideas";
-import { syncNow } from "./sync";
+import { lastCloudSync, lastCloudSyncError, syncNow } from "./sync";
 
 // The Supabase sync, exercised end to end with the client doubled: a
 // chainable stub that serves the seeded cloud rows and records every
@@ -10,6 +10,7 @@ const h = vi.hoisted(() => {
     ideasRows: [] as Record<string, unknown>[],
     deletionRows: [] as { idea_id: string }[],
     ideaUpserts: [] as Record<string, unknown>[],
+    failUpsert: false,
   };
   type Chain = {
     select: () => Chain;
@@ -24,6 +25,7 @@ const h = vi.hoisted(() => {
     const result = () => {
       if (op === "select" && table === "ideas") return { data: state.ideasRows, error: null };
       if (op === "select" && table === "idea_deletions") return { data: state.deletionRows, error: null };
+      if (op === "upsert" && table === "ideas" && state.failUpsert) return { data: null, error: { message: "upsert refused" } };
       return { data: null, error: null };
     };
     const self: Chain = {
@@ -94,5 +96,46 @@ describe("Supabase sync — aiPolishedAt", () => {
     h.state.ideasRows = [cloudRow({ ai_polished_at: 500 })];
     await syncNow();
     expect(h.state.ideaUpserts).toEqual([]);
+  });
+});
+
+describe("Supabase sync — result and health record (F-6.1)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    h.state.ideasRows = [];
+    h.state.deletionRows = [];
+    h.state.ideaUpserts = [];
+    h.state.failUpsert = false;
+  });
+
+  it("a healthy pass resolves ok and stamps the last successful sync", async () => {
+    const result = await syncNow();
+    expect(result).toEqual({ ok: true, restored: 0 });
+    expect(lastCloudSync()).toBeGreaterThan(0);
+    expect(lastCloudSyncError()).toBe("");
+  });
+
+  it("a refused final upsert resolves not-ok and is recorded — never thrown, never silent", async () => {
+    replaceIdeas([localIdea({ updatedAt: 2000 })]);
+    h.state.ideasRows = [cloudRow({ updated_at: 1000 })];
+    h.state.failUpsert = true;
+    const result = await syncNow();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("تعذّرت المزامنة السحابية");
+    expect(lastCloudSync()).toBe(0);
+    expect(lastCloudSyncError()).toContain("تعذّرت المزامنة السحابية");
+  });
+
+  it("the next healthy pass clears the recorded failure", async () => {
+    replaceIdeas([localIdea({ updatedAt: 2000 })]);
+    h.state.ideasRows = [cloudRow({ updated_at: 1000 })];
+    h.state.failUpsert = true;
+    await syncNow();
+    expect(lastCloudSyncError()).not.toBe("");
+    h.state.failUpsert = false;
+    const result = await syncNow();
+    expect(result.ok).toBe(true);
+    expect(lastCloudSyncError()).toBe("");
+    expect(lastCloudSync()).toBeGreaterThan(0);
   });
 });

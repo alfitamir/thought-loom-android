@@ -4,7 +4,7 @@ import { THEME_KEY, useTheme } from "@/lib/theme";
 
 // Keep the settings dialog away from the cloud/drive plumbing (same
 // stubs as my-voice-gating.test.tsx).
-vi.mock("@/lib/sync", () => ({ syncNow: vi.fn(async () => {}) }));
+vi.mock("@/lib/sync", () => ({ syncNow: vi.fn(async () => ({ ok: true as const, restored: 0 })), lastCloudSync: () => 0, lastCloudSyncError: () => "" }));
 vi.mock("@/lib/drive-sync", () => ({
   lastDriveSync: () => 0,
   syncDrive: vi.fn(async () => ({ ok: true as const })),
