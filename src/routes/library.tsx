@@ -138,9 +138,9 @@ export function Library() {
   };
   useEffect(() => {
     refresh(); setOnline(navigator.onLine);
-    const connect = () => { setOnline(true); void syncNow().catch(() => {}); };
+    const connect = () => { setOnline(true); void syncNow(); };
     const disconnect = () => setOnline(false);
-    void syncNow().catch(() => {});
+    void syncNow();
     window.addEventListener("online", connect);
     window.addEventListener("offline", disconnect);
     window.addEventListener("afkari:ideas-changed", refresh);

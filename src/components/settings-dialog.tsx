@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CloudUpload, Database, Download, KeyRound, MonitorSmartphone, Moon, Palette, Sun, Trash2, Upload } from "lucide-react";
+import { CloudUpload, Database, Download, KeyRound, MonitorSmartphone, Moon, Palette, ShieldCheck, Sun, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getGeminiKey, setGeminiKey, testGeminiKey } from "@/lib/gemini";
@@ -9,10 +9,22 @@ import { StatsSection } from "@/components/stats-section";
 import { isMyVoicePublic } from "@/lib/my-voice";
 import { buildBackup, parseBackup, restoreBackup } from "@/lib/backup";
 import { lastDriveSync, syncDrive } from "@/lib/drive-sync";
-import { loadIdeas } from "@/lib/ideas";
-import { syncNow } from "@/lib/sync";
+import { arabicNumber } from "@/lib/archive-pick";
+import { loadDeleted, loadDriveDeleted, loadIdeas, storedIdeasBytes } from "@/lib/ideas";
+import { loadPendingDeletes } from "@/lib/pending-deletes";
+import { lastCloudSync, lastCloudSyncError, syncNow } from "@/lib/sync";
 
 const THEME_ICONS: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, system: MonitorSmartphone };
+
+const fmtDateTime = (ts: number) => new Date(ts).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+
+/** Human storage size with Arabic-Indic digits, e.g. «١٢٫٥ ك.ب». */
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${arabicNumber(bytes)} بايت`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toLocaleString("ar-EG", { maximumFractionDigits: 1 })} ك.ب`;
+  return `${(kb / 1024).toLocaleString("ar-EG", { maximumFractionDigits: 2 })} م.ب`;
+};
 
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
@@ -24,13 +36,41 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const [driveAt, setDriveAt] = useState(0);
   const [driveMsg, setDriveMsg] = useState("");
   const [driveBusy, setDriveBusy] = useState(false);
+  // Backup-health gauges (audit F-8.6): read from the sync engines'
+  // records and the local stores every time the dialog opens, and kept
+  // live while it stays open via the sync events.
+  const [cloudAt, setCloudAt] = useState(0);
+  const [cloudError, setCloudError] = useState("");
+  const [pendingCount, setPendingCount] = useState(0);
+  const [libraryBytes, setLibraryBytes] = useState(0);
+  const [storageEst, setStorageEst] = useState<{ usage: number; quota: number } | null>(null);
+  const [songBackup, setSongBackup] = useState({ total: 0, backed: 0 });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { if (open) { setSaved(!!getGeminiKey()); setDraft(""); setKeyMsg(""); setBackupMsg(""); setDriveMsg(""); setDriveAt(lastDriveSync()); } }, [open]);
+  const refreshHealth = () => {
+    setCloudAt(lastCloudSync());
+    setCloudError(lastCloudSyncError());
+    setPendingCount(loadDeleted().length + loadDriveDeleted().length + loadPendingDeletes().length);
+    setLibraryBytes(storedIdeasBytes());
+    // The honest song-backup state: how many of this device's songs
+    // actually carry a Drive copy — not a sync timestamp (audit §4).
+    const songs = loadIdeas().filter((i) => i.song);
+    setSongBackup({ total: songs.length, backed: songs.filter((i) => i.driveFileId).length });
+    if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
+      void navigator.storage.estimate().then((est) => {
+        if (typeof est.usage === "number" && typeof est.quota === "number" && est.quota > 0) {
+          setStorageEst({ usage: est.usage, quota: est.quota });
+        }
+      }).catch(() => {});
+    }
+  };
+
+  useEffect(() => { if (open) { setSaved(!!getGeminiKey()); setDraft(""); setKeyMsg(""); setBackupMsg(""); setDriveMsg(""); setDriveAt(lastDriveSync()); refreshHealth(); } }, [open ]);
   useEffect(() => {
-    const update = () => setDriveAt(lastDriveSync());
+    const update = () => { setDriveAt(lastDriveSync()); refreshHealth(); };
     window.addEventListener("afkari:drive-synced", update);
-    return () => window.removeEventListener("afkari:drive-synced", update);
+    window.addEventListener("afkari:ideas-changed", update);
+    return () => { window.removeEventListener("afkari:drive-synced", update); window.removeEventListener("afkari:ideas-changed", update); };
   }, []);
 
   const syncDriveNow = async () => {
@@ -78,11 +118,21 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     try {
       const added = restoreBackup(parseBackup(await file.text()));
       setBackupMsg(added ? `استُعيدت ${added} فكرة ✓` : "النسخة مستعادة ✓ كل أفكارها موجودة بالفعل.");
-      void syncNow().catch(() => {});
+      void syncNow();
     } catch (error) {
       setBackupMsg(error instanceof Error ? error.message : "تعذّرت قراءة الملف.");
     } finally { if (fileRef.current) fileRef.current.value = ""; }
   };
+
+  // Song backup, stated from the songs' own Drive stamps: all backed up,
+  // some still waiting for the next Drive pass, or none uploaded yet.
+  const songLine = songBackup.total === 0
+    ? "لا توجد أغانٍ مسجّلة على هذا الهاتف بعد."
+    : songBackup.backed === songBackup.total
+      ? `مفعّل — كل الأغاني (${arabicNumber(songBackup.total)}) محفوظة في مجلد «أفكاري — الأغاني».`
+      : songBackup.backed === 0
+        ? "لم تُرفع أي أغنية بعد — تُرفع التسجيلات تلقائيًا مع مزامنة Drive."
+        : `${arabicNumber(songBackup.backed)} من ${arabicNumber(songBackup.total)} أغنية محفوظة — الباقي يُرفع مع المزامنة القادمة.`;
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
@@ -129,8 +179,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <span className={`ms-auto text-xs ${driveAt ? "text-primary" : "text-muted-foreground"}`}>{driveAt ? "متصل" : "غير متصل"}</span>
         </div>
         <p className="text-sm text-muted-foreground">تُحفظ أفكارك ومقالاتك تلقائيًا في ملف «afkari-sync.json» على Google Drive كلما اتصلت بالإنترنت وأنت مسجّل الدخول، وتُستعاد منه على أي هاتف.</p>
-        <p className="text-sm text-muted-foreground">{driveAt ? `آخر مزامنة: ${new Date(driveAt).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}` : "لم تتم المزامنة بعد على هذا الهاتف."}</p>
-        <p className="text-sm text-muted-foreground">نسخ الأغاني على Drive: <span className={driveAt ? "text-primary" : ""}>{driveAt ? "مفعّل" : "غير مفعّل"}</span>{driveAt ? " — تُرفع التسجيلات تلقائيًا إلى مجلد «أفكاري — الأغاني»." : " — يُفعَّل مع أول مزامنة ناجحة."}</p>
+        <p className="text-sm text-muted-foreground">نسخ الأغاني على Drive: {songLine}</p>
         <Button variant="outline" className="[&_svg]:size-5" onClick={syncDriveNow} disabled={driveBusy}><CloudUpload />مزامنة الآن</Button>
         {driveMsg && <p role="status" className="break-words text-sm text-muted-foreground">{driveMsg}</p>}
       </section>
@@ -146,6 +195,26 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <input ref={fileRef} type="file" accept=".json,application/json,text/plain" hidden aria-label="ملف النسخة الاحتياطية" onChange={(e) => importBackup(e.target.files?.[0])} />
         </div>
         {backupMsg && <p role="status" className="break-words text-sm text-muted-foreground">{backupMsg}</p>}
+      </section>
+      <section className="space-y-3 border-t border-border pt-4">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="size-5 text-primary" />
+          <h3 className="font-display text-lg">حالة النسخ الاحتياطي</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          النسخة السحابية: {cloudAt ? `آخر مزامنة ناجحة ${fmtDateTime(cloudAt)}` : "لم تتم مزامنة ناجحة بعد على هذا الهاتف."}
+        </p>
+        {cloudError && <p role="status" className="break-words text-sm text-destructive">آخر محاولة سحابية لم تنجح: {cloudError}</p>}
+        <p className="text-sm text-muted-foreground">
+          Google Drive: {driveAt ? `آخر مزامنة ${fmtDateTime(driveAt)}` : "لم تتم المزامنة بعد على هذا الهاتف."}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {pendingCount ? `عناصر حذف بانتظار الترحيل: ${arabicNumber(pendingCount)}` : "لا توجد عناصر معلّقة بانتظار الترحيل."}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          حجم مكتبتك على هذا الهاتف: {formatBytes(libraryBytes)}
+          {storageEst ? ` · مساحة التطبيق المستخدمة ${formatBytes(storageEst.usage)} من أصل ${formatBytes(storageEst.quota)} تقريبًا` : ""}
+        </p>
       </section>
     </DialogContent>
   </Dialog>;

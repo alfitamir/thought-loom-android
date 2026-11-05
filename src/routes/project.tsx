@@ -106,9 +106,9 @@ export function ProjectView({ project, medical, onRenamed, onDeleted }: {
   };
   useEffect(() => {
     refresh(); setOnline(navigator.onLine);
-    const connect = () => { setOnline(true); void syncNow().catch(() => {}); };
+    const connect = () => { setOnline(true); void syncNow(); };
     const disconnect = () => setOnline(false);
-    void syncNow().catch(() => {});
+    void syncNow();
     window.addEventListener("online", connect);
     window.addEventListener("offline", disconnect);
     window.addEventListener("afkari:ideas-changed", refresh);
@@ -122,7 +122,7 @@ export function ProjectView({ project, medical, onRenamed, onDeleted }: {
 
   const announce = () => {
     window.dispatchEvent(new Event("afkari:ideas-changed"));
-    void syncNow().catch(() => {});
+    void syncNow();
   };
   const doRename = () => {
     const next = renameDraft.trim();

@@ -9,6 +9,7 @@ import {
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -16,6 +17,7 @@ import { BottomNav } from "../components/bottom-nav";
 import { Toaster } from "../components/ui/sonner";
 import { initPendingDeletes } from "../lib/delete-flow";
 import { initTheme } from "../lib/theme";
+import { onStorageWriteError } from "../lib/ideas";
 
 function NotFoundComponent() {
   return (
@@ -132,6 +134,12 @@ function RootComponent() {
   // class pre-paint; this keeps it live — preference changes anywhere in
   // the tab and device changes while in «حسب الجهاز» mode).
   useEffect(() => initTheme(), []);
+
+  // A library write localStorage refused (device storage full) must be
+  // SEEN, not silently lost with the on-screen state looking saved:
+  // ideas.ts reports the first failure of a streak, the toast carries
+  // its Arabic explanation (audit F-3.3).
+  useEffect(() => onStorageWriteError((error) => { toast.error(error.message); }), []);
 
   return (
     <QueryClientProvider client={queryClient}>

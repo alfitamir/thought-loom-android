@@ -6,6 +6,43 @@ import { syncDrive } from "./drive-sync";
 
 const getSession = async () => (await supabase.auth.getSession()).data.session;
 
+/**
+ * Sync health record (audit F-6.1). A failed cloud sync used to be
+ * indistinguishable from a healthy one — run() returned 0 on every
+ * failure branch and no caller could tell. Now every pass ends in a
+ * typed SyncResult, the last SUCCESS is timestamped, and the last
+ * failure's message is kept until a pass succeeds again; Settings shows
+ * both in «حالة النسخ الاحتياطي».
+ */
+const LAST_SYNC_KEY = "afkari.lastCloudSync";
+const LAST_ERROR_KEY = "afkari.lastCloudSyncError";
+
+/** Outcome of a cloud sync pass, modelled on DriveResult. */
+export type SyncResult = { ok: true; restored: number } | { ok: false; message: string };
+
+/** When the cloud backup last completed a full sync on this device (0 = never). */
+export const lastCloudSync = (): number => {
+  try { return Number(localStorage.getItem(LAST_SYNC_KEY)) || 0; } catch { return 0; }
+};
+
+/** Why the most recent cloud sync attempt failed ("" once one succeeds). */
+export const lastCloudSyncError = (): string => {
+  try { return localStorage.getItem(LAST_ERROR_KEY) ?? ""; } catch { return ""; }
+};
+
+const CLOUD_FAIL_MESSAGE = "تعذّرت المزامنة السحابية الآن. أفكارك محفوظة على الهاتف، وسنعيد المحاولة تلقائيًا.";
+
+const recordSyncSuccess = () => {
+  try {
+    localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+    localStorage.removeItem(LAST_ERROR_KEY);
+  } catch { /* the record is a gauge, never a blocker */ }
+};
+const fail = (message: string): SyncResult => {
+  try { localStorage.setItem(LAST_ERROR_KEY, message); } catch { /* same */ }
+  return { ok: false, message };
+};
+
 const cloudRow = (idea: Idea, userId: string) => ({
   id: idea.id, user_id: userId, text: idea.text, created_at: idea.createdAt,
   article_title: idea.articleTitle ?? null, article_body: idea.articleBody ?? null,
@@ -35,7 +72,7 @@ export const deleteIdeaCloud = async (_id: string) => {
   await syncNow();
 };
 
-let running: Promise<number> | null = null;
+let running: Promise<SyncResult> | null = null;
 let again = false;
 
 /**
@@ -43,9 +80,10 @@ let again = false;
  * coalesced so a slow sync can never re-add ideas that a newer one deleted.
  * Deletions are recorded in the cloud and win on every device, unless the user
  * explicitly restored the idea from a backup.
- * Returns the number of ideas restored from the cloud.
+ * Resolves with a SyncResult — how many ideas the cloud restored, or why
+ * the pass failed (the failure is also recorded for Settings). Never rejects.
  */
-export function syncNow(): Promise<number> {
+export function syncNow(): Promise<SyncResult> {
   if (running) { again = true; return running; }
   running = run().finally(() => {
     running = null;
@@ -54,16 +92,25 @@ export function syncNow(): Promise<number> {
   return running;
 }
 
-async function run(): Promise<number> {
+async function run(): Promise<SyncResult> {
+  try {
+    return await runPass();
+  } catch {
+    return fail(CLOUD_FAIL_MESSAGE);
+  }
+}
+
+async function runPass(): Promise<SyncResult> {
+  if (!navigator.onLine) return fail("لا يوجد اتصال بالإنترنت الآن. سنزامن عند الاتصال.");
   const s = await getSession();
-  if (!s || !navigator.onLine) return 0;
+  if (!s) return fail("سجّل الدخول أولاً لتفعيل النسخة الاحتياطية السحابية.");
   const uid = s.user.id;
 
   // Explicit restores lift the cloud deletion record first.
   const revived = loadCloudRevived();
   if (revived.length) {
     const { error } = await supabase.from("idea_deletions").delete().eq("user_id", uid).in("idea_id", revived);
-    if (error) return 0;
+    if (error) return fail(CLOUD_FAIL_MESSAGE);
     clearCloudRevived(revived);
   }
 
@@ -71,15 +118,16 @@ async function run(): Promise<number> {
   const deleted = loadDeleted();
   if (deleted.length) {
     const { error } = await supabase.from("idea_deletions").upsert(deleted.map((idea_id) => ({ user_id: uid, idea_id })));
-    if (error) return 0;
-    await supabase.from("ideas").delete().in("id", deleted).eq("user_id", uid);
+    if (error) return fail(CLOUD_FAIL_MESSAGE);
+    const { error: deleteError } = await supabase.from("ideas").delete().in("id", deleted).eq("user_id", uid);
+    if (deleteError) return fail(CLOUD_FAIL_MESSAGE);
   }
 
   const [{ data: gone, error: goneError }, { data, error }] = await Promise.all([
     supabase.from("idea_deletions").select("idea_id").eq("user_id", uid),
     supabase.from("ideas").select("id,text,created_at,article_title,article_body,updated_at,ai_polished_at,merged_from,topic,topic_manual,song,song_duration,drive_file_id,liked,source,sources,pinned,medical,project,versions").eq("user_id", uid),
   ]);
-  if (goneError || error || !gone || !data) return 0;
+  if (goneError || error || !gone || !data) return fail(CLOUD_FAIL_MESSAGE);
   if (deleted.length) clearDeleted(deleted);
 
   const cloudDeleted = new Set(gone.map((g) => g.idea_id));
@@ -120,7 +168,10 @@ async function run(): Promise<number> {
 
   // Leftover rows of deleted ideas are cleaned up; changed ideas are uploaded.
   const stale = data.filter((r) => cloudDeleted.has(r.id) && !revivedNow.has(r.id)).map((r) => r.id);
-  if (stale.length) await supabase.from("ideas").delete().in("id", stale).eq("user_id", uid);
+  if (stale.length) {
+    const { error: staleError } = await supabase.from("ideas").delete().in("id", stale).eq("user_id", uid);
+    if (staleError) return fail(CLOUD_FAIL_MESSAGE);
+  }
   const cloudById = new Map(remote.map((i) => [i.id, i]));
   const changed = merged.filter((i) => {
     const cloud = cloudById.get(i.id);
@@ -148,8 +199,12 @@ async function run(): Promise<number> {
       // re-polishes finished articles.
       || (i.aiPolishedAt ?? null) !== (cloud.aiPolishedAt ?? null);
   });
-  if (changed.length) await supabase.from("ideas").upsert(changed.map((i) => cloudRow(i, uid)));
+  if (changed.length) {
+    const { error: upsertError } = await supabase.from("ideas").upsert(changed.map((i) => cloudRow(i, uid)));
+    if (upsertError) return fail(CLOUD_FAIL_MESSAGE);
+  }
   window.dispatchEvent(new Event("afkari:ideas-changed"));
   void syncDrive().catch(() => {});
-  return merged.filter((i) => !localIds.has(i.id)).length;
+  recordSyncSuccess();
+  return { ok: true, restored: merged.filter((i) => !localIds.has(i.id)).length };
 }

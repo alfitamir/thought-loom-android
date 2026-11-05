@@ -175,10 +175,148 @@ export function toArticle(text: string): { title: string; paragraphs: string[] }
 const KEY = "afkari.ideas";
 const DEL_KEY = "afkari.deleted";
 
-export const loadIdeas = (): Idea[] => {
-  try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; }
+/**
+ * Storage safety net for the library (audit F-3.3). The whole library —
+ * full texts plus up to five frozen versions per article — lives in ONE
+ * localStorage value, and the browser quota (~5 MB, shared with the auth
+ * session and every other afkari.* key) makes a refused write a when,
+ * not an if. Three guards keep a bad moment from becoming lost writing:
+ *
+ * 1. LAST-GOOD MIRROR — every successful write also lands, byte for byte,
+ *    under `afkari.ideas.lastGood`. The mirror is written only AFTER the
+ *    main value is safely stored, so a write that dies on quota can never
+ *    clobber the mirror with the very data that failed to save.
+ * 2. TYPED WRITE ERRORS — a refused write never throws into the calling
+ *    flow (the on-screen state stays exactly as the user left it), but it
+ *    is never silent either: subscribers registered through
+ *    `onStorageWriteError` hear about the FIRST failure of a streak (the
+ *    root component turns it into a toast), and `lastStorageWriteError`
+ *    keeps the failure retrievable until a write succeeds again.
+ * 3. CORRUPTION FALLBACK — a main value that no longer parses (or is not
+ *    an array) is NOT an empty library: `loadIdeas` falls back to the
+ *    mirror. Only when the mirror is unusable too is the library read as
+ *    empty, and the corrupt strings are quarantined first so nothing
+ *    recoverable is overwritten unseen.
+ */
+export const LAST_GOOD_KEY = "afkari.ideas.lastGood";
+export const QUARANTINE_KEY = "afkari.ideas.corrupt";
+
+/** A library write localStorage refused (quota full or storage blocked). */
+export class StorageWriteError extends Error {
+  readonly quota: boolean;
+  readonly originalError?: unknown;
+  constructor(quota: boolean, originalError?: unknown) {
+    super(quota
+      ? "مساحة تخزين الجهاز امتلأت — تعذّر حفظ آخر التغييرات. حرّر بعض المساحة أو خذ نسخة احتياطية من الإعدادات."
+      : "تعذّر الحفظ في تخزين الجهاز — آخر التغييرات ظاهرة على الشاشة لكنها قد لا تبقى بعد إغلاق التطبيق.");
+    this.name = "StorageWriteError";
+    this.quota = quota;
+    this.originalError = originalError;
+  }
+}
+
+const isQuotaError = (e: unknown): boolean => {
+  if (!e || typeof e !== "object") return false;
+  const err = e as { name?: string; code?: number; message?: string };
+  return err.name === "QuotaExceededError" || err.code === 22 || /quota/i.test(`${err.name ?? ""} ${err.message ?? ""}`);
 };
-export const replaceIdeas = (all: Idea[]) => localStorage.setItem(KEY, JSON.stringify(all));
+
+type StorageWriteListener = (error: StorageWriteError) => void;
+const storageWriteListeners = new Set<StorageWriteListener>();
+let currentWriteError: StorageWriteError | null = null;
+
+/** Hear about library writes localStorage refused. Returns an unsubscribe. */
+export const onStorageWriteError = (listener: StorageWriteListener): (() => void) => {
+  storageWriteListeners.add(listener);
+  return () => { storageWriteListeners.delete(listener); };
+};
+
+/** The latest unsaved-changes failure, or null once a write succeeds again. */
+export const lastStorageWriteError = (): StorageWriteError | null => currentWriteError;
+
+const noteWriteFailure = (error: StorageWriteError) => {
+  const firstOfStreak = currentWriteError === null;
+  currentWriteError = error;
+  if (!firstOfStreak) return;
+  for (const listener of storageWriteListeners) {
+    try { listener(error); } catch { /* a listener must never break a write path */ }
+  }
+};
+
+const parseIdeas = (raw: string | null): Idea[] | null => {
+  if (raw === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Idea[]) : null;
+  } catch { return null; }
+};
+
+const getRaw = (key: string): string | null => {
+  try { return localStorage.getItem(key); } catch { return null; }
+};
+
+/** Preserve corrupt raw values for possible recovery instead of overwriting them unseen. */
+const quarantine = (entries: Array<{ key: string; raw: string }>) => {
+  try {
+    const prior: unknown = JSON.parse(localStorage.getItem(QUARANTINE_KEY) || "[]");
+    const list = Array.isArray(prior) ? prior : [];
+    for (const e of entries) list.push({ ...e, at: Date.now() });
+    localStorage.setItem(QUARANTINE_KEY, JSON.stringify(list.slice(-5)));
+  } catch { /* quarantine is best effort — it must never break a read */ }
+};
+
+/**
+ * The one write path for the library blob — replaceIdeas and the
+ * save/delete helpers below all land here. Returns false when storage
+ * refused the write; the failure is recorded and broadcast (see the
+ * safety-net note above), never thrown into the caller's flow.
+ */
+const writeIdeas = (all: Idea[]): boolean => {
+  const json = JSON.stringify(all);
+  try {
+    localStorage.setItem(KEY, json);
+  } catch (e) {
+    noteWriteFailure(new StorageWriteError(isQuotaError(e), e));
+    return false;
+  }
+  currentWriteError = null;
+  // The mirror updates only after the main value is stored: a failed main
+  // write leaves the previous good mirror untouched.
+  try { localStorage.setItem(LAST_GOOD_KEY, json); } catch { /* best effort */ }
+  return true;
+};
+
+export const loadIdeas = (): Idea[] => {
+  const raw = getRaw(KEY);
+  if (raw === null) return [];
+  const parsed = parseIdeas(raw);
+  if (parsed) return parsed;
+  // The main value is corrupt: fall back to the last-good mirror rather
+  // than reading a damaged library as empty (and letting the next write
+  // destroy whatever was recoverable).
+  const mirrorRaw = getRaw(LAST_GOOD_KEY);
+  const mirror = parseIdeas(mirrorRaw);
+  if (mirror) {
+    // Repair the main value from the mirror so later reads stay cheap.
+    try { localStorage.setItem(KEY, mirrorRaw as string); } catch { /* best effort */ }
+    return mirror;
+  }
+  quarantine([
+    { key: KEY, raw },
+    ...(mirrorRaw !== null ? [{ key: LAST_GOOD_KEY, raw: mirrorRaw }] : []),
+  ]);
+  return [];
+};
+
+export const replaceIdeas = (all: Idea[]) => { writeIdeas(all); };
+
+/** Byte size of the stored library blob — the Settings backup-health gauge. */
+export const storedIdeasBytes = (): number => {
+  try {
+    const raw = localStorage.getItem(KEY);
+    return raw ? new TextEncoder().encode(raw).length : 0;
+  } catch { return 0; }
+};
 
 export function getArticle(idea: Idea): { title: string; body: string } {
   const local = toArticle(idea.text);
@@ -368,11 +506,11 @@ export const saveIdea = (text: string, opts?: { medical?: boolean }): Idea => {
   // «القسم الطبي» chip is up is born inside the medical section.
   if (opts?.medical) idea.medical = true;
   all.unshift(idea);
-  localStorage.setItem(KEY, JSON.stringify(all));
+  writeIdeas(all);
   return idea;
 };
 export const deleteIdea = (id: string) => {
-  localStorage.setItem(KEY, JSON.stringify(loadIdeas().filter((i) => i.id !== id)));
+  writeIdeas(loadIdeas().filter((i) => i.id !== id));
   const del = loadDeleted();
   if (!del.includes(id)) localStorage.setItem(DEL_KEY, JSON.stringify([...del, id]));
   writeList(DRIVE_DEL_KEY, [...loadDriveDeleted(), id]);
