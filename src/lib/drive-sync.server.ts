@@ -22,6 +22,13 @@ const idea = z.object({
   song: z.boolean().optional(),
   songDuration: z.number().optional(),
   driveFileId: z.string().max(200).optional(),
+  // A liked article's flag and attribution ride along like every other
+  // field: zod strips unknown keys, so without these three the Drive file
+  // would silently turn someone else's article into the owner's own
+  // writing and lift its hard AI ban on any other device's restore.
+  liked: z.boolean().optional(),
+  source: z.string().max(5000).optional(),
+  sources: z.array(z.string().max(5000)).max(100).optional(),
   pinned: z.boolean().optional(),
   medical: z.boolean().optional(),
   project: z.string().max(500).optional(),
