@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  LAST_GOOD_KEY, QUARANTINE_KEY, StorageWriteError, lastStorageWriteError, loadIdeas, onStorageWriteError, replaceIdeas, saveIdea, type Idea,
+  LAST_GOOD_KEY,
+  QUARANTINE_KEY,
+  StorageWriteError,
+  lastStorageWriteError,
+  loadIdeas,
+  onStorageWriteError,
+  replaceIdeas,
+  saveIdea,
+  type Idea,
 } from "./ideas";
 
 // Audit F-3.3: the library lives in ONE localStorage value with a ~5 MB
@@ -8,14 +16,23 @@ import {
 // a last-good mirror, typed write errors instead of silent loss, and a
 // corruption fallback that never reads a damaged library as "empty".
 const MAIN_KEY = "afkari.ideas";
-const idea = (patch: Partial<Idea> = {}): Idea => ({ id: "a", text: "نص محفوظ", createdAt: 1, ...patch });
+const idea = (patch: Partial<Idea> = {}): Idea => ({
+  id: "a",
+  text: "نص محفوظ",
+  createdAt: 1,
+  ...patch,
+});
 
 const quotaError = () => new DOMException("The quota has been exceeded.", "QuotaExceededError");
 
 /** Make Storage.setItem throw for the keys `failFor` approves; everything else writes through. */
 const stubSetItem = (failFor: (key: string) => Error | null) => {
   const original = Storage.prototype.setItem;
-  vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+    this: Storage,
+    key: string,
+    value: string,
+  ) {
     const err = failFor(key);
     if (err) throw err;
     return original.call(this, key, value);
@@ -29,7 +46,9 @@ beforeEach(() => {
   replaceIdeas([]);
   localStorage.clear();
 });
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("storage guard — last-good mirror", () => {
   it("mirrors every successful write byte for byte", () => {
@@ -120,7 +139,10 @@ describe("storage guard — corruption fallback", () => {
     localStorage.setItem(MAIN_KEY, "{bad main");
     localStorage.setItem(LAST_GOOD_KEY, "{bad mirror");
     expect(loadIdeas()).toEqual([]);
-    const quarantined = JSON.parse(localStorage.getItem(QUARANTINE_KEY) ?? "[]") as Array<{ key: string; raw: string }>;
+    const quarantined = JSON.parse(localStorage.getItem(QUARANTINE_KEY) ?? "[]") as Array<{
+      key: string;
+      raw: string;
+    }>;
     expect(quarantined.map((q) => q.raw)).toContain("{bad main");
     expect(quarantined.map((q) => q.raw)).toContain("{bad mirror");
     // The store still works afterwards — the next write starts clean.

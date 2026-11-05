@@ -6,7 +6,8 @@ import { computeStats, countWords } from "./stats";
 // A fixed local "now": noon on 2026-06-15 (local calendar — the same
 // calendar computeStats reads createdAt against).
 const NOW = new Date(2026, 5, 15, 12, 0, 0).getTime();
-const at = (y: number, m: number, d: number, h = 10, min = 0) => new Date(y, m, d, h, min).getTime();
+const at = (y: number, m: number, d: number, h = 10, min = 0) =>
+  new Date(y, m, d, h, min).getTime();
 
 let seq = 0;
 const mk = (over: Partial<Idea> = {}): Idea => {
@@ -16,10 +17,18 @@ const mk = (over: Partial<Idea> = {}): Idea => {
 /** An own article whose body has an exact word count (body is what the
  *  editor counts, so fixtures pin it directly). */
 const article = (createdAt: number, words: number, over: Partial<Idea> = {}): Idea =>
-  mk({ createdAt, articleBody: Array.from({ length: words }, (_, i) => `كلمة${i + 1}`).join(" "), ...over });
-const pinned = (topic: string, over: Partial<Idea> = {}): Idea => mk({ topic, topicManual: true, ...over });
+  mk({
+    createdAt,
+    articleBody: Array.from({ length: words }, (_, i) => `كلمة${i + 1}`).join(" "),
+    ...over,
+  });
+const pinned = (topic: string, over: Partial<Idea> = {}): Idea =>
+  mk({ topic, topicManual: true, ...over });
 
-beforeEach(() => { seq = 0; localStorage.clear(); });
+beforeEach(() => {
+  seq = 0;
+  localStorage.clear();
+});
 
 describe("countWords", () => {
   it("counts whitespace-separated tokens the editor's way", () => {
@@ -57,7 +66,11 @@ describe("this month", () => {
     const ideas = [
       article(at(2026, 5, 2), 4),
       mk({ createdAt: at(2026, 5, 2), song: true, text: "كلمات أغنية طويلة هنا" }),
-      mk({ createdAt: at(2026, 5, 2), liked: true, articleBody: "نص طويل لكاتب آخر فيه كلمات كثيرة جدا" }),
+      mk({
+        createdAt: at(2026, 5, 2),
+        liked: true,
+        articleBody: "نص طويل لكاتب آخر فيه كلمات كثيرة جدا",
+      }),
     ];
     const s = computeStats(ideas, NOW);
     expect(s.monthArticles).toBe(1);
@@ -68,7 +81,8 @@ describe("this month", () => {
 describe("totals", () => {
   it("separates own articles, songs, liked and medical", () => {
     const ideas = [
-      mk(), mk(), // two plain articles
+      mk(),
+      mk(), // two plain articles
       mk({ medical: true }), // medical article: counts as an article AND as medical
       mk({ song: true, text: "غنا" }),
       mk({ liked: true }),
@@ -85,9 +99,13 @@ describe("totals", () => {
 describe("top topics", () => {
   it("ranks own articles by their topic, top 3, ties broken by topic name", () => {
     const ideas = [
-      pinned("جراحة"), pinned("جراحة"), pinned("جراحة", { medical: true }), // medical counts too
-      pinned("خواطر"), pinned("خواطر"),
-      pinned("سفر"), pinned("سفر"),
+      pinned("جراحة"),
+      pinned("جراحة"),
+      pinned("جراحة", { medical: true }), // medical counts too
+      pinned("خواطر"),
+      pinned("خواطر"),
+      pinned("سفر"),
+      pinned("سفر"),
       pinned("طب"),
       pinned("جراحة", { liked: true }), // someone else's — out
       pinned("جراحة", { song: true }), // a recording — out
@@ -100,7 +118,9 @@ describe("top topics", () => {
   });
 
   it("returns fewer than three when the library has fewer topics, and none when empty", () => {
-    expect(computeStats([pinned("سفر"), pinned("سفر")], NOW).topTopics).toEqual([{ topic: "سفر", count: 2 }]);
+    expect(computeStats([pinned("سفر"), pinned("سفر")], NOW).topTopics).toEqual([
+      { topic: "سفر", count: 2 },
+    ]);
     expect(computeStats([], NOW).topTopics).toEqual([]);
   });
 });
@@ -110,8 +130,14 @@ describe("streaks", () => {
 
   it("counts consecutive days ending today, and the longest run ever", () => {
     const ideas = [
-      on(2026, 5, 15), on(2026, 5, 14), on(2026, 5, 13), // current run: 3
-      on(2026, 5, 5), on(2026, 5, 4), on(2026, 5, 3), on(2026, 5, 2), on(2026, 5, 1), // older run: 5
+      on(2026, 5, 15),
+      on(2026, 5, 14),
+      on(2026, 5, 13), // current run: 3
+      on(2026, 5, 5),
+      on(2026, 5, 4),
+      on(2026, 5, 3),
+      on(2026, 5, 2),
+      on(2026, 5, 1), // older run: 5
       on(2026, 4, 20), // a lone day in May
     ];
     const s = computeStats(ideas, NOW);
@@ -139,7 +165,10 @@ describe("streaks", () => {
 
   it("runs across a month boundary", () => {
     const feb2 = new Date(2026, 1, 2, 12, 0, 0).getTime();
-    const s = computeStats([on(2026, 0, 30), on(2026, 0, 31), on(2026, 1, 1), on(2026, 1, 2)], feb2);
+    const s = computeStats(
+      [on(2026, 0, 30), on(2026, 0, 31), on(2026, 1, 1), on(2026, 1, 2)],
+      feb2,
+    );
     expect(s.currentStreak).toBe(4);
     expect(s.longestStreak).toBe(4);
   });
@@ -153,8 +182,15 @@ describe("streaks", () => {
 describe("empty and pending-delete handling", () => {
   it("an empty library is all zeros", () => {
     expect(computeStats([], NOW)).toEqual({
-      monthArticles: 0, monthWords: 0, articles: 0, songs: 0, liked: 0, medical: 0,
-      topTopics: [], currentStreak: 0, longestStreak: 0,
+      monthArticles: 0,
+      monthWords: 0,
+      articles: 0,
+      songs: 0,
+      liked: 0,
+      medical: 0,
+      topTopics: [],
+      currentStreak: 0,
+      longestStreak: 0,
     });
   });
 
@@ -162,7 +198,10 @@ describe("empty and pending-delete handling", () => {
     const kept = article(at(2026, 5, 10), 3);
     const pending = article(at(2026, 5, 10), 50);
     localStorage.setItem("afkari.ideas", JSON.stringify([kept, pending]));
-    localStorage.setItem("afkari.pendingDeletes", JSON.stringify([{ id: pending.id, deadline: NOW + 60_000 }]));
+    localStorage.setItem(
+      "afkari.pendingDeletes",
+      JSON.stringify([{ id: pending.id, deadline: NOW + 60_000 }]),
+    );
     const s = computeStats(loadVisibleIdeas(), NOW);
     expect(s.articles).toBe(1);
     expect(s.monthWords).toBe(3);

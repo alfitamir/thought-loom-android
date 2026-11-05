@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { composeXPost, xCharCount, X_DISCLAIMER, X_POST_LIMIT, type XPostInput } from "@/lib/x-post";
+import {
+  composeXPost,
+  xCharCount,
+  X_DISCLAIMER,
+  X_POST_LIMIT,
+  type XPostInput,
+} from "@/lib/x-post";
 
 const hashtags = (post: string) => post.match(/#/g)?.length ?? 0;
 
@@ -27,9 +33,23 @@ describe("composeXPost — the 280 guarantee", () => {
       }
     }
     // Word-boundary-friendly long texts, Latin text, emoji in the body.
-    cases.push({ title: "كلمة ".repeat(90).trim(), body: "جملة ".repeat(400).trim(), medical: true, topic: "جراحة" });
-    cases.push({ title: "A very long English title ".repeat(20).trim(), body: "Some English sentence. ".repeat(200), medical: false });
-    cases.push({ title: "عنوان فيه إيموجي 😀", body: "نص 😀😀😀 ".repeat(300), medical: true, topic: "صحة" });
+    cases.push({
+      title: "كلمة ".repeat(90).trim(),
+      body: "جملة ".repeat(400).trim(),
+      medical: true,
+      topic: "جراحة",
+    });
+    cases.push({
+      title: "A very long English title ".repeat(20).trim(),
+      body: "Some English sentence. ".repeat(200),
+      medical: false,
+    });
+    cases.push({
+      title: "عنوان فيه إيموجي 😀",
+      body: "نص 😀😀😀 ".repeat(300),
+      medical: true,
+      topic: "صحة",
+    });
     for (const input of cases) {
       const post = composeXPost(input);
       expect(xCharCount(post)).toBeLessThanOrEqual(X_POST_LIMIT);
@@ -45,7 +65,9 @@ describe("composeXPost — the 280 guarantee", () => {
 
   it("a title alone is the whole post when the body adds nothing", () => {
     expect(composeXPost({ title: "عنوان وحده", body: "" })).toBe("عنوان وحده");
-    expect(composeXPost({ title: "", body: "الجملة الأولى هنا. والثانية بعدها." }).split("\n")[0]).toBe("الجملة الأولى هنا.");
+    expect(
+      composeXPost({ title: "", body: "الجملة الأولى هنا. والثانية بعدها." }).split("\n")[0],
+    ).toBe("الجملة الأولى هنا.");
   });
 });
 
@@ -106,12 +128,19 @@ describe("composeXPost — the insight", () => {
 
 describe("composeXPost — the medical disclaimer", () => {
   it("closes a medical post with the disclaimer when space allows", () => {
-    const post = composeXPost({ title: "ما علاج الفتق الإربي؟", body: "العلاج يختلف بحسب الحالة.", medical: true });
+    const post = composeXPost({
+      title: "ما علاج الفتق الإربي؟",
+      body: "العلاج يختلف بحسب الحالة.",
+      medical: true,
+    });
     expect(post.split("\n").at(-1)).toBe(X_DISCLAIMER);
   });
 
   it("never adds the disclaimer to a non-medical post", () => {
-    const post = composeXPost({ title: "ما علاج الفتق الإربي؟", body: "العلاج يختلف بحسب الحالة." });
+    const post = composeXPost({
+      title: "ما علاج الفتق الإربي؟",
+      body: "العلاج يختلف بحسب الحالة.",
+    });
     expect(post).not.toContain(X_DISCLAIMER);
   });
 
@@ -136,7 +165,9 @@ describe("composeXPost — hashtags stay rare and capped", () => {
   });
 
   it("adds none for phrase topics, the misc bucket, or no topic", () => {
-    expect(composeXPost({ title: "عنوان", body: "نص.", topic: "الإيمان والروح" })).not.toContain("#");
+    expect(composeXPost({ title: "عنوان", body: "نص.", topic: "الإيمان والروح" })).not.toContain(
+      "#",
+    );
     expect(composeXPost({ title: "عنوان", body: "نص.", topic: "متفرقات" })).not.toContain("#");
     expect(composeXPost({ title: "عنوان", body: "نص." })).not.toContain("#");
   });

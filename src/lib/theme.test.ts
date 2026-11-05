@@ -14,7 +14,8 @@ let systemDark = false;
 type MediaListener = (e: { matches: boolean; media: string }) => void;
 let mediaListeners: MediaListener[] = [];
 const fireMediaChange = () => {
-  for (const l of [...mediaListeners]) l({ matches: systemDark, media: "(prefers-color-scheme: dark)" });
+  for (const l of [...mediaListeners])
+    l({ matches: systemDark, media: "(prefers-color-scheme: dark)" });
 };
 
 beforeEach(() => {

@@ -5,10 +5,18 @@ const classifyBatch = vi.fn();
 vi.mock("./ai-features", () => ({ classifyBatch: (...a: unknown[]) => classifyBatch(...a) }));
 import { labelAll, labelFor, loadLabels, unlabeled } from "./ai-labels";
 
-const idea = (id: string, updatedAt = 1, text = "غزة والمقاومة"): Idea => ({ id, text, createdAt: 1, updatedAt });
+const idea = (id: string, updatedAt = 1, text = "غزة والمقاومة"): Idea => ({
+  id,
+  text,
+  createdAt: 1,
+  updatedAt,
+});
 // Afkari's shared test setup cleared localStorage around every test; Thought Loom's does
 // not, so this suite (whose storage is its subject) clears it locally instead.
-beforeEach(() => { classifyBatch.mockReset(); localStorage.clear(); });
+beforeEach(() => {
+  classifyBatch.mockReset();
+  localStorage.clear();
+});
 
 describe("ai labels", () => {
   it("falls back to the offline keyword topic before any AI label exists", () => {
@@ -30,7 +38,9 @@ describe("ai labels", () => {
   });
   it("batches, reports progress, and only sends stale ideas", async () => {
     const many = Array.from({ length: 65 }, (_, i) => idea(`i${i}`));
-    classifyBatch.mockImplementation(async (chunk: Idea[]) => Object.fromEntries(chunk.map((c) => [c.id, { topic: "الصحة", tags: [] }])));
+    classifyBatch.mockImplementation(async (chunk: Idea[]) =>
+      Object.fromEntries(chunk.map((c) => [c.id, { topic: "الصحة", tags: [] }])),
+    );
     const progress: number[] = [];
     await labelAll(many, { onProgress: (d) => progress.push(d) });
     expect(classifyBatch.mock.calls.map((c) => c[0].length)).toEqual([30, 30, 5]);
@@ -42,7 +52,9 @@ describe("ai labels", () => {
   it("keeps progress from earlier batches when a later batch fails", async () => {
     const many = Array.from({ length: 40 }, (_, i) => idea(`i${i}`));
     classifyBatch
-      .mockImplementationOnce(async (chunk: Idea[]) => Object.fromEntries(chunk.map((c) => [c.id, { topic: "الصحة", tags: [] }])))
+      .mockImplementationOnce(async (chunk: Idea[]) =>
+        Object.fromEntries(chunk.map((c) => [c.id, { topic: "الصحة", tags: [] }])),
+      )
       .mockRejectedValueOnce(new Error("quota"));
     await expect(labelAll(many)).rejects.toThrow("quota");
     expect(Object.keys(loadLabels())).toHaveLength(30);

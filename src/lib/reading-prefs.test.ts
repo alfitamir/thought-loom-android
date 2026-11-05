@@ -17,7 +17,9 @@ describe("reading prefs (device-local display preference)", () => {
 
   it("round-trips a saved choice under its own key", () => {
     saveReadingPrefs({ fontSize: 2, lineHeight: 1, bgTint: 1 });
-    expect(localStorage.getItem(READING_PREFS_KEY)).toBe('{"fontSize":2,"lineHeight":1,"bgTint":1}');
+    expect(localStorage.getItem(READING_PREFS_KEY)).toBe(
+      '{"fontSize":2,"lineHeight":1,"bgTint":1}',
+    );
     expect(loadReadingPrefs()).toEqual({ fontSize: 2, lineHeight: 1, bgTint: 1 });
     saveReadingPrefs({ fontSize: 1, lineHeight: 0, bgTint: 0 });
     expect(loadReadingPrefs()).toEqual({ fontSize: 1, lineHeight: 0, bgTint: 0 });
@@ -70,7 +72,10 @@ describe("reading prefs (device-local display preference)", () => {
   });
 
   it("the warm tint defers to the theme-aware --reading-bg-warm variable", () => {
-    const vars = readingStyleVars({ fontSize: 0, lineHeight: 0, bgTint: 1 }) as unknown as Record<string, string>;
+    const vars = readingStyleVars({ fontSize: 0, lineHeight: 0, bgTint: 1 }) as unknown as Record<
+      string,
+      string
+    >;
     expect(vars["--reading-bg"]).toBe("var(--reading-bg-warm)");
   });
 });

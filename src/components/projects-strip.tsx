@@ -16,7 +16,8 @@ export function ProjectsStrip({ ideas, medical = false }: { ideas: Idea[]; medic
   return (
     <div className="mb-5">
       <p className="mb-2 flex items-center gap-1.5 font-display text-lg text-foreground">
-        <FolderOpen className="size-5 text-primary" />المشاريع
+        <FolderOpen className="size-5 text-primary" />
+        المشاريع
       </p>
       <div className="flex flex-wrap gap-2">
         {projects.map(({ project, count }) => (

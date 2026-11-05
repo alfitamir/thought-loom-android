@@ -24,13 +24,21 @@ const h = vi.hoisted(() => {
     let op = "";
     const result = () => {
       if (op === "select" && table === "ideas") return { data: state.ideasRows, error: null };
-      if (op === "select" && table === "idea_deletions") return { data: state.deletionRows, error: null };
-      if (op === "upsert" && table === "ideas" && state.failUpsert) return { data: null, error: { message: "upsert refused" } };
+      if (op === "select" && table === "idea_deletions")
+        return { data: state.deletionRows, error: null };
+      if (op === "upsert" && table === "ideas" && state.failUpsert)
+        return { data: null, error: { message: "upsert refused" } };
       return { data: null, error: null };
     };
     const self: Chain = {
-      select: () => { op = "select"; return self; },
-      delete: () => { op = "delete"; return self; },
+      select: () => {
+        op = "select";
+        return self;
+      },
+      delete: () => {
+        op = "delete";
+        return self;
+      },
       upsert: (rows) => {
         op = "upsert";
         if (table === "ideas") state.ideaUpserts.push(...rows);
@@ -55,15 +63,35 @@ vi.mock("./drive-sync", () => ({ syncDrive: async () => ({ ok: true, restored: 0
 
 /** A cloud row as PostgREST serves it, every column present. */
 const cloudRow = (patch: Record<string, unknown> = {}): Record<string, unknown> => ({
-  id: "a", text: "نص المقال", created_at: 100, article_title: null, article_body: null,
-  updated_at: 1000, ai_polished_at: null, merged_from: null, topic: null, topic_manual: false,
-  song: false, song_duration: null, drive_file_id: null, liked: false, source: null, sources: null,
-  pinned: false, medical: false, project: null, versions: null,
+  id: "a",
+  text: "نص المقال",
+  created_at: 100,
+  article_title: null,
+  article_body: null,
+  updated_at: 1000,
+  ai_polished_at: null,
+  merged_from: null,
+  topic: null,
+  topic_manual: false,
+  song: false,
+  song_duration: null,
+  drive_file_id: null,
+  liked: false,
+  source: null,
+  sources: null,
+  pinned: false,
+  medical: false,
+  project: null,
+  versions: null,
   ...patch,
 });
 
 const localIdea = (patch: Partial<Idea> = {}): Idea => ({
-  id: "a", text: "نص المقال", createdAt: 100, updatedAt: 1000, ...patch,
+  id: "a",
+  text: "نص المقال",
+  createdAt: 100,
+  updatedAt: 1000,
+  ...patch,
 });
 
 describe("Supabase sync — aiPolishedAt", () => {

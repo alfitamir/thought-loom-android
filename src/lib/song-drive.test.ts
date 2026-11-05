@@ -5,8 +5,13 @@ import { createSongDriveOps, SONGS_FOLDER_NAME, type DriveFetch } from "./drive-
 import { loadIdeas, mergeIdeas, replaceIdeas, type Idea } from "./ideas";
 import { blobToBytes } from "./tts";
 import {
-  deleteSongDriveCopy, downloadSongAudio, loadSongDriveTombstones, queueSongDriveDelete,
-  runSongAudioPass, songDriveFileName, type SongDriveClient,
+  deleteSongDriveCopy,
+  downloadSongAudio,
+  loadSongDriveTombstones,
+  queueSongDriveDelete,
+  runSongAudioPass,
+  songDriveFileName,
+  type SongDriveClient,
 } from "./song-drive";
 
 const songIdea = (patch: Partial<Idea> = {}): Idea => ({
@@ -21,20 +26,33 @@ const songIdea = (patch: Partial<Idea> = {}): Idea => ({
 });
 
 /** A SongDriveClient double that records every call and can be told to fail. */
-function fakeClient(behavior: {
-  existing?: Record<string, string>;
-  failUploads?: boolean;
-  failDeletes?: boolean;
-} = {}) {
-  const calls = { find: [] as string[], upload: [] as { songId: string; name: string; mime: string }[], download: [] as string[], remove: [] as string[] };
+function fakeClient(
+  behavior: {
+    existing?: Record<string, string>;
+    failUploads?: boolean;
+    failDeletes?: boolean;
+  } = {},
+) {
+  const calls = {
+    find: [] as string[],
+    upload: [] as { songId: string; name: string; mime: string }[],
+    download: [] as string[],
+    remove: [] as string[],
+  };
   const client: SongDriveClient = {
-    async findSongFile(songId) { calls.find.push(songId); return behavior.existing?.[songId] ?? null; },
+    async findSongFile(songId) {
+      calls.find.push(songId);
+      return behavior.existing?.[songId] ?? null;
+    },
     async uploadSong(input) {
       calls.upload.push({ songId: input.songId, name: input.name, mime: input.mime });
       if (behavior.failUploads) throw new Error("drive busy");
       return `drive-${input.songId}`;
     },
-    async downloadSong(fileId) { calls.download.push(fileId); return new Blob(["AUDIO"], { type: "audio/webm" }); },
+    async downloadSong(fileId) {
+      calls.download.push(fileId);
+      return new Blob(["AUDIO"], { type: "audio/webm" });
+    },
     async deleteSongFile(fileId) {
       calls.remove.push(fileId);
       if (behavior.failDeletes) throw new Error("offline");
@@ -44,7 +62,10 @@ function fakeClient(behavior: {
 }
 
 const seedAudio = async (store = memorySongAudioStore(), id = "song-1") => {
-  await saveSongAudio({ ideaId: id, blob: new Blob(["singing"], { type: "audio/webm" }), duration: 95 }, store);
+  await saveSongAudio(
+    { ideaId: id, blob: new Blob(["singing"], { type: "audio/webm" }), duration: 95 },
+    store,
+  );
   return store;
 };
 
@@ -59,10 +80,10 @@ describe("runSongAudioPass", () => {
     await seedAudio(store, "song-2");
     const { client, calls } = fakeClient();
     const ideas = [
-      songIdea(),                                                    // needs upload
-      songIdea({ id: "song-2", driveFileId: "already-there" }),      // has a copy
-      songIdea({ id: "song-3" }),                                    // no local audio
-      { id: "plain", text: "فكرة", createdAt: 5 },                   // not a song
+      songIdea(), // needs upload
+      songIdea({ id: "song-2", driveFileId: "already-there" }), // has a copy
+      songIdea({ id: "song-3" }), // no local audio
+      { id: "plain", text: "فكرة", createdAt: 5 }, // not a song
     ];
     replaceIdeas(ideas);
     const gained = await runSongAudioPass({ ideas, audioStore: store, client, toMp3: fakeToMp3 });
@@ -105,7 +126,9 @@ describe("runSongAudioPass", () => {
     const { client, calls } = fakeClient();
     const ideas = [songIdea()];
     replaceIdeas(ideas);
-    expect(await runSongAudioPass({ ideas, audioStore: store, client, toMp3: async () => null })).toBe(0);
+    expect(
+      await runSongAudioPass({ ideas, audioStore: store, client, toMp3: async () => null }),
+    ).toBe(0);
     expect(calls.upload).toEqual([]);
     expect(loadIdeas()[0]?.driveFileId).toBeUndefined();
     // And the next pass, with conversion working again, lands the copy.
@@ -117,13 +140,23 @@ describe("runSongAudioPass", () => {
     queueSongDriveDelete("dead-1");
     queueSongDriveDelete("dead-2");
     const ok = fakeClient();
-    await runSongAudioPass({ ideas: [], audioStore: memorySongAudioStore(), client: ok.client, toMp3: fakeToMp3 });
+    await runSongAudioPass({
+      ideas: [],
+      audioStore: memorySongAudioStore(),
+      client: ok.client,
+      toMp3: fakeToMp3,
+    });
     expect(ok.calls.remove.sort()).toEqual(["dead-1", "dead-2"]);
     expect(loadSongDriveTombstones()).toEqual([]);
 
     queueSongDriveDelete("dead-3");
     const failing = fakeClient({ failDeletes: true });
-    await runSongAudioPass({ ideas: [], audioStore: memorySongAudioStore(), client: failing.client, toMp3: fakeToMp3 });
+    await runSongAudioPass({
+      ideas: [],
+      audioStore: memorySongAudioStore(),
+      client: failing.client,
+      toMp3: fakeToMp3,
+    });
     expect(loadSongDriveTombstones()).toEqual(["dead-3"]);
   });
 });
@@ -134,7 +167,10 @@ describe("downloadSongAudio", () => {
   it("stores the downloaded blob under the song id, so the state flips to ready", async () => {
     const store = memorySongAudioStore();
     const { client, calls } = fakeClient();
-    const rec = await downloadSongAudio(songIdea({ driveFileId: "drive-9" }), { audioStore: store, client });
+    const rec = await downloadSongAudio(songIdea({ driveFileId: "drive-9" }), {
+      audioStore: store,
+      client,
+    });
     expect(calls.download).toEqual(["drive-9"]);
     expect(rec.ideaId).toBe("song-1");
     expect(rec.duration).toBe(95);
@@ -185,9 +221,13 @@ describe("driveFileId in serializers", () => {
   it("round-trips through a backup file and is dropped when malformed", () => {
     const parsed = parseBackup(buildBackup([songIdea({ driveFileId: "drive-1" })]));
     expect(parsed[0]?.driveFileId).toBe("drive-1");
-    const bad = parseBackup(JSON.stringify([{ id: "x", text: "t", createdAt: 1, song: true, driveFileId: 42 }]));
+    const bad = parseBackup(
+      JSON.stringify([{ id: "x", text: "t", createdAt: 1, song: true, driveFileId: 42 }]),
+    );
     expect(bad[0]?.driveFileId).toBeUndefined();
-    const blank = parseBackup(JSON.stringify([{ id: "x", text: "t", createdAt: 1, song: true, driveFileId: "  " }]));
+    const blank = parseBackup(
+      JSON.stringify([{ id: "x", text: "t", createdAt: 1, song: true, driveFileId: "  " }]),
+    );
     expect(blank[0]?.driveFileId).toBeUndefined();
   });
 
@@ -218,7 +258,8 @@ function fakeDriveFetch() {
   };
   let seq = 0;
   const drive: DriveFetch = async (path, init = {}) => {
-    const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });
+    const json = (data: unknown) =>
+      new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });
     if (path === "drive/v3/files?fields=id") {
       state.createdFolders++;
       state.folder = { id: `folder-${++seq}` };
@@ -234,13 +275,18 @@ function fakeDriveFetch() {
     if (path.startsWith("upload/drive/v3/files")) {
       const text = new TextDecoder().decode(await blobToBytes(init.body as Blob));
       const start = text.indexOf("{");
-      const metadata = JSON.parse(text.slice(start, text.indexOf("\r\n--", start))) as { name: string; appProperties: { songId: string }; parents: string[] };
+      const metadata = JSON.parse(text.slice(start, text.indexOf("\r\n--", start))) as {
+        name: string;
+        appProperties: { songId: string };
+        parents: string[];
+      };
       const id = `file-${++seq}`;
       state.files.set(id, { songId: metadata.appProperties.songId, name: metadata.name });
       expect(metadata.parents).toEqual([state.folder?.id]);
       return json({ id });
     }
-    if (path.includes("?alt=media")) return new Response("AUDIO", { headers: { "Content-Type": "audio/webm" } });
+    if (path.includes("?alt=media"))
+      return new Response("AUDIO", { headers: { "Content-Type": "audio/webm" } });
     if (init.method === "DELETE") {
       const id = path.replace("drive/v3/files/", "");
       state.deleted.push(id);
@@ -271,7 +317,12 @@ describe("createSongDriveOps", () => {
     const { drive, state } = fakeDriveFetch();
     const ops = createSongDriveOps(drive);
     expect(await ops.findSongFile("s1")).toBeNull();
-    const id = await ops.uploadSong({ songId: "s1", name: "n.webm", blob: new Blob(["x"], { type: "audio/webm" }), mime: "audio/webm" });
+    const id = await ops.uploadSong({
+      songId: "s1",
+      name: "n.webm",
+      blob: new Blob(["x"], { type: "audio/webm" }),
+      mime: "audio/webm",
+    });
     expect(await ops.findSongFile("s1")).toBe(id);
     const res = await ops.downloadSong(id);
     expect(new TextDecoder().decode(await res.arrayBuffer())).toBe("AUDIO");

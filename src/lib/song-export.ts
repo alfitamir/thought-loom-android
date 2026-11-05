@@ -12,9 +12,7 @@
 // in the audio database's `song-exports` store under a fingerprint of
 // the source recording (article-audio.ts), so repeat shares are instant
 // and a replaced recording (re-record, Drive restore) re-encodes once.
-import {
-  songExportStore, type SongAudioRecord, type SongExportStore,
-} from "./article-audio";
+import { songExportStore, type SongAudioRecord, type SongExportStore } from "./article-audio";
 
 export const SONG_MP3_MIME = "audio/mpeg";
 
@@ -73,8 +71,9 @@ export async function encodeAudioBufferToMp3(buffer: AudioBuffer): Promise<Blob>
 
 /** Decode any browser-playable recording and re-encode it as MP3. */
 export async function convertSongBlobToMp3(blob: Blob): Promise<Blob> {
-  const Ctor = window.AudioContext
-    ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  const Ctor =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) throw new Error("AudioContext unavailable");
   const ctx = new Ctor();
   try {
@@ -100,14 +99,19 @@ export interface SongMp3Deps {
  * AudioContext, an undecodable file) — callers decide their fallback;
  * a broken cache never blocks an export, it just re-encodes.
  */
-export async function getSongMp3(rec: SongAudioRecord, deps: SongMp3Deps = {}): Promise<Blob | null> {
+export async function getSongMp3(
+  rec: SongAudioRecord,
+  deps: SongMp3Deps = {},
+): Promise<Blob | null> {
   if (rec.mime === SONG_MP3_MIME) return rec.blob;
   const store = deps.exportStore ?? songExportStore();
   const fingerprint = songExportFingerprint(rec);
   try {
     const cached = await store.get(rec.ideaId);
     if (cached && cached.fingerprint === fingerprint) return cached.blob;
-  } catch { /* cache unreadable — fall through and re-encode */ }
+  } catch {
+    /* cache unreadable — fall through and re-encode */
+  }
   let mp3: Blob;
   try {
     mp3 = await (deps.convert ?? convertSongBlobToMp3)(rec.blob);
@@ -116,9 +120,15 @@ export async function getSongMp3(rec: SongAudioRecord, deps: SongMp3Deps = {}): 
   }
   try {
     await store.put({
-      key: rec.ideaId, ideaId: rec.ideaId, fingerprint,
-      mime: SONG_MP3_MIME, blob: mp3, createdAt: Date.now(),
+      key: rec.ideaId,
+      ideaId: rec.ideaId,
+      fingerprint,
+      mime: SONG_MP3_MIME,
+      blob: mp3,
+      createdAt: Date.now(),
     });
-  } catch { /* cache unwritable — the export itself still succeeds */ }
+  } catch {
+    /* cache unwritable — the export itself still succeeds */
+  }
   return mp3;
 }

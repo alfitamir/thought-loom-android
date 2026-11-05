@@ -35,12 +35,17 @@ const idea = z.object({
   // Frozen pre-AI texts ride along like every other field (capped at 5
   // per article by the writer; the schema allows headroom, the backup
   // parser re-caps on read).
-  versions: z.array(z.object({
-    at: z.number(),
-    text: z.string().max(400000),
-    title: z.string().max(5000).optional(),
-    source: z.enum(["improve", "clean", "merge", "restore"]),
-  })).max(20).optional(),
+  versions: z
+    .array(
+      z.object({
+        at: z.number(),
+        text: z.string().max(400000),
+        title: z.string().max(5000).optional(),
+        source: z.enum(["improve", "clean", "merge", "restore"]),
+      }),
+    )
+    .max(20)
+    .optional(),
 });
 const inputSchema = z.object({
   ideas: z.array(idea).max(10000),
@@ -49,30 +54,41 @@ const inputSchema = z.object({
 });
 
 class DriveError extends Error {
-  constructor(public status: number, body: string) { super(`Drive request failed [${status}]: ${body}`); }
+  constructor(
+    public status: number,
+    body: string,
+  ) {
+    super(`Drive request failed [${status}]: ${body}`);
+  }
 }
 
 export async function driveSync(request: Request): Promise<Response> {
-  const fail = (message: string, status: number) => Response.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
+  const fail = (message: string, status: number) =>
+    Response.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
   const url = process.env["SUPABASE_URL"];
   const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const driveKey = process.env["GOOGLE_DRIVE_API_KEY"];
   const owner = process.env["DRIVE_OWNER_USER_ID"];
-  if (!url || !key || !lovableKey || !driveKey || !owner) return fail("المزامنة مع Google Drive غير مهيأة الآن.", 503);
+  if (!url || !key || !lovableKey || !driveKey || !owner)
+    return fail("المزامنة مع Google Drive غير مهيأة الآن.", 503);
 
   const bearer = request.headers.get("Authorization");
-  if (!bearer?.startsWith("Bearer ")) return fail("سجّل الدخول أولاً لتفعيل المزامنة مع Google Drive.", 401);
+  if (!bearer?.startsWith("Bearer "))
+    return fail("سجّل الدخول أولاً لتفعيل المزامنة مع Google Drive.", 401);
   const cloud = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { fetch: (input, init) => {
-      const headers = new Headers(init?.headers);
-      headers.set("apikey", key);
-      return fetch(input, { ...init, headers });
-    } },
+    global: {
+      fetch: (input, init) => {
+        const headers = new Headers(init?.headers);
+        headers.set("apikey", key);
+        return fetch(input, { ...init, headers });
+      },
+    },
   });
   const { data: auth, error: authError } = await cloud.auth.getUser(bearer.slice(7));
-  if (authError || !auth.user) return fail("سجّل الدخول مجددًا لتفعيل المزامنة مع Google Drive.", 401);
+  if (authError || !auth.user)
+    return fail("سجّل الدخول مجددًا لتفعيل المزامنة مع Google Drive.", 401);
   // The Drive belongs to the app owner; nobody else may read or write it.
   if (auth.user.id !== owner) return fail("المزامنة مع Google Drive متاحة لصاحب التطبيق فقط.", 403);
 
@@ -92,20 +108,29 @@ export async function driveSync(request: Request): Promise<Response> {
     return res;
   };
   const search = async (q: string) => {
-    const res = await drive(`drive/v3/files?spaces=drive&orderBy=modifiedTime%20desc&fields=files(id)&q=${encodeURIComponent(q)}`);
+    const res = await drive(
+      `drive/v3/files?spaces=drive&orderBy=modifiedTime%20desc&fields=files(id)&q=${encodeURIComponent(q)}`,
+    );
     return ((await res.json()).files ?? []) as { id: string }[];
   };
-  const download = async (id: string) => parseDriveFile(await (await drive(`drive/v3/files/${id}?alt=media`)).text());
+  const download = async (id: string) =>
+    parseDriveFile(await (await drive(`drive/v3/files/${id}?alt=media`)).text());
 
   try {
-    const [own] = await search(`name='${FILE_NAME}' and trashed=false and appProperties has { key='afkari' and value='sync' }`);
+    const [own] = await search(
+      `name='${FILE_NAME}' and trashed=false and appProperties has { key='afkari' and value='sync' }`,
+    );
     let current: DriveState = { ideas: [], deleted: [] };
     if (own) current = await download(own.id);
     else {
       // First sync: bring in older backups already in Drive (e.g. from another copy of the app).
       for (const file of (await search(`name='${LEGACY_NAME}' and trashed=false`)).slice(0, 5)) {
         const legacy = await download(file.id).catch(() => null);
-        if (legacy) current = { ideas: mergeIdeas(current.ideas, legacy.ideas, []), deleted: current.deleted };
+        if (legacy)
+          current = {
+            ideas: mergeIdeas(current.ideas, legacy.ideas, []),
+            deleted: current.deleted,
+          };
       }
     }
     const { deleted, revived } = parsed.data;
@@ -114,22 +139,36 @@ export async function driveSync(request: Request): Promise<Response> {
     const content = buildDriveFile(merged);
     if (own) {
       await drive(`upload/drive/v3/files/${own.id}?uploadType=media`, {
-        method: "PATCH", headers: { "Content-Type": "application/json; charset=UTF-8" }, body: content,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json; charset=UTF-8" },
+        body: content,
       });
     } else {
       const boundary = `afkari${crypto.randomUUID()}`;
-      const metadata = { name: FILE_NAME, mimeType: "application/json", appProperties: { afkari: "sync" }, description: "نسخة أفكاري التلقائية — لا تحذفها" };
+      const metadata = {
+        name: FILE_NAME,
+        mimeType: "application/json",
+        appProperties: { afkari: "sync" },
+        description: "نسخة أفكاري التلقائية — لا تحذفها",
+      };
       const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${content}\r\n--${boundary}--`;
       await drive("upload/drive/v3/files?uploadType=multipart", {
-        method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body,
+        method: "POST",
+        headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+        body,
       });
     }
     return Response.json(merged, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof DriveError) {
-      if (error.status === 401 || error.status === 403) return fail("انقطع الربط مع Google Drive. أعد ربطه ثم حاول مرة أخرى.", 502);
-      if (error.status === 429) return fail("Google Drive مشغول الآن. سنحاول مرة أخرى لاحقًا.", 503);
-      return fail(`تعذّرت المزامنة مع Google Drive الآن (${error.status}). أفكارك محفوظة على الهاتف.`, 502);
+      if (error.status === 401 || error.status === 403)
+        return fail("انقطع الربط مع Google Drive. أعد ربطه ثم حاول مرة أخرى.", 502);
+      if (error.status === 429)
+        return fail("Google Drive مشغول الآن. سنحاول مرة أخرى لاحقًا.", 503);
+      return fail(
+        `تعذّرت المزامنة مع Google Drive الآن (${error.status}). أفكارك محفوظة على الهاتف.`,
+        502,
+      );
     }
     console.error("Drive sync failed", error);
     return fail("تعذّرت المزامنة مع Google Drive الآن. أفكارك محفوظة على الهاتف.", 502);

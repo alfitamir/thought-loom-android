@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  memorySongAudioStore, memorySongExportStore, saveSongAudio, type SongAudioRecord,
+  memorySongAudioStore,
+  memorySongExportStore,
+  saveSongAudio,
+  type SongAudioRecord,
 } from "./article-audio";
 import {
-  encodeAudioBufferToMp3, getSongMp3, songExportFingerprint, songMp3FileName, SONG_MP3_MIME,
+  encodeAudioBufferToMp3,
+  getSongMp3,
+  songExportFingerprint,
+  songMp3FileName,
+  SONG_MP3_MIME,
 } from "./song-export";
 import { blobToBytes } from "./tts";
 
@@ -37,7 +44,9 @@ describe("songExportFingerprint", () => {
     expect(songExportFingerprint({ ...rec, mime: "audio/mp4" })).not.toBe(base);
     expect(songExportFingerprint({ ...rec, duration: 96 })).not.toBe(base);
     expect(songExportFingerprint({ ...rec, createdAt: rec.createdAt + 1 })).not.toBe(base);
-    const bigger = await seedRecord({ blob: new Blob(["webm-master-longer"], { type: "audio/webm" }) });
+    const bigger = await seedRecord({
+      blob: new Blob(["webm-master-longer"], { type: "audio/webm" }),
+    });
     expect(songExportFingerprint(bigger)).not.toBe(base);
   });
 });
@@ -70,7 +79,10 @@ describe("getSongMp3", () => {
   });
 
   it("passes an MP3 master straight through — a restored Drive copy needs no conversion", async () => {
-    const rec = await seedRecord({ mime: "audio/mpeg", blob: new Blob(["already-mp3"], { type: "audio/mpeg" }) });
+    const rec = await seedRecord({
+      mime: "audio/mpeg",
+      blob: new Blob(["already-mp3"], { type: "audio/mpeg" }),
+    });
     const convert = vi.fn(async (_blob: Blob) => new Blob(["x"], { type: SONG_MP3_MIME }));
     const out = await getSongMp3(rec, { exportStore: memorySongExportStore(), convert });
     expect(out).toBe(rec.blob);
@@ -80,19 +92,27 @@ describe("getSongMp3", () => {
   it("returns null when conversion is impossible, caches nothing, and a retry can succeed", async () => {
     const rec = await seedRecord();
     const exports = memorySongExportStore();
-    const failing = vi.fn(async (_blob: Blob): Promise<Blob> => { throw new Error("cannot decode"); });
+    const failing = vi.fn(async (_blob: Blob): Promise<Blob> => {
+      throw new Error("cannot decode");
+    });
     expect(await getSongMp3(rec, { exportStore: exports, convert: failing })).toBeNull();
     expect(await exports.get("song-1")).toBeNull();
     const working = vi.fn(async (_blob: Blob) => new Blob(["mp3"], { type: SONG_MP3_MIME }));
-    expect((await getSongMp3(rec, { exportStore: exports, convert: working }))?.type).toBe(SONG_MP3_MIME);
+    expect((await getSongMp3(rec, { exportStore: exports, convert: working }))?.type).toBe(
+      SONG_MP3_MIME,
+    );
     expect(working).toHaveBeenCalledTimes(1);
   });
 
   it("a broken export cache never blocks the export — it just re-encodes", async () => {
     const rec = await seedRecord();
     const broken = {
-      get: async (): Promise<never> => { throw new Error("idb gone"); },
-      put: async (): Promise<never> => { throw new Error("idb gone"); },
+      get: async (): Promise<never> => {
+        throw new Error("idb gone");
+      },
+      put: async (): Promise<never> => {
+        throw new Error("idb gone");
+      },
       remove: async () => {},
     };
     const convert = vi.fn(async (_blob: Blob) => new Blob(["mp3"], { type: SONG_MP3_MIME }));
@@ -108,11 +128,15 @@ describe("encodeAudioBufferToMp3 (real lamejs)", () => {
     const length = Math.floor(sampleRate * seconds);
     const data = Array.from({ length: channels }, (_, ch) => {
       const arr = new Float32Array(length);
-      for (let i = 0; i < length; i++) arr[i] = 0.4 * Math.sin((i / sampleRate) * 2 * Math.PI * (440 + ch * 110));
+      for (let i = 0; i < length; i++)
+        arr[i] = 0.4 * Math.sin((i / sampleRate) * 2 * Math.PI * (440 + ch * 110));
       return arr;
     });
     return {
-      numberOfChannels: channels, sampleRate, length, duration: seconds,
+      numberOfChannels: channels,
+      sampleRate,
+      length,
+      duration: seconds,
       getChannelData: (ch: number) => data[ch] ?? data[0],
     } as unknown as AudioBuffer;
   };

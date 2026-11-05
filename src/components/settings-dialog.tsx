@@ -1,5 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { CloudUpload, Database, Download, KeyRound, MonitorSmartphone, Moon, Palette, ShieldCheck, Sun, Trash2, Upload } from "lucide-react";
+import {
+  CloudUpload,
+  Database,
+  Download,
+  KeyRound,
+  MonitorSmartphone,
+  Moon,
+  Palette,
+  ShieldCheck,
+  Sun,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getGeminiKey, setGeminiKey, testGeminiKey } from "@/lib/gemini";
@@ -14,9 +26,14 @@ import { loadDeleted, loadDriveDeleted, loadIdeas, storedIdeasBytes } from "@/li
 import { loadPendingDeletes } from "@/lib/pending-deletes";
 import { lastCloudSync, lastCloudSyncError, syncNow } from "@/lib/sync";
 
-const THEME_ICONS: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, system: MonitorSmartphone };
+const THEME_ICONS: Record<ThemeMode, typeof Sun> = {
+  light: Sun,
+  dark: Moon,
+  system: MonitorSmartphone,
+};
 
-const fmtDateTime = (ts: number) => new Date(ts).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+const fmtDateTime = (ts: number) =>
+  new Date(ts).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
 
 /** Human storage size with Arabic-Indic digits, e.g. «١٢٫٥ ك.ب». */
 const formatBytes = (bytes: number): string => {
@@ -26,7 +43,13 @@ const formatBytes = (bytes: number): string => {
   return `${(kb / 1024).toLocaleString("ar-EG", { maximumFractionDigits: 2 })} م.ب`;
 };
 
-export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function SettingsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const [saved, setSaved] = useState(false);
   const [draft, setDraft] = useState("");
@@ -57,40 +80,83 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     const songs = loadIdeas().filter((i) => i.song);
     setSongBackup({ total: songs.length, backed: songs.filter((i) => i.driveFileId).length });
     if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
-      void navigator.storage.estimate().then((est) => {
-        if (typeof est.usage === "number" && typeof est.quota === "number" && est.quota > 0) {
-          setStorageEst({ usage: est.usage, quota: est.quota });
-        }
-      }).catch(() => {});
+      void navigator.storage
+        .estimate()
+        .then((est) => {
+          if (typeof est.usage === "number" && typeof est.quota === "number" && est.quota > 0) {
+            setStorageEst({ usage: est.usage, quota: est.quota });
+          }
+        })
+        .catch(() => {});
     }
   };
 
-  useEffect(() => { if (open) { setSaved(!!getGeminiKey()); setDraft(""); setKeyMsg(""); setBackupMsg(""); setDriveMsg(""); setDriveAt(lastDriveSync()); refreshHealth(); } }, [open ]);
   useEffect(() => {
-    const update = () => { setDriveAt(lastDriveSync()); refreshHealth(); };
+    if (open) {
+      setSaved(!!getGeminiKey());
+      setDraft("");
+      setKeyMsg("");
+      setBackupMsg("");
+      setDriveMsg("");
+      setDriveAt(lastDriveSync());
+      refreshHealth();
+    }
+  }, [open]);
+  useEffect(() => {
+    const update = () => {
+      setDriveAt(lastDriveSync());
+      refreshHealth();
+    };
     window.addEventListener("afkari:drive-synced", update);
     window.addEventListener("afkari:ideas-changed", update);
-    return () => { window.removeEventListener("afkari:drive-synced", update); window.removeEventListener("afkari:ideas-changed", update); };
+    return () => {
+      window.removeEventListener("afkari:drive-synced", update);
+      window.removeEventListener("afkari:ideas-changed", update);
+    };
   }, []);
 
   const syncDriveNow = async () => {
-    setDriveBusy(true); setDriveMsg("جارٍ المزامنة مع Google Drive…");
-    const result = await syncDrive().catch(() => ({ ok: false as const, message: "تعذّرت المزامنة مع Google Drive الآن." }));
+    setDriveBusy(true);
+    setDriveMsg("جارٍ المزامنة مع Google Drive…");
+    const result = await syncDrive().catch(() => ({
+      ok: false as const,
+      message: "تعذّرت المزامنة مع Google Drive الآن.",
+    }));
     setDriveBusy(false);
-    setDriveMsg(result.ok ? (result.restored ? `تمت المزامنة ✓ واستُعيدت ${result.restored} فكرة من Drive.` : "تمت المزامنة ✓ كل أفكارك محفوظة في Google Drive.") : result.message);
+    setDriveMsg(
+      result.ok
+        ? result.restored
+          ? `تمت المزامنة ✓ واستُعيدت ${result.restored} فكرة من Drive.`
+          : "تمت المزامنة ✓ كل أفكارك محفوظة في Google Drive."
+        : result.message,
+    );
   };
 
   const saveKey = async () => {
     const key = draft.trim();
     if (!key) return;
-    setGeminiKey(key); setSaved(true); setDraft("");
-    if (!navigator.onLine) { setKeyMsg("حُفظ المفتاح ✓ سنستخدمه عند الاتصال بالإنترنت."); return; }
-    setTesting(true); setKeyMsg("جارٍ التأكد من المفتاح…");
+    setGeminiKey(key);
+    setSaved(true);
+    setDraft("");
+    if (!navigator.onLine) {
+      setKeyMsg("حُفظ المفتاح ✓ سنستخدمه عند الاتصال بالإنترنت.");
+      return;
+    }
+    setTesting(true);
+    setKeyMsg("جارٍ التأكد من المفتاح…");
     const error = await testGeminiKey(key);
     setTesting(false);
-    setKeyMsg(error ? `حُفظ المفتاح، لكن: ${error}` : "المفتاح يعمل ✓ الضبط والدمج سيستخدمان Gemini الخاص بك.");
+    setKeyMsg(
+      error
+        ? `حُفظ المفتاح، لكن: ${error}`
+        : "المفتاح يعمل ✓ الضبط والدمج سيستخدمان Gemini الخاص بك.",
+    );
   };
-  const removeKey = () => { setGeminiKey(""); setSaved(false); setKeyMsg("حُذف المفتاح من هذا الهاتف."); };
+  const removeKey = () => {
+    setGeminiKey("");
+    setSaved(false);
+    setKeyMsg("حُذف المفتاح من هذا الهاتف.");
+  };
 
   const exportBackup = async () => {
     setBackupMsg("");
@@ -109,113 +175,227 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     }
     const url = URL.createObjectURL(file);
     const a = document.createElement("a");
-    a.href = url; a.download = name; a.click();
+    a.href = url;
+    a.download = name;
+    a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setBackupMsg(`نُزّلت النسخة (${ideas.length} فكرة) ✓ ارفعها إلى Google Drive من مجلد التنزيلات.`);
+    setBackupMsg(
+      `نُزّلت النسخة (${ideas.length} فكرة) ✓ ارفعها إلى Google Drive من مجلد التنزيلات.`,
+    );
   };
   const importBackup = async (file: File | undefined) => {
     if (!file) return;
     try {
       const added = restoreBackup(parseBackup(await file.text()));
-      setBackupMsg(added ? `استُعيدت ${added} فكرة ✓` : "النسخة مستعادة ✓ كل أفكارها موجودة بالفعل.");
+      setBackupMsg(
+        added ? `استُعيدت ${added} فكرة ✓` : "النسخة مستعادة ✓ كل أفكارها موجودة بالفعل.",
+      );
       void syncNow();
     } catch (error) {
       setBackupMsg(error instanceof Error ? error.message : "تعذّرت قراءة الملف.");
-    } finally { if (fileRef.current) fileRef.current.value = ""; }
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
   // Song backup, stated from the songs' own Drive stamps: all backed up,
   // some still waiting for the next Drive pass, or none uploaded yet.
-  const songLine = songBackup.total === 0
-    ? "لا توجد أغانٍ مسجّلة على هذا الهاتف بعد."
-    : songBackup.backed === songBackup.total
-      ? `مفعّل — كل الأغاني (${arabicNumber(songBackup.total)}) محفوظة في مجلد «أفكاري — الأغاني».`
-      : songBackup.backed === 0
-        ? "لم تُرفع أي أغنية بعد — تُرفع التسجيلات تلقائيًا مع مزامنة Drive."
-        : `${arabicNumber(songBackup.backed)} من ${arabicNumber(songBackup.total)} أغنية محفوظة — الباقي يُرفع مع المزامنة القادمة.`;
+  const songLine =
+    songBackup.total === 0
+      ? "لا توجد أغانٍ مسجّلة على هذا الهاتف بعد."
+      : songBackup.backed === songBackup.total
+        ? `مفعّل — كل الأغاني (${arabicNumber(songBackup.total)}) محفوظة في مجلد «أفكاري — الأغاني».`
+        : songBackup.backed === 0
+          ? "لم تُرفع أي أغنية بعد — تُرفع التسجيلات تلقائيًا مع مزامنة Drive."
+          : `${arabicNumber(songBackup.backed)} من ${arabicNumber(songBackup.total)} أغنية محفوظة — الباقي يُرفع مع المزامنة القادمة.`;
 
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
-      <DialogTitle className="text-start font-display">الإعدادات</DialogTitle>
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Palette className="size-5 text-primary" />
-          <h3 className="font-display text-lg">المظهر</h3>
-        </div>
-        <p className="text-sm text-muted-foreground">فاتح، ليلي، أو حسب إعداد جهازك — يُطبَّق فورًا على التطبيق كله ويُحفظ على هذا الجهاز فقط.</p>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="وضع المظهر">
-          {THEME_MODES.map(({ mode, label }) => {
-            const Icon = THEME_ICONS[mode];
-            const active = themeMode === mode;
-            return <Button key={mode} variant={active ? "default" : "outline"} className="[&_svg]:size-5" aria-pressed={active} onClick={() => setThemeMode(mode)}><Icon />{label}</Button>;
-          })}
-        </div>
-      </section>
-      <StatsSection />
-      <section className="space-y-3 border-t border-border pt-4">
-        <div className="flex items-center gap-2">
-          <KeyRound className="size-5 text-primary" />
-          <h3 className="font-display text-lg">مفتاح Gemini الخاص بك</h3>
-          <span className={`ms-auto text-xs ${saved ? "text-primary" : "text-muted-foreground"}`}>{saved ? "مُضاف" : "غير مُضاف"}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">مع المفتاح يعمل الضبط والدمج عبر حسابك في Gemini دون استهلاك رصيد التطبيق. يُحفظ على هذا الهاتف فقط.</p>
-        {saved && <p className="text-sm text-primary">✓ يوجد مفتاح محفوظ على هذا الهاتف</p>}
-        <input type="password" aria-label="مفتاح Gemini" placeholder={saved ? "ضع مفتاحًا جديدًا لاستبداله" : "الصق المفتاح هنا"} value={draft} onChange={(e) => setDraft(e.target.value)}
-          dir="ltr" autoComplete="off" className="w-full rounded-md border border-input bg-card px-3 py-2 outline-none focus:ring-2 focus:ring-ring" />
-        <div className="flex flex-wrap gap-2">
-          <Button className="[&_svg]:size-5" onClick={saveKey} disabled={!draft.trim() || testing}><KeyRound />حفظ المفتاح</Button>
-          {saved && <Button variant="ghost" className="text-destructive [&_svg]:size-5" onClick={removeKey}><Trash2 />حذف المفتاح</Button>}
-        </div>
-        <p className="text-xs text-muted-foreground">تحصل على المفتاح من aistudio.google.com/apikey</p>
-        {keyMsg && <p role="status" className="break-words text-sm text-muted-foreground">{keyMsg}</p>}
-      </section>
-      {/* «صوتي» is temporarily hidden (MY_VOICE_PUBLIC) — section and its
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent dir="rtl" className="max-h-[85dvh] overflow-y-auto">
+        <DialogTitle className="text-start font-display">الإعدادات</DialogTitle>
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Palette className="size-5 text-primary" />
+            <h3 className="font-display text-lg">المظهر</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            فاتح، ليلي، أو حسب إعداد جهازك — يُطبَّق فورًا على التطبيق كله ويُحفظ على هذا الجهاز
+            فقط.
+          </p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="وضع المظهر">
+            {THEME_MODES.map(({ mode, label }) => {
+              const Icon = THEME_ICONS[mode];
+              const active = themeMode === mode;
+              return (
+                <Button
+                  key={mode}
+                  variant={active ? "default" : "outline"}
+                  className="[&_svg]:size-5"
+                  aria-pressed={active}
+                  onClick={() => setThemeMode(mode)}
+                >
+                  <Icon />
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
+        </section>
+        <StatsSection />
+        <section className="space-y-3 border-t border-border pt-4">
+          <div className="flex items-center gap-2">
+            <KeyRound className="size-5 text-primary" />
+            <h3 className="font-display text-lg">مفتاح Gemini الخاص بك</h3>
+            <span className={`ms-auto text-xs ${saved ? "text-primary" : "text-muted-foreground"}`}>
+              {saved ? "مُضاف" : "غير مُضاف"}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            مع المفتاح يعمل الضبط والدمج عبر حسابك في Gemini دون استهلاك رصيد التطبيق. يُحفظ على هذا
+            الهاتف فقط.
+          </p>
+          {saved && <p className="text-sm text-primary">✓ يوجد مفتاح محفوظ على هذا الهاتف</p>}
+          <input
+            type="password"
+            aria-label="مفتاح Gemini"
+            placeholder={saved ? "ضع مفتاحًا جديدًا لاستبداله" : "الصق المفتاح هنا"}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            dir="ltr"
+            autoComplete="off"
+            className="w-full rounded-md border border-input bg-card px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              className="[&_svg]:size-5"
+              onClick={saveKey}
+              disabled={!draft.trim() || testing}
+            >
+              <KeyRound />
+              حفظ المفتاح
+            </Button>
+            {saved && (
+              <Button
+                variant="ghost"
+                className="text-destructive [&_svg]:size-5"
+                onClick={removeKey}
+              >
+                <Trash2 />
+                حذف المفتاح
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            تحصل على المفتاح من aistudio.google.com/apikey
+          </p>
+          {keyMsg && (
+            <p role="status" className="break-words text-sm text-muted-foreground">
+              {keyMsg}
+            </p>
+          )}
+        </section>
+        {/* «صوتي» is temporarily hidden (MY_VOICE_PUBLIC) — section and its
           stored profile stay intact, just unrendered. */}
-      {isMyVoicePublic() && <MyVoiceSection />}
-      <section className="space-y-3 border-t border-border pt-4">
-        <div className="flex items-center gap-2">
-          <CloudUpload className="size-5 text-primary" />
-          <h3 className="font-display text-lg">Google Drive</h3>
-          <span className={`ms-auto text-xs ${driveAt ? "text-primary" : "text-muted-foreground"}`}>{driveAt ? "متصل" : "غير متصل"}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">تُحفظ أفكارك ومقالاتك تلقائيًا في ملف «afkari-sync.json» على Google Drive كلما اتصلت بالإنترنت وأنت مسجّل الدخول، وتُستعاد منه على أي هاتف.</p>
-        <p className="text-sm text-muted-foreground">نسخ الأغاني على Drive: {songLine}</p>
-        <Button variant="outline" className="[&_svg]:size-5" onClick={syncDriveNow} disabled={driveBusy}><CloudUpload />مزامنة الآن</Button>
-        {driveMsg && <p role="status" className="break-words text-sm text-muted-foreground">{driveMsg}</p>}
-      </section>
-      <section className="space-y-3 border-t border-border pt-4">
-        <div className="flex items-center gap-2">
-          <Database className="size-5 text-primary" />
-          <h3 className="font-display text-lg">النسخة الاحتياطية</h3>
-        </div>
-        <p className="text-sm text-muted-foreground">ملف واحد فيه كل أفكارك ومقالاتك. احفظه في Google Drive واستعده على أي هاتف.</p>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="[&_svg]:size-5" onClick={exportBackup}><Download />تصدير نسخة</Button>
-          <Button variant="outline" className="[&_svg]:size-5" onClick={() => fileRef.current?.click()}><Upload />استعادة نسخة</Button>
-          <input ref={fileRef} type="file" accept=".json,application/json,text/plain" hidden aria-label="ملف النسخة الاحتياطية" onChange={(e) => importBackup(e.target.files?.[0])} />
-        </div>
-        {backupMsg && <p role="status" className="break-words text-sm text-muted-foreground">{backupMsg}</p>}
-      </section>
-      <section className="space-y-3 border-t border-border pt-4">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="size-5 text-primary" />
-          <h3 className="font-display text-lg">حالة النسخ الاحتياطي</h3>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          النسخة السحابية: {cloudAt ? `آخر مزامنة ناجحة ${fmtDateTime(cloudAt)}` : "لم تتم مزامنة ناجحة بعد على هذا الهاتف."}
-        </p>
-        {cloudError && <p role="status" className="break-words text-sm text-destructive">آخر محاولة سحابية لم تنجح: {cloudError}</p>}
-        <p className="text-sm text-muted-foreground">
-          Google Drive: {driveAt ? `آخر مزامنة ${fmtDateTime(driveAt)}` : "لم تتم المزامنة بعد على هذا الهاتف."}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {pendingCount ? `عناصر حذف بانتظار الترحيل: ${arabicNumber(pendingCount)}` : "لا توجد عناصر معلّقة بانتظار الترحيل."}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          حجم مكتبتك على هذا الهاتف: {formatBytes(libraryBytes)}
-          {storageEst ? ` · مساحة التطبيق المستخدمة ${formatBytes(storageEst.usage)} من أصل ${formatBytes(storageEst.quota)} تقريبًا` : ""}
-        </p>
-      </section>
-    </DialogContent>
-  </Dialog>;
+        {isMyVoicePublic() && <MyVoiceSection />}
+        <section className="space-y-3 border-t border-border pt-4">
+          <div className="flex items-center gap-2">
+            <CloudUpload className="size-5 text-primary" />
+            <h3 className="font-display text-lg">Google Drive</h3>
+            <span
+              className={`ms-auto text-xs ${driveAt ? "text-primary" : "text-muted-foreground"}`}
+            >
+              {driveAt ? "متصل" : "غير متصل"}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            تُحفظ أفكارك ومقالاتك تلقائيًا في ملف «afkari-sync.json» على Google Drive كلما اتصلت
+            بالإنترنت وأنت مسجّل الدخول، وتُستعاد منه على أي هاتف.
+          </p>
+          <p className="text-sm text-muted-foreground">نسخ الأغاني على Drive: {songLine}</p>
+          <Button
+            variant="outline"
+            className="[&_svg]:size-5"
+            onClick={syncDriveNow}
+            disabled={driveBusy}
+          >
+            <CloudUpload />
+            مزامنة الآن
+          </Button>
+          {driveMsg && (
+            <p role="status" className="break-words text-sm text-muted-foreground">
+              {driveMsg}
+            </p>
+          )}
+        </section>
+        <section className="space-y-3 border-t border-border pt-4">
+          <div className="flex items-center gap-2">
+            <Database className="size-5 text-primary" />
+            <h3 className="font-display text-lg">النسخة الاحتياطية</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            ملف واحد فيه كل أفكارك ومقالاتك. احفظه في Google Drive واستعده على أي هاتف.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="[&_svg]:size-5" onClick={exportBackup}>
+              <Download />
+              تصدير نسخة
+            </Button>
+            <Button
+              variant="outline"
+              className="[&_svg]:size-5"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload />
+              استعادة نسخة
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json,application/json,text/plain"
+              hidden
+              aria-label="ملف النسخة الاحتياطية"
+              onChange={(e) => importBackup(e.target.files?.[0])}
+            />
+          </div>
+          {backupMsg && (
+            <p role="status" className="break-words text-sm text-muted-foreground">
+              {backupMsg}
+            </p>
+          )}
+        </section>
+        <section className="space-y-3 border-t border-border pt-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-5 text-primary" />
+            <h3 className="font-display text-lg">حالة النسخ الاحتياطي</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            النسخة السحابية:{" "}
+            {cloudAt
+              ? `آخر مزامنة ناجحة ${fmtDateTime(cloudAt)}`
+              : "لم تتم مزامنة ناجحة بعد على هذا الهاتف."}
+          </p>
+          {cloudError && (
+            <p role="status" className="break-words text-sm text-destructive">
+              آخر محاولة سحابية لم تنجح: {cloudError}
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground">
+            Google Drive:{" "}
+            {driveAt ? `آخر مزامنة ${fmtDateTime(driveAt)}` : "لم تتم المزامنة بعد على هذا الهاتف."}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {pendingCount
+              ? `عناصر حذف بانتظار الترحيل: ${arabicNumber(pendingCount)}`
+              : "لا توجد عناصر معلّقة بانتظار الترحيل."}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            حجم مكتبتك على هذا الهاتف: {formatBytes(libraryBytes)}
+            {storageEst
+              ? ` · مساحة التطبيق المستخدمة ${formatBytes(storageEst.usage)} من أصل ${formatBytes(storageEst.quota)} تقريبًا`
+              : ""}
+          </p>
+        </section>
+      </DialogContent>
+    </Dialog>
+  );
 }

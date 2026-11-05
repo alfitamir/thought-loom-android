@@ -6,36 +6,65 @@ import { READING_PREFS_KEY } from "@/lib/reading-prefs";
 // Same leaf-module stubs as editor-header.test.tsx: this suite covers the
 // reading-comfort contract — the header control, the CSS variables it
 // drives on the editor root, and the surfaces that consume them.
-vi.mock("@/lib/sync", () => ({ pushIdea: vi.fn(async () => {}), syncNow: vi.fn(async () => 0), deleteIdeaCloud: vi.fn(async () => {}) }));
-vi.mock("@/lib/ai-features", () => ({ getArticleEnrichment: vi.fn(), getFacebookPost: vi.fn(), getEvidence: vi.fn() }));
+vi.mock("@/lib/sync", () => ({
+  pushIdea: vi.fn(async () => {}),
+  syncNow: vi.fn(async () => 0),
+  deleteIdeaCloud: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/ai-features", () => ({
+  getArticleEnrichment: vi.fn(),
+  getFacebookPost: vi.fn(),
+  getEvidence: vi.fn(),
+}));
 vi.mock("@/lib/ai-engine", () => ({ resolveEngine: vi.fn(async () => "x") }));
 vi.mock("@/lib/article-ai", () => ({ improveFull: vi.fn(), cleanFull: vi.fn() }));
 vi.mock("@/lib/gemini", () => ({ getGeminiKey: () => "" }));
 vi.mock("@/lib/tts", () => ({
   GEMINI_TTS_VOICE: "Charon",
-  blobToBytes: vi.fn(), concatPcm: vi.fn(), createTtsSession: vi.fn(), mapWithConcurrency: vi.fn(),
-  modelForVoiceKey: vi.fn(), pcmToWav: vi.fn(), speakWithDevice: vi.fn(), splitForSpeech: () => [],
-  synthesizeGeminiChunkWithModel: vi.fn(), toSpeechText: (t: string) => t,
+  blobToBytes: vi.fn(),
+  concatPcm: vi.fn(),
+  createTtsSession: vi.fn(),
+  mapWithConcurrency: vi.fn(),
+  modelForVoiceKey: vi.fn(),
+  pcmToWav: vi.fn(),
+  speakWithDevice: vi.fn(),
+  splitForSpeech: () => [],
+  synthesizeGeminiChunkWithModel: vi.fn(),
+  toSpeechText: (t: string) => t,
 }));
 vi.mock("@/lib/article-audio", () => ({
   PCM_CHUNK_MIME: "audio/pcm",
   audioFileName: (t: string) => `${t}.wav`,
-  deleteArticleAudioForVoice: vi.fn(), deleteSongAudio: vi.fn(async () => {}),
-  findCachedAudioForVoice: vi.fn(async () => null), getAudioChunk: vi.fn(async () => null),
-  getSongAudio: vi.fn(async () => null), listArticleIdsWithAudio: vi.fn(async () => new Set<string>()),
-  saveAudioChunk: vi.fn(async () => {}), saveAudioManifest: vi.fn(async () => {}),
-  saveSongAudio: vi.fn(async () => {}), songAudioStore: vi.fn(),
+  deleteArticleAudioForVoice: vi.fn(),
+  deleteSongAudio: vi.fn(async () => {}),
+  findCachedAudioForVoice: vi.fn(async () => null),
+  getAudioChunk: vi.fn(async () => null),
+  getSongAudio: vi.fn(async () => null),
+  listArticleIdsWithAudio: vi.fn(async () => new Set<string>()),
+  saveAudioChunk: vi.fn(async () => {}),
+  saveAudioManifest: vi.fn(async () => {}),
+  saveSongAudio: vi.fn(async () => {}),
+  songAudioStore: vi.fn(),
 }));
 vi.mock("@/lib/my-voice", () => ({
-  effectiveListenVoice: (c: string) => c, getMyVoiceProfile: () => null, isMyVoicePublic: () => false,
+  effectiveListenVoice: (c: string) => c,
+  getMyVoiceProfile: () => null,
+  isMyVoicePublic: () => false,
 }));
-vi.mock("@/lib/song-drive", () => ({ downloadSongAudio: vi.fn(), deleteSongDriveCopy: vi.fn(async () => {}) }));
+vi.mock("@/lib/song-drive", () => ({
+  downloadSongAudio: vi.fn(),
+  deleteSongDriveCopy: vi.fn(async () => {}),
+}));
 vi.mock("@/lib/song-lyrics", () => ({
-  applySongLyrics: vi.fn(), decideLyricsApplication: () => "none",
-  isSongLyricsPending: () => false, onSongLyricsPendingChange: () => () => {}, transcribeSong: vi.fn(),
+  applySongLyrics: vi.fn(),
+  decideLyricsApplication: () => "none",
+  isSongLyricsPending: () => false,
+  onSongLyricsPendingChange: () => () => {},
+  transcribeSong: vi.fn(),
 }));
 vi.mock("@/lib/share-card", () => ({
-  deliverCardImage: vi.fn(async () => "shared"), renderShareCardPng: vi.fn(async () => new Blob()),
+  deliverCardImage: vi.fn(async () => "shared"),
+  renderShareCardPng: vi.fn(async () => new Blob()),
   shareCardModel: () => ({}),
 }));
 vi.mock("@/components/evidence-dialog", () => ({ EvidenceDialog: () => null }));
@@ -47,11 +76,23 @@ const FOLLOWS = 4; // Node.DOCUMENT_POSITION_FOLLOWING
 const before = (a: Element, b: Element) => (a.compareDocumentPosition(b) & FOLLOWS) !== 0;
 
 const article: Idea = {
-  id: "a1", text: "نص المقال الأصلي", createdAt: 1000, updatedAt: 5000,
-  articleTitle: "عنوان المقال", articleBody: "متن المقال الطويل الذي يقرأه القارئ هنا بسطور كثيرة",
+  id: "a1",
+  text: "نص المقال الأصلي",
+  createdAt: 1000,
+  updatedAt: 5000,
+  articleTitle: "عنوان المقال",
+  articleBody: "متن المقال الطويل الذي يقرأه القارئ هنا بسطور كثيرة",
 };
 const renderEditor = (idea: Idea) => {
-  const utils = render(<ArticleEditor idea={idea} topic="متفرقات" online={false} onChange={vi.fn()} onDelete={vi.fn()} />);
+  const utils = render(
+    <ArticleEditor
+      idea={idea}
+      topic="متفرقات"
+      online={false}
+      onChange={vi.fn()}
+      onDelete={vi.fn()}
+    />,
+  );
   const root = utils.container.querySelector("article")!;
   return { ...utils, root };
 };
@@ -86,15 +127,24 @@ describe("reading comfort (وضع القراءة المريح)", () => {
   it("stepping the menu updates the applied variables and persists the choice", () => {
     localStorage.setItem("afkari.ideas", JSON.stringify([article]));
     const { root } = renderEditor(article);
-    const openMenu = () => fireEvent.keyDown(screen.getByRole("button", { name: "راحة القراءة" }), { key: "ArrowDown" });
+    const openMenu = () =>
+      fireEvent.keyDown(screen.getByRole("button", { name: "راحة القراءة" }), { key: "ArrowDown" });
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "حجم النص: أكبر" }));
     expect(varOf(root, "--reading-font-size")).toBe("1.75rem");
-    expect(JSON.parse(localStorage.getItem(READING_PREFS_KEY)!)).toEqual({ fontSize: 2, lineHeight: 0, bgTint: 0 });
+    expect(JSON.parse(localStorage.getItem(READING_PREFS_KEY)!)).toEqual({
+      fontSize: 2,
+      lineHeight: 0,
+      bgTint: 0,
+    });
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "تباعد الأسطر: واسعة" }));
     expect(varOf(root, "--reading-line-height")).toBe("2.4");
-    expect(JSON.parse(localStorage.getItem(READING_PREFS_KEY)!)).toEqual({ fontSize: 2, lineHeight: 1, bgTint: 0 });
+    expect(JSON.parse(localStorage.getItem(READING_PREFS_KEY)!)).toEqual({
+      fontSize: 2,
+      lineHeight: 1,
+      bgTint: 0,
+    });
   });
 
   it("a stored choice applies on open, without touching the article data", () => {
@@ -116,7 +166,14 @@ describe("reading comfort (وضع القراءة المريح)", () => {
   });
 
   it("songs inherit the preference on their lyrics — and still get the control", () => {
-    const song: Idea = { id: "s1", text: "كلمات الأغنية كاملة هنا", createdAt: 1000, updatedAt: 5000, articleTitle: "أغنية", song: true };
+    const song: Idea = {
+      id: "s1",
+      text: "كلمات الأغنية كاملة هنا",
+      createdAt: 1000,
+      updatedAt: 5000,
+      articleTitle: "أغنية",
+      song: true,
+    };
     localStorage.setItem("afkari.ideas", JSON.stringify([song]));
     localStorage.setItem(READING_PREFS_KEY, JSON.stringify({ fontSize: 2, lineHeight: 0 }));
     const { root } = renderEditor(song);

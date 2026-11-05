@@ -8,8 +8,12 @@ import { deleteSongAudio } from "./article-audio";
 import { deleteSongDriveCopy } from "./song-drive";
 import { deleteIdeaCloud } from "./sync";
 import {
-  beginPendingDelete, cancelPendingDelete, loadPendingDeletes, sweepPendingDeletes,
-  type DeleteEffects, type PendingDelete,
+  beginPendingDelete,
+  cancelPendingDelete,
+  loadPendingDeletes,
+  sweepPendingDeletes,
+  type DeleteEffects,
+  type PendingDelete,
 } from "./pending-deletes";
 
 /** The side effects the old immediate delete ran — unchanged, just deferred
@@ -18,27 +22,41 @@ import {
  *  tombstoned by song-drive and retried by the next upload pass). */
 export const realDeleteEffects: DeleteEffects = {
   removeRecord: (id) => deleteIdea(id),
-  deleteSongAudio: (id) => { void deleteSongAudio(id).catch(() => {}); },
-  deleteSongDriveCopy: (idea) => { void deleteSongDriveCopy(idea).catch(() => {}); },
-  deleteCloud: (id) => { void deleteIdeaCloud(id).catch(() => {}); },
+  deleteSongAudio: (id) => {
+    void deleteSongAudio(id).catch(() => {});
+  },
+  deleteSongDriveCopy: (idea) => {
+    void deleteSongDriveCopy(idea).catch(() => {});
+  },
+  deleteCloud: (id) => {
+    void deleteIdeaCloud(id).catch(() => {});
+  },
 };
 
-const notify = () => { if (typeof window !== "undefined") window.dispatchEvent(new Event("afkari:ideas-changed")); };
+const notify = () => {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("afkari:ideas-changed"));
+};
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 /** (Re)arm the single finalization timer at the earliest pending deadline. */
 function armTimer() {
-  if (timer) { clearTimeout(timer); timer = null; }
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
   const list = loadPendingDeletes();
   if (!list.length) return;
   const next = Math.min(...list.map((e) => e.deadline));
-  timer = setTimeout(() => {
-    timer = null;
-    sweepPendingDeletes(realDeleteEffects);
-    armTimer();
-    notify();
-  }, Math.max(0, next - Date.now()));
+  timer = setTimeout(
+    () => {
+      timer = null;
+      sweepPendingDeletes(realDeleteEffects);
+      armTimer();
+      notify();
+    },
+    Math.max(0, next - Date.now()),
+  );
 }
 
 /** Delete gesture: mark the idea pending (it vanishes from every surface
@@ -55,7 +73,10 @@ export function requestDelete(id: string): PendingDelete {
  *  exactly as it was. Returns whether there was anything to undo. */
 export function undoDelete(id: string): boolean {
   const restored = cancelPendingDelete(id);
-  if (restored) { armTimer(); notify(); }
+  if (restored) {
+    armTimer();
+    notify();
+  }
   return restored;
 }
 

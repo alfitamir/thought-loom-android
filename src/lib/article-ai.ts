@@ -8,7 +8,10 @@ export function parseImprovedArticle(text: string): { title: string; body: strin
   return { title, body };
 }
 
-export async function readArticleStream(response: Response, onText: (text: string) => void): Promise<string> {
+export async function readArticleStream(
+  response: Response,
+  onText: (text: string) => void,
+): Promise<string> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message ?? "تعذّر تحسين المقال الآن.");
@@ -16,12 +19,17 @@ export async function readArticleStream(response: Response, onText: (text: strin
   if (!response.body) throw new Error("لم تصل نسخة من المقال.");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "", output = "", completed = false;
+  let buffer = "",
+    output = "",
+    completed = false;
   const processLine = (line: string) => {
     if (!line.trim()) return;
     const event = JSON.parse(line);
     if (event.type === "error") throw new Error(event.message);
-    if (event.type === "text") { output += event.text; onText(output); }
+    if (event.type === "text") {
+      output += event.text;
+      onText(output);
+    }
     if (event.type === "done") completed = true;
   };
   try {
@@ -42,11 +50,16 @@ export async function readArticleStream(response: Response, onText: (text: strin
     reader.releaseLock();
   }
 }
-const words = (s: string) => s.replace(/[\u064B-\u0652]/g, "").split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1);
+const words = (s: string) =>
+  s
+    .replace(/[\u064B-\u0652]/g, "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length > 1);
 
 /** Reject AI output that dropped content: too short, or missing the source's final sentence. */
 export function isComplete(source: string, output: string): boolean {
-  const src = words(source), out = words(output);
+  const src = words(source),
+    out = words(output);
   if (out.length < src.length * 0.85) return false;
   const tail = src.slice(-6).filter((w) => w.length > 2);
   if (!tail.length) return true;
@@ -57,11 +70,18 @@ export function isComplete(source: string, output: string): boolean {
 
 /** Split long bodies on paragraph boundaries so each AI call stays small and complete. */
 export function splitChunks(body: string, maxWords = 1500): string[] {
-  const chunks: string[] = []; let cur: string[] = []; let n = 0;
+  const chunks: string[] = [];
+  let cur: string[] = [];
+  let n = 0;
   for (const p of body.split(/\n\s*\n/)) {
     const c = p.split(/\s+/).length;
-    if (cur.length && n + c > maxWords) { chunks.push(cur.join("\n\n")); cur = []; n = 0; }
-    cur.push(p); n += c;
+    if (cur.length && n + c > maxWords) {
+      chunks.push(cur.join("\n\n"));
+      cur = [];
+      n = 0;
+    }
+    cur.push(p);
+    n += c;
   }
   if (cur.length) chunks.push(cur.join("\n\n"));
   return chunks;
@@ -93,21 +113,25 @@ export class MergeIncompleteError extends Error {
  * survives with light rewording or different spelling conventions still
  * counts as present, while a genuinely absent line still fails.
  */
-export const normalizeForCompare = (s: string): string => s
-  .replace(/[\u064B-\u065F\u0670]/g, "")
-  .replace(/\u0640/g, "")
-  .replace(/[أإآٱ]/g, "ا")
-  .replace(/ة/g, "ه")
-  .replace(/ى/g, "ي")
-  .replace(/ؤ/g, "و")
-  .replace(/ئ/g, "ي")
-  .replace(/ء/g, "")
-  .replace(/[*_#`>]/g, " ")
-  .replace(/[^\p{L}\p{N}\s]+/gu, " ")
-  .replace(/\s+/g, " ")
-  .trim();
+export const normalizeForCompare = (s: string): string =>
+  s
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/\u0640/g, "")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/ء/g, "")
+    .replace(/[*_#`>]/g, " ")
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-const compareTokens = (s: string): string[] => normalizeForCompare(s).split(" ").filter((w) => w.length > 1);
+const compareTokens = (s: string): string[] =>
+  normalizeForCompare(s)
+    .split(" ")
+    .filter((w) => w.length > 1);
 
 /**
  * Split a body into the units the merge guard checks: paragraphs first, then
@@ -165,15 +189,20 @@ export type Engine = { kind: "gemini"; key: string } | { kind: "cloud"; token: s
 
 /** Run one AI task on the chosen engine and return its full streamed text. */
 export async function runAi(
-  engine: Engine, task: AiTask, payload: string, signal: AbortSignal,
-  onText: (text: string) => void = () => {}, json?: object,
+  engine: Engine,
+  task: AiTask,
+  payload: string,
+  signal: AbortSignal,
+  onText: (text: string) => void = () => {},
+  json?: object,
 ): Promise<string> {
   if (engine.kind === "gemini") {
     const { geminiStream } = await import("./gemini");
     return geminiStream(engine.key, TASK_INSTRUCTIONS[task], payload, signal, onText, json);
   }
   const response = await fetch("/api/articles/improve", {
-    method: "POST", signal,
+    method: "POST",
+    signal,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${engine.token}` },
     body: JSON.stringify({ task, payload }),
   });
@@ -182,13 +211,23 @@ export async function runAi(
 
 /** Proofread a full article (chunked), verifying nothing is lost. */
 export async function improveFull(
-  article: { title: string; body: string }, original: string, samples: string[], engine: Engine,
-  signal: AbortSignal, onText: (text: string) => void,
+  article: { title: string; body: string },
+  original: string,
+  samples: string[],
+  engine: Engine,
+  signal: AbortSignal,
+  onText: (text: string) => void,
 ): Promise<{ title: string; body: string }> {
   const chunks = splitChunks(article.body);
-  let title = article.title; const parts: string[] = [];
+  let title = article.title;
+  const parts: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
-    const payload = { title: article.title, body: chunks[i], original: chunks.length > 1 ? "" : original.slice(0, 40000), samples };
+    const payload = {
+      title: article.title,
+      body: chunks[i],
+      original: chunks.length > 1 ? "" : original.slice(0, 40000),
+      samples,
+    };
     const show = (t: string) => onText([...parts, t].join("\n\n"));
     const text = await runAi(engine, "improve", JSON.stringify(payload), signal, show);
     const out = parseImprovedArticle(text);
@@ -207,11 +246,14 @@ export async function improveFull(
  * nothing can steer the model toward restyling the author's words.
  */
 export async function cleanFull(
-  article: { title: string; body: string }, engine: Engine,
-  signal: AbortSignal, onText: (text: string) => void,
+  article: { title: string; body: string },
+  engine: Engine,
+  signal: AbortSignal,
+  onText: (text: string) => void,
 ): Promise<{ title: string; body: string }> {
   const chunks = splitChunks(article.body);
-  let title = article.title; const parts: string[] = [];
+  let title = article.title;
+  const parts: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
     const payload = { title: article.title, body: chunks[i] };
     const show = (t: string) => onText([...parts, t].join("\n\n"));

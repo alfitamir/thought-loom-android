@@ -35,15 +35,18 @@ describe("driveSync (server)", () => {
     process.env["DRIVE_OWNER_USER_ID"] = "owner-1";
     h.uploads.length = 0;
     const emptyDriveFile = buildDriveFile({ ideas: [], deleted: [] });
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = String(input);
-      if (url.includes("alt=media")) return new Response(emptyDriveFile, { status: 200 });
-      if (url.includes("upload/drive/v3/files")) {
-        h.uploads.push(String(init?.body ?? ""));
-        return new Response("{}", { status: 200 });
-      }
-      return Response.json({ files: [{ id: "drive-file-1" }] });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const url = String(input);
+        if (url.includes("alt=media")) return new Response(emptyDriveFile, { status: 200 });
+        if (url.includes("upload/drive/v3/files")) {
+          h.uploads.push(String(init?.body ?? ""));
+          return new Response("{}", { status: 200 });
+        }
+        return Response.json({ files: [{ id: "drive-file-1" }] });
+      }),
+    );
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -58,11 +61,19 @@ describe("driveSync (server)", () => {
     // The merged state the handler answers with…
     const body = (await res.json()) as { ideas: Idea[]; deleted: string[] };
     expect(body.ideas).toHaveLength(1);
-    expect(body.ideas[0]).toMatchObject({ liked: true, source: "مجلة الفكر", sources: ["موقع آخر", "مدوّنة الناقد"] });
+    expect(body.ideas[0]).toMatchObject({
+      liked: true,
+      source: "مجلة الفكر",
+      sources: ["موقع آخر", "مدوّنة الناقد"],
+    });
     // …and the file actually written back to Drive both carry the three
     // fields — a restore from it must never un-like the article.
     expect(h.uploads).toHaveLength(1);
     const written = parseDriveFile(h.uploads[0] ?? "");
-    expect(written.ideas[0]).toMatchObject({ liked: true, source: "مجلة الفكر", sources: ["موقع آخر", "مدوّنة الناقد"] });
+    expect(written.ideas[0]).toMatchObject({
+      liked: true,
+      source: "مجلة الفكر",
+      sources: ["موقع آخر", "مدوّنة الناقد"],
+    });
   });
 });

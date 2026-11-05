@@ -4,7 +4,11 @@ import { THEME_KEY, useTheme } from "@/lib/theme";
 
 // Keep the settings dialog away from the cloud/drive plumbing (same
 // stubs as my-voice-gating.test.tsx).
-vi.mock("@/lib/sync", () => ({ syncNow: vi.fn(async () => ({ ok: true as const, restored: 0 })), lastCloudSync: () => 0, lastCloudSyncError: () => "" }));
+vi.mock("@/lib/sync", () => ({
+  syncNow: vi.fn(async () => ({ ok: true as const, restored: 0 })),
+  lastCloudSync: () => 0,
+  lastCloudSyncError: () => "",
+}));
 vi.mock("@/lib/drive-sync", () => ({
   lastDriveSync: () => 0,
   syncDrive: vi.fn(async () => ({ ok: true as const })),
@@ -36,7 +40,12 @@ beforeEach(() => {
 
 describe("appearance (المظهر)", () => {
   it("useTheme holders stay in sync through the window event", () => {
-    render(<><ThemeProbe id="a" /><ThemeProbe id="b" /></>);
+    render(
+      <>
+        <ThemeProbe id="a" />
+        <ThemeProbe id="b" />
+      </>,
+    );
     expect(screen.getByTestId("mode-a").textContent).toBe("system");
     expect(screen.getByTestId("mode-b").textContent).toBe("system");
     fireEvent.click(screen.getByRole("button", { name: "وضع a ليلي" }));
@@ -52,7 +61,9 @@ describe("appearance (المظهر)", () => {
     expect(screen.getByRole("heading", { name: "المظهر" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /ليلي/ }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: /فاتح/ }).getAttribute("aria-pressed")).toBe("false");
-    expect(screen.getByRole("button", { name: /حسب الجهاز/ }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: /حسب الجهاز/ }).getAttribute("aria-pressed")).toBe(
+      "false",
+    );
   });
 
   it("choosing a mode in Settings applies immediately and persists", () => {

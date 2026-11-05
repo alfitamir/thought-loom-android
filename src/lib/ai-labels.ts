@@ -11,12 +11,19 @@ const KEY = "afkari.aiLabels";
 const BATCH = 30;
 
 const load = (): Record<string, Stored> => {
-  try { return JSON.parse(localStorage.getItem(KEY) || "{}") ?? {}; } catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem(KEY) || "{}") ?? {};
+  } catch {
+    return {};
+  }
 };
 const version = (idea: Idea) => idea.updatedAt ?? 0;
 
 /** The AI label if it is still valid for this edition of the article, otherwise the offline keyword fallback. */
-export function labelFor(idea: Idea, all: Record<string, Stored> = load()): Label & { ai: boolean } {
+export function labelFor(
+  idea: Idea,
+  all: Record<string, Stored> = load(),
+): Label & { ai: boolean } {
   const s = all[idea.id];
   if (s && s.v === version(idea)) return { topic: s.topic, tags: s.tags, ai: true };
   return { topic: classify(idea.text), tags: [], ai: false };
@@ -27,14 +34,19 @@ export const unlabeled = (ideas: Idea[]) => {
   // A hand-pinned topic is settled by the user: bulk classification skips the article
   // entirely, so it never counts as awaiting classification either. A liked article
   // is someone else's writing — AI classification never touches it at all.
-  return ideas.filter((i) => { if (i.topicManual || i.liked) return false; const s = all[i.id]; return !s || s.v !== version(i); });
+  return ideas.filter((i) => {
+    if (i.topicManual || i.liked) return false;
+    const s = all[i.id];
+    return !s || s.v !== version(i);
+  });
 };
 
 export const loadLabels = load;
 
 /** Label every stale/unlabeled idea in batches; progress callback reports done/total. Partial progress is kept on failure. */
 export async function labelAll(
-  ideas: Idea[], o: AIOptions & { onProgress?: (done: number, total: number) => void } = {},
+  ideas: Idea[],
+  o: AIOptions & { onProgress?: (done: number, total: number) => void } = {},
 ): Promise<number> {
   const todo = unlabeled(ideas);
   let done = 0;
@@ -42,7 +54,10 @@ export async function labelAll(
     const chunk = todo.slice(i, i + BATCH);
     const labels = await classifyBatch(chunk, o);
     const all = load();
-    for (const idea of chunk) { const lab = labels[idea.id]; if (lab) all[idea.id] = { ...lab, v: version(idea) }; }
+    for (const idea of chunk) {
+      const lab = labels[idea.id];
+      if (lab) all[idea.id] = { ...lab, v: version(idea) };
+    }
     localStorage.setItem(KEY, JSON.stringify(all));
     done += chunk.length;
     o.onProgress?.(Math.min(done, todo.length), todo.length);

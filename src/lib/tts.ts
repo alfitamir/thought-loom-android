@@ -41,7 +41,8 @@ export const GEMINI_TTS_SAMPLE_RATE = 24000;
  * across models, and never across the prebuilt voice and the user's own
  * replicated voice.
  */
-export const ttsVoiceKey = (model: string, voice: string = GEMINI_TTS_VOICE): string => `${model}:${voice}`;
+export const ttsVoiceKey = (model: string, voice: string = GEMINI_TTS_VOICE): string =>
+  `${model}:${voice}`;
 
 /**
  * The voice half of a cache voice key: everything after the model id, or
@@ -94,7 +95,9 @@ export class TtsError extends Error {}
  * from Settings).
  */
 export class VoiceUnavailableError extends TtsError {
-  constructor(message = "تعذّر استخدام صوتك المُستنسخ — ربما حُذف أو انتهت صلاحيته. أعد إنشاءه من الإعدادات ⚙️.") {
+  constructor(
+    message = "تعذّر استخدام صوتك المُستنسخ — ربما حُذف أو انتهت صلاحيته. أعد إنشاءه من الإعدادات ⚙️.",
+  ) {
     super(message);
   }
 }
@@ -109,7 +112,10 @@ export class VoiceUnavailableError extends TtsError {
 export function isVoiceUnavailable(status: number, message: string): boolean {
   if (/model/i.test(message)) return false;
   if (/voice/i.test(message)) {
-    return status === 404 || /not found|invalid|expired|deleted|does not exist|not available|unavailable/i.test(message);
+    return (
+      status === 404 ||
+      /not found|invalid|expired|deleted|does not exist|not available|unavailable/i.test(message)
+    );
   }
   return status === 404;
 }
@@ -130,7 +136,10 @@ export function toSpeechText(title: string, body: string): string {
 function splitSentences(text: string): string[] {
   const flat = text.replace(/\s+/g, " ").trim();
   if (!flat) return [];
-  return flat.split(/(?<=[.!؟?…])\s+/).map((s) => s.trim()).filter(Boolean);
+  return flat
+    .split(/(?<=[.!؟?…])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -141,14 +150,21 @@ function splitSentences(text: string): string[] {
 export function splitForSpeech(text: string, maxChars = 1800): string[] {
   const chunks: string[] = [];
   let current = "";
-  const flush = () => { if (current.trim()) chunks.push(current.trim()); current = ""; };
+  const flush = () => {
+    if (current.trim()) chunks.push(current.trim());
+    current = "";
+  };
   const addPiece = (piece: string) => {
     if (piece.length > maxChars) {
       flush();
       let rest = piece;
       while (rest.length > maxChars) {
         let cut = rest.lastIndexOf(" ", maxChars);
-        const comma = Math.max(rest.lastIndexOf("،", maxChars), rest.lastIndexOf("؛", maxChars), rest.lastIndexOf(",", maxChars));
+        const comma = Math.max(
+          rest.lastIndexOf("،", maxChars),
+          rest.lastIndexOf("؛", maxChars),
+          rest.lastIndexOf(",", maxChars),
+        );
         if (comma > maxChars * 0.4) cut = comma + 1;
         if (cut <= 0) cut = maxChars;
         chunks.push(rest.slice(0, cut).trim());
@@ -158,7 +174,10 @@ export function splitForSpeech(text: string, maxChars = 1800): string[] {
       return;
     }
     const joined = current ? `${current} ${piece}` : piece;
-    if (joined.length > maxChars) { flush(); current = piece; } else current = joined;
+    if (joined.length > maxChars) {
+      flush();
+      current = piece;
+    } else current = joined;
   };
   for (const sentence of splitSentences(text)) addPiece(sentence);
   flush();
@@ -169,7 +188,9 @@ export function splitForSpeech(text: string, maxChars = 1800): string[] {
 export function pcmToWav(pcm: Uint8Array, sampleRate = GEMINI_TTS_SAMPLE_RATE): Uint8Array {
   const header = new ArrayBuffer(44);
   const v = new DataView(header);
-  const writeStr = (off: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  const writeStr = (off: number, s: string) => {
+    for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
+  };
   writeStr(0, "RIFF");
   v.setUint32(4, 36 + pcm.length, true);
   writeStr(8, "WAVE");
@@ -215,7 +236,10 @@ export function concatPcm(parts: readonly Uint8Array[]): Uint8Array {
   for (const p of parts) total += p.length;
   const all = new Uint8Array(total);
   let off = 0;
-  for (const p of parts) { all.set(p, off); off += p.length; }
+  for (const p of parts) {
+    all.set(p, off);
+    off += p.length;
+  }
   return all;
 }
 
@@ -265,8 +289,9 @@ export function buildGeminiTtsRequest(text: string) {
 
 /** Extract the base64 PCM from a Gemini TTS response. Throws a TtsError when absent. */
 export function parseGeminiTtsAudio(json: unknown): Uint8Array {
-  const data = (json as { candidates?: { content?: { parts?: { inlineData?: { data?: unknown } }[] } }[] })
-    ?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  const data = (
+    json as { candidates?: { content?: { parts?: { inlineData?: { data?: unknown } }[] } }[] }
+  )?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   if (typeof data !== "string" || !data) throw new TtsError("لم يصل صوت من Gemini. حاول مرة أخرى.");
   return base64ToBytes(data);
 }
@@ -274,13 +299,21 @@ export function parseGeminiTtsAudio(json: unknown): Uint8Array {
 export type SynthProgress = (done: number, total: number) => void;
 
 /** The 3.8 models are served by the Interactions API; older ones are not. */
-const INTERACTIONS_MODELS: ReadonlySet<string> = new Set([GEMINI_TTS_MODELS[0], GEMINI_TTS_MODELS[1]]);
+const INTERACTIONS_MODELS: ReadonlySet<string> = new Set([
+  GEMINI_TTS_MODELS[0],
+  GEMINI_TTS_MODELS[1],
+]);
 const usesInteractionsApi = (model: string): boolean => INTERACTIONS_MODELS.has(model);
 
 /** Internal signal: this model cannot serve the request at all, so a session
  * may fall through to the next model in GEMINI_TTS_MODELS. Never user-facing. */
 export class ModelUnavailableError extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 /**
@@ -292,7 +325,9 @@ export class ModelUnavailableError extends Error {
 export function isModelUnavailable(status: number, message: string): boolean {
   if (status === 404) return true;
   if (status !== 400 && status !== 403) return false;
-  return /not found|not available|not supported|unsupported|does not exist|unknown model|invalid model/i.test(message);
+  return /not found|not available|not supported|unsupported|does not exist|unknown model|invalid model/i.test(
+    message,
+  );
 }
 
 const responseErrorMessage = (json: unknown): string => {
@@ -309,7 +344,11 @@ const responseErrorMessage = (json: unknown): string => {
  * `voice` is a prebuilt voice name ("Charon") or a replicated voice id
  * (`voice_...`) — the field accepts both.
  */
-export function buildInteractionsTtsRequest(model: string, text: string, voice: string = GEMINI_TTS_VOICE) {
+export function buildInteractionsTtsRequest(
+  model: string,
+  text: string,
+  voice: string = GEMINI_TTS_VOICE,
+) {
   return {
     model,
     input: [{ type: "user_input", content: [{ type: "text", text }] }],
@@ -328,7 +367,8 @@ const ascii = (bytes: Uint8Array, off: number, len: number): string =>
  * mono 16-bit, so the PCM frames are directly concatenable either way.
  */
 export function unwrapPcm(bytes: Uint8Array, mimeType?: string): Uint8Array {
-  const isWav = mimeType?.toLowerCase().includes("wav") ||
+  const isWav =
+    mimeType?.toLowerCase().includes("wav") ||
     (bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 4) === "WAVE");
   if (!isWav) return bytes;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -358,7 +398,10 @@ export function parseInteractionsTtsAudio(json: unknown): Uint8Array {
   for (const step of root?.steps ?? []) {
     if (step?.type !== "model_output") continue;
     for (const part of step.content ?? []) {
-      if (part?.type === "audio") { data = part.data; mimeType = part.mime_type; }
+      if (part?.type === "audio") {
+        data = part.data;
+        mimeType = part.mime_type;
+      }
     }
   }
   // Defensive: SDK-shaped convenience field, if a gateway ever returns it.
@@ -378,7 +421,11 @@ export function parseInteractionsTtsAudio(json: unknown): Uint8Array {
  * or degrading to another voice.
  */
 export async function synthesizeGeminiChunkWithModel(
-  chunk: string, key: string, model: string, signal?: AbortSignal, voiceId?: string,
+  chunk: string,
+  key: string,
+  model: string,
+  signal?: AbortSignal,
+  voiceId?: string,
 ): Promise<Uint8Array> {
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const interactions = usesInteractionsApi(model);
@@ -395,7 +442,11 @@ export async function synthesizeGeminiChunkWithModel(
         method: "POST",
         ...(signal ? { signal } : {}),
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(interactions ? buildInteractionsTtsRequest(model, chunk, voiceId) : buildGeminiTtsRequest(chunk)),
+        body: JSON.stringify(
+          interactions
+            ? buildInteractionsTtsRequest(model, chunk, voiceId)
+            : buildGeminiTtsRequest(chunk),
+        ),
       },
     );
   } catch (error) {
@@ -406,7 +457,8 @@ export async function synthesizeGeminiChunkWithModel(
     const err = await response.json().catch(() => ({}));
     const message = responseErrorMessage(err);
     if (voiceId && isVoiceUnavailable(response.status, message)) throw new VoiceUnavailableError();
-    if (isModelUnavailable(response.status, message)) throw new ModelUnavailableError(response.status, message);
+    if (isModelUnavailable(response.status, message))
+      throw new ModelUnavailableError(response.status, message);
     throw new TtsError(geminiErrorMessage(response.status, message));
   }
   const json = await response.json().catch(() => null);
@@ -416,7 +468,9 @@ export async function synthesizeGeminiChunkWithModel(
 /** One Gemini TTS request for a single chunk of text; returns raw PCM bytes.
  * Pinned to the 2.5 fallback model (the classic generateContent shape). */
 export async function synthesizeGeminiChunk(
-  chunk: string, key: string, signal?: AbortSignal,
+  chunk: string,
+  key: string,
+  signal?: AbortSignal,
 ): Promise<Uint8Array> {
   return synthesizeGeminiChunkWithModel(chunk, key, GEMINI_TTS_MODEL, signal);
 }
@@ -466,17 +520,29 @@ export function createTtsSession(key: string, opts: { voiceId?: string } = {}): 
     let lastUnavailable: ModelUnavailableError | null = null;
     for (const candidate of models) {
       try {
-        const pcm = await synthesizeGeminiChunkWithModel(first.chunk, key, candidate, first.signal, voiceId);
+        const pcm = await synthesizeGeminiChunkWithModel(
+          first.chunk,
+          key,
+          candidate,
+          first.signal,
+          voiceId,
+        );
         resolved = candidate;
         first.resolve(pcm);
         const pending = waiters;
         waiters = [];
         for (const w of pending) {
-          void synthesizeGeminiChunkWithModel(w.chunk, key, candidate, w.signal, voiceId).then(w.resolve, w.reject);
+          void synthesizeGeminiChunkWithModel(w.chunk, key, candidate, w.signal, voiceId).then(
+            w.resolve,
+            w.reject,
+          );
         }
         return;
       } catch (error) {
-        if (error instanceof ModelUnavailableError) { lastUnavailable = error; continue; }
+        if (error instanceof ModelUnavailableError) {
+          lastUnavailable = error;
+          continue;
+        }
         probing = false;
         first.reject(error);
         settleWaiters(error);
@@ -484,7 +550,9 @@ export function createTtsSession(key: string, opts: { voiceId?: string } = {}): 
       }
     }
     probing = false;
-    const error = new TtsError(geminiErrorMessage(lastUnavailable?.status ?? 404, lastUnavailable?.message ?? ""));
+    const error = new TtsError(
+      geminiErrorMessage(lastUnavailable?.status ?? 404, lastUnavailable?.message ?? ""),
+    );
     first.reject(error);
     settleWaiters(error);
   };
@@ -504,8 +572,12 @@ export function createTtsSession(key: string, opts: { voiceId?: string } = {}): 
   };
 
   return {
-    get model() { return resolved ?? models[0]!; },
-    get voiceKey() { return ttsVoiceKey(resolved ?? models[0]!, voiceId); },
+    get model() {
+      return resolved ?? models[0]!;
+    },
+    get voiceKey() {
+      return ttsVoiceKey(resolved ?? models[0]!, voiceId);
+    },
     synthesizeChunk,
   };
 }
@@ -525,16 +597,23 @@ export type SynthesizeChunksOptions = {
 };
 
 async function synthesizeChunkList(
-  chunks: string[], key: string, opts: SynthesizeChunksOptions,
+  chunks: string[],
+  key: string,
+  opts: SynthesizeChunksOptions,
 ): Promise<Uint8Array[]> {
   if (!key.trim()) throw new TtsError("أضف مفتاح Gemini من الإعدادات ⚙️ لتوليد الصوت.");
   if (!chunks.length) throw new TtsError("لا يوجد نص للقراءة.");
   const session = createTtsSession(key, { ...(opts.voiceId ? { voiceId: opts.voiceId } : {}) });
-  return mapWithConcurrency(chunks, opts.concurrency ?? 3, async (chunk, i) => {
-    const pcm = await session.synthesizeChunk(chunk, opts.signal);
-    opts.onChunkReady?.(i, pcm);
-    return pcm;
-  }, opts.signal);
+  return mapWithConcurrency(
+    chunks,
+    opts.concurrency ?? 3,
+    async (chunk, i) => {
+      const pcm = await session.synthesizeChunk(chunk, opts.signal);
+      opts.onChunkReady?.(i, pcm);
+      return pcm;
+    },
+    opts.signal,
+  );
 }
 
 /**
@@ -543,21 +622,27 @@ async function synthesizeChunkList(
  * completion, for progressive playback.
  */
 export async function synthesizeGeminiChunks(
-  text: string, key: string, opts: SynthesizeChunksOptions = {},
+  text: string,
+  key: string,
+  opts: SynthesizeChunksOptions = {},
 ): Promise<Uint8Array[]> {
   return synthesizeChunkList(splitForSpeech(text, opts.maxChars), key, opts);
 }
 
 /** Generate one WAV file for the whole text with Gemini TTS. */
 export async function synthesizeGemini(
-  text: string, key: string,
+  text: string,
+  key: string,
   opts: { signal?: AbortSignal; onProgress?: SynthProgress; maxChars?: number } = {},
 ): Promise<Blob> {
   const chunks = splitForSpeech(text, opts.maxChars);
   let done = 0;
   const parts = await synthesizeChunkList(chunks, key, {
     ...(opts.signal ? { signal: opts.signal } : {}),
-    onChunkReady: () => { done++; opts.onProgress?.(done, chunks.length); },
+    onChunkReady: () => {
+      done++;
+      opts.onProgress?.(done, chunks.length);
+    },
   });
   return new Blob([pcmToWav(concatPcm(parts)) as BlobPart], { type: "audio/wav" });
 }
@@ -584,22 +669,44 @@ export function speakWithDevice(
   let stopped = false;
   let idx = 0;
   let resolveDone: () => void = () => {};
-  const done = new Promise<void>((res) => { resolveDone = res; });
+  const done = new Promise<void>((res) => {
+    resolveDone = res;
+  });
   const next = () => {
     if (stopped) return;
-    if (idx >= chunks.length) { resolveDone(); return; }
+    if (idx >= chunks.length) {
+      resolveDone();
+      return;
+    }
     const u = new SpeechSynthesisUtterance(chunks[idx]);
     u.rate = opts.rate ?? 1;
-    if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = "ar";
+    if (voice) {
+      u.voice = voice;
+      u.lang = voice.lang;
+    } else u.lang = "ar";
     opts.onChunk?.(idx, chunks.length);
-    u.onend = () => { if (!stopped) { idx++; next(); } };
-    u.onerror = () => { if (!stopped) { idx++; next(); } };
+    u.onend = () => {
+      if (!stopped) {
+        idx++;
+        next();
+      }
+    };
+    u.onerror = () => {
+      if (!stopped) {
+        idx++;
+        next();
+      }
+    };
     synth.speak(u);
   };
   synth.cancel();
   next();
   return {
-    stop: () => { stopped = true; synth.cancel(); resolveDone(); },
+    stop: () => {
+      stopped = true;
+      synth.cancel();
+      resolveDone();
+    },
     done,
   };
 }

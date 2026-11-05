@@ -1,5 +1,26 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { classify, toArticle, OTHER, getArticle, matchesArticle, saveIdea, updateArticle, loadIdeas, replaceIdeas, mergeIdeas, articleTopic, setArticleTopic, clearArticleTopic, topicOptions, setPinned, sortWithPinnedFirst, setMedical, partitionIdeas, buildSongIdea, saveArticleIdea } from "./ideas";
+import {
+  classify,
+  toArticle,
+  OTHER,
+  getArticle,
+  matchesArticle,
+  saveIdea,
+  updateArticle,
+  loadIdeas,
+  replaceIdeas,
+  mergeIdeas,
+  articleTopic,
+  setArticleTopic,
+  clearArticleTopic,
+  topicOptions,
+  setPinned,
+  sortWithPinnedFirst,
+  setMedical,
+  partitionIdeas,
+  buildSongIdea,
+  saveArticleIdea,
+} from "./ideas";
 
 describe("ideas", () => {
   it("classifies by topic keywords", () => {
@@ -20,7 +41,10 @@ describe("article tools", () => {
     const saved = loadIdeas()[0];
     if (!saved) throw new Error("Edited article was not saved");
     expect(saved.text).toBe("انا شايف ان الشغل محتاج صبر");
-    expect(getArticle(saved)).toEqual({ title: "الصبر في العمل", body: "أنا شايف إن الشغل محتاج صبر." });
+    expect(getArticle(saved)).toEqual({
+      title: "الصبر في العمل",
+      body: "أنا شايف إن الشغل محتاج صبر.",
+    });
   });
   it("searches words inside edited article body", () => {
     const idea = saveIdea("فكرة قصيرة");
@@ -32,15 +56,27 @@ describe("article tools", () => {
     expect(matchesArticle({ id: "1", text: "أَفكار", createdAt: 1 }, "افكار")).toBe(true);
   });
   it("still formats old ideas without edited article fields", () => {
-    expect(getArticle({ id: "1", text: "الصبر مفتاح الفرج", createdAt: 1 }).body).toBe("الصبر مفتاح الفرج.");
+    expect(getArticle({ id: "1", text: "الصبر مفتاح الفرج", createdAt: 1 }).body).toBe(
+      "الصبر مفتاح الفرج.",
+    );
   });
   it("restores the newer cloud edition", () => {
     const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 2, articleBody: "محلي" };
-    expect(mergeIdeas([local], [{ ...local, updatedAt: 3, articleBody: "سحابي" }], [])[0]?.articleBody).toBe("سحابي");
+    expect(
+      mergeIdeas([local], [{ ...local, updatedAt: 3, articleBody: "سحابي" }], [])[0]?.articleBody,
+    ).toBe("سحابي");
   });
   it("keeps a newer offline edit instead of an older cloud edition", () => {
-    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "تعديل دون اتصال" };
-    expect(mergeIdeas([local], [{ ...local, updatedAt: 2, articleBody: "قديم" }], [])[0]?.articleBody).toBe("تعديل دون اتصال");
+    const local = {
+      id: "1",
+      text: "الأصل",
+      createdAt: 1,
+      updatedAt: 3,
+      articleBody: "تعديل دون اتصال",
+    };
+    expect(
+      mergeIdeas([local], [{ ...local, updatedAt: 2, articleBody: "قديم" }], [])[0]?.articleBody,
+    ).toBe("تعديل دون اتصال");
   });
   it("never restores an offline-deleted article", () => {
     expect(mergeIdeas([], [{ id: "1", text: "محذوف", createdAt: 1 }], ["1"])).toEqual([]);
@@ -104,7 +140,15 @@ describe("manual topics", () => {
     expect(options).toContainEqual({ topic: "العمل والنجاح", count: 1 });
   });
   it("a newer edition without a pin does not erase a hand-pinned topic", () => {
-    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 2, articleBody: "محلي", topic: "موضوعي", topicManual: true };
+    const local = {
+      id: "1",
+      text: "الأصل",
+      createdAt: 1,
+      updatedAt: 2,
+      articleBody: "محلي",
+      topic: "موضوعي",
+      topicManual: true,
+    };
     const { topic: _droppedTopic, topicManual: _droppedPin, ...unpinned } = local;
     const [winner] = mergeIdeas([local], [{ ...unpinned, updatedAt: 3, articleBody: "سحابي" }], []);
     expect(winner?.articleBody).toBe("سحابي");
@@ -112,13 +156,28 @@ describe("manual topics", () => {
   });
   it("an unpinned winner adopts the pin of the other edition", () => {
     const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "محلي" };
-    const [winner] = mergeIdeas([local], [{ ...local, updatedAt: 2, topic: "موضوعي", topicManual: true }], []);
+    const [winner] = mergeIdeas(
+      [local],
+      [{ ...local, updatedAt: 2, topic: "موضوعي", topicManual: true }],
+      [],
+    );
     expect(winner?.articleBody).toBe("محلي");
     expect(winner).toMatchObject({ topic: "موضوعي", topicManual: true });
   });
   it("the winning edition's own pin beats the other edition's pin", () => {
-    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, topic: "أ", topicManual: true };
-    const [winner] = mergeIdeas([local], [{ ...local, updatedAt: 2, topic: "ب", topicManual: true }], []);
+    const local = {
+      id: "1",
+      text: "الأصل",
+      createdAt: 1,
+      updatedAt: 3,
+      topic: "أ",
+      topicManual: true,
+    };
+    const [winner] = mergeIdeas(
+      [local],
+      [{ ...local, updatedAt: 2, topic: "ب", topicManual: true }],
+      [],
+    );
     expect(winner?.topic).toBe("أ");
   });
 });
@@ -155,8 +214,19 @@ describe("library pinning", () => {
     expect([a, b, c, d].map((i) => i.id)).toEqual(["a", "b", "c", "d"]);
   });
   it("a newer edition without the pin does not unpin the winner", () => {
-    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 2, articleBody: "محلي", pinned: true };
-    const [winner] = mergeIdeas([local], [{ id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "سحابي" }], []);
+    const local = {
+      id: "1",
+      text: "الأصل",
+      createdAt: 1,
+      updatedAt: 2,
+      articleBody: "محلي",
+      pinned: true,
+    };
+    const [winner] = mergeIdeas(
+      [local],
+      [{ id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "سحابي" }],
+      [],
+    );
     expect(winner?.articleBody).toBe("سحابي");
     expect(winner?.pinned).toBe(true);
   });
@@ -203,8 +273,19 @@ describe("medical section", () => {
     expect(saveIdea("نص عام ثالث", { medical: false })).not.toHaveProperty("medical");
   });
   it("a newer edition without the flag does not pull the winner out of the section", () => {
-    const local = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 2, articleBody: "محلي", medical: true };
-    const [winner] = mergeIdeas([local], [{ id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "سحابي" }], []);
+    const local = {
+      id: "1",
+      text: "الأصل",
+      createdAt: 1,
+      updatedAt: 2,
+      articleBody: "محلي",
+      medical: true,
+    };
+    const [winner] = mergeIdeas(
+      [local],
+      [{ id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "سحابي" }],
+      [],
+    );
     expect(winner?.articleBody).toBe("سحابي");
     expect(winner?.medical).toBe(true);
   });

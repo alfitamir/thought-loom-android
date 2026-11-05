@@ -9,17 +9,25 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
     ...actual,
-    Link: ({ children, ...props }: Record<string, unknown>) => <a {...props}>{children as React.ReactNode}</a>,
+    Link: ({ children, ...props }: Record<string, unknown>) => (
+      <a {...props}>{children as React.ReactNode}</a>
+    ),
   };
 });
 vi.mock("@/components/article-editor", () => ({
-  ArticleEditor: ({ idea }: { idea: Idea }) => <div data-testid="card">{idea.articleTitle ?? idea.text}</div>,
+  ArticleEditor: ({ idea }: { idea: Idea }) => (
+    <div data-testid="card">{idea.articleTitle ?? idea.text}</div>
+  ),
 }));
 vi.mock("@/components/merge-banner", () => ({ MergeBanner: () => null }));
 vi.mock("@/components/ask-dialog", () => ({ AskDialog: () => null }));
 vi.mock("@/components/insights-dialog", () => ({ InsightsDialog: () => null }));
 vi.mock("@/components/liked-dialog", () => ({ LikedDialog: () => null }));
-vi.mock("@/lib/sync", () => ({ pushIdea: vi.fn(), syncNow: vi.fn(async () => 0), deleteIdeaCloud: vi.fn() }));
+vi.mock("@/lib/sync", () => ({
+  pushIdea: vi.fn(),
+  syncNow: vi.fn(async () => 0),
+  deleteIdeaCloud: vi.fn(),
+}));
 vi.mock("@/lib/article-ai", () => ({ cleanFull: vi.fn(), improveFull: vi.fn() }));
 vi.mock("@/lib/ai-engine", () => ({ resolveEngine: vi.fn(async () => "x") }));
 vi.mock("@/lib/ai-labels", () => ({
@@ -28,7 +36,9 @@ vi.mock("@/lib/ai-labels", () => ({
   unlabeled: () => [],
   labelAll: vi.fn(async () => 0),
 }));
-vi.mock("@/lib/article-audio", () => ({ listArticleIdsWithAudio: vi.fn(async () => new Set<string>()) }));
+vi.mock("@/lib/article-audio", () => ({
+  listArticleIdsWithAudio: vi.fn(async () => new Set<string>()),
+}));
 vi.mock("@/lib/delete-flow", () => ({ requestDelete: vi.fn(), undoDelete: vi.fn(() => true) }));
 vi.mock("sonner", () => ({ toast: vi.fn() }));
 
@@ -42,12 +52,39 @@ const mk = (over: Partial<Idea>): Idea => ({
   updatedAt: 1000,
   ...over,
 });
-const article = mk({ articleTitle: "مقالة للتجميع", articleBody: "محتوى المقالة", topic: "موضوع عام", topicManual: true });
-const song = mk({ articleTitle: "أغنية مسجلة", text: "كلمات الأغنية", topic: "موضوع عام", topicManual: true, song: true });
-const liked = mk({ articleTitle: "مقالة أعجبتني", articleBody: "نص خارجي", topic: "موضوع عام", topicManual: true, liked: true, source: "مدونة ما" });
-const medical = mk({ articleTitle: "مقالة طبية للتجميع", articleBody: "محتوى طبي", topic: "موضوع طبي", topicManual: true, medical: true });
+const article = mk({
+  articleTitle: "مقالة للتجميع",
+  articleBody: "محتوى المقالة",
+  topic: "موضوع عام",
+  topicManual: true,
+});
+const song = mk({
+  articleTitle: "أغنية مسجلة",
+  text: "كلمات الأغنية",
+  topic: "موضوع عام",
+  topicManual: true,
+  song: true,
+});
+const liked = mk({
+  articleTitle: "مقالة أعجبتني",
+  articleBody: "نص خارجي",
+  topic: "موضوع عام",
+  topicManual: true,
+  liked: true,
+  source: "مدونة ما",
+});
+const medical = mk({
+  articleTitle: "مقالة طبية للتجميع",
+  articleBody: "محتوى طبي",
+  topic: "موضوع طبي",
+  topicManual: true,
+  medical: true,
+});
 
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+});
 
 describe("library selection mode", () => {
   it("checkboxes on articles and liked — never on songs — and the bar counts, compiles and cancels", () => {
@@ -62,7 +99,9 @@ describe("library selection mode", () => {
     expect(screen.queryByRole("checkbox", { name: /أغنية مسجلة/ })).toBeNull();
     expect(screen.getByText("لم تُختر مقالات بعد")).toBeTruthy();
     // The compile action stays disabled until something is picked.
-    expect((screen.getByRole("button", { name: /تجميع في مستند/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: /تجميع في مستند/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
 
     fireEvent.click(screen.getByRole("checkbox", { name: "اختيار مقالة: مقالة للتجميع" }));
     expect(screen.getByText("تم اختيار 1")).toBeTruthy();

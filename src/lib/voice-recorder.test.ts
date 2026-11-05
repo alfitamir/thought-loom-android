@@ -3,15 +3,32 @@ import { createVoiceRecorder, MIC_DENIED } from "./voice-recorder";
 
 class FakeSR {
   static all: FakeSR[] = [];
-  lang = ""; continuous = true; interimResults = false; maxAlternatives = 1;
-  onstart: any; onaudiostart: any; onresult: any; onerror: any; onend: any;
+  lang = "";
+  continuous = true;
+  interimResults = false;
+  maxAlternatives = 1;
+  onstart: any;
+  onaudiostart: any;
+  onresult: any;
+  onerror: any;
+  onend: any;
   started = false;
-  constructor() { FakeSR.all.push(this); }
-  start() { this.started = true; this.onstart?.(); }
-  stop() { this.onend?.(); }
-  abort() { this.onend?.(); }
+  constructor() {
+    FakeSR.all.push(this);
+  }
+  start() {
+    this.started = true;
+    this.onstart?.();
+  }
+  stop() {
+    this.onend?.();
+  }
+  abort() {
+    this.onend?.();
+  }
   say(text: string, final = true) {
-    const r: any = [{ transcript: text }]; r.isFinal = final;
+    const r: any = [{ transcript: text }];
+    r.isFinal = final;
     this.onresult?.({ resultIndex: 0, results: [r] });
   }
 }
@@ -24,10 +41,20 @@ function setup() {
   let msg = "";
   const rec = createVoiceRecorder(FakeSR, {
     onText: (t) => texts.push(t),
-    onListening: (on) => { listening = on; },
-    onMessage: (m) => { msg = m; },
+    onListening: (on) => {
+      listening = on;
+    },
+    onMessage: (m) => {
+      msg = m;
+    },
   });
-  return { rec, texts, isListening: () => listening, msg: () => msg, last: () => FakeSR.all.at(-1)! };
+  return {
+    rec,
+    texts,
+    isListening: () => listening,
+    msg: () => msg,
+    last: () => FakeSR.all.at(-1)!,
+  };
 }
 
 describe("voice recording stops only when the user presses stop", () => {
@@ -75,11 +102,16 @@ describe("voice recording stops only when the user presses stop", () => {
 
   it("stops only when the phone refuses the microphone from the start", () => {
     const s = setup();
-    FakeSR.prototype.start = function (this: FakeSR) { this.started = true; };
+    FakeSR.prototype.start = function (this: FakeSR) {
+      this.started = true;
+    };
     s.rec.start();
     s.last().onerror({ error: "not-allowed" });
     expect(s.isListening()).toBe(false);
     expect(s.msg()).toBe(MIC_DENIED);
-    FakeSR.prototype.start = function (this: FakeSR) { this.started = true; this.onstart?.(); };
+    FakeSR.prototype.start = function (this: FakeSR) {
+      this.started = true;
+      this.onstart?.();
+    };
   });
 });

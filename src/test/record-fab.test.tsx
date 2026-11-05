@@ -9,7 +9,9 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   return {
     ...actual,
     Link: ({ children, to, search, ...props }: Record<string, unknown>) => (
-      <a data-to={to as string} data-search={JSON.stringify(search)} {...props}>{children as React.ReactNode}</a>
+      <a data-to={to as string} data-search={JSON.stringify(search)} {...props}>
+        {children as React.ReactNode}
+      </a>
     ),
   };
 });
@@ -17,13 +19,19 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
 // the FAB lives, so a stub renders each card's title (same as the views'
 // own test files).
 vi.mock("@/components/article-editor", () => ({
-  ArticleEditor: ({ idea }: { idea: Idea }) => <div data-testid="card">{idea.articleTitle ?? idea.text}</div>,
+  ArticleEditor: ({ idea }: { idea: Idea }) => (
+    <div data-testid="card">{idea.articleTitle ?? idea.text}</div>
+  ),
 }));
 vi.mock("@/components/merge-banner", () => ({ MergeBanner: () => null }));
 vi.mock("@/components/ask-dialog", () => ({ AskDialog: () => null }));
 vi.mock("@/components/insights-dialog", () => ({ InsightsDialog: () => null }));
 vi.mock("@/components/liked-dialog", () => ({ LikedDialog: () => null }));
-vi.mock("@/lib/sync", () => ({ pushIdea: vi.fn(), syncNow: vi.fn(async () => 0), deleteIdeaCloud: vi.fn() }));
+vi.mock("@/lib/sync", () => ({
+  pushIdea: vi.fn(),
+  syncNow: vi.fn(async () => 0),
+  deleteIdeaCloud: vi.fn(),
+}));
 vi.mock("@/lib/article-ai", () => ({ cleanFull: vi.fn(), improveFull: vi.fn() }));
 vi.mock("@/lib/ai-engine", () => ({ resolveEngine: vi.fn(async () => "x") }));
 vi.mock("@/lib/ai-labels", () => ({
@@ -32,7 +40,9 @@ vi.mock("@/lib/ai-labels", () => ({
   unlabeled: () => [],
   labelAll: vi.fn(async () => 0),
 }));
-vi.mock("@/lib/article-audio", () => ({ listArticleIdsWithAudio: vi.fn(async () => new Set<string>()) }));
+vi.mock("@/lib/article-audio", () => ({
+  listArticleIdsWithAudio: vi.fn(async () => new Set<string>()),
+}));
 vi.mock("@/lib/delete-flow", () => ({ requestDelete: vi.fn(), undoDelete: vi.fn(() => true) }));
 vi.mock("sonner", () => ({ toast: vi.fn() }));
 
@@ -47,19 +57,39 @@ const mk = (over: Partial<Idea>): Idea => ({
   updatedAt: 1000,
   ...over,
 });
-const medical = mk({ articleTitle: "مقالة طبية", articleBody: "محتوى طبي", topic: "موضوع طبي", topicManual: true, medical: true });
+const medical = mk({
+  articleTitle: "مقالة طبية",
+  articleBody: "محتوى طبي",
+  topic: "موضوع طبي",
+  topicManual: true,
+  medical: true,
+});
 
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
-afterEach(() => { vi.restoreAllMocks(); });
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const fabSearch = (label: string) => {
   const el = screen.getByLabelText(label);
-  return { to: el.getAttribute("data-to"), search: JSON.parse(el.getAttribute("data-search") ?? "{}") as { record?: number; section?: string } };
+  return {
+    to: el.getAttribute("data-to"),
+    search: JSON.parse(el.getAttribute("data-search") ?? "{}") as {
+      record?: number;
+      section?: string;
+    },
+  };
 };
 
 describe("buildRecordSearch — the recorder deep-link builder", () => {
   it("carries the medical context when the section asks for it", () => {
-    expect(buildRecordSearch("medical", 1234567890)).toEqual({ record: 1234567890, section: "medical" });
+    expect(buildRecordSearch("medical", 1234567890)).toEqual({
+      record: 1234567890,
+      section: "medical",
+    });
   });
 
   it("is a bare nonce without a section", () => {

@@ -8,7 +8,12 @@
 // extracted from the singing only deliberately — from the editor's
 // «استخرج الكلمات من الغنا» button in song-lyrics.ts, when the user
 // asks — and never by the dictation pipeline or any automatic pass.)
-import { saveSongAudio, songAudioStore, type SongAudioRecord, type SongAudioStore } from "./article-audio";
+import {
+  saveSongAudio,
+  songAudioStore,
+  type SongAudioRecord,
+  type SongAudioStore,
+} from "./article-audio";
 import { buildSongIdea, loadIdeas, replaceIdeas, type Idea } from "./ideas";
 import { formatElapsed } from "./voice-session";
 import type { VoiceStore } from "./voice-store";
@@ -86,7 +91,12 @@ export async function saveRecordedSong(input: {
     createdAt: now,
   });
   await saveSongAudio(
-    { ideaId: idea.id, blob: assembled.blob, mime: assembled.mime, duration: input.durationSeconds ?? 0 },
+    {
+      ideaId: idea.id,
+      blob: assembled.blob,
+      mime: assembled.mime,
+      duration: input.durationSeconds ?? 0,
+    },
     input.audioStore ?? songAudioStore(),
   );
   replaceIdeas([idea, ...loadIdeas()]);

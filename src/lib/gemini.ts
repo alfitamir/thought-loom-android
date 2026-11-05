@@ -14,29 +14,51 @@ export const GEMINI_MODELS = [
   { name: "gemini-flash-lite-latest", thinkingLevel: "minimal" },
 ] as const;
 /** Max wait for the first chunk / between chunks before trying the next model. */
-const FIRST_CHUNK_MS = 25000, IDLE_MS = 30000;
+const FIRST_CHUNK_MS = 25000,
+  IDLE_MS = 30000;
 
 export const getGeminiKey = (): string => {
-  try { return localStorage.getItem(KEY)?.trim() ?? ""; } catch { return ""; }
+  try {
+    return localStorage.getItem(KEY)?.trim() ?? "";
+  } catch {
+    return "";
+  }
 };
 export const setGeminiKey = (key: string) => {
   const k = key.replace(/\s+/g, "").replace(/^["']|["']$/g, "");
-  if (k) localStorage.setItem(KEY, k); else localStorage.removeItem(KEY);
+  if (k) localStorage.setItem(KEY, k);
+  else localStorage.removeItem(KEY);
   window.dispatchEvent(new Event("afkari:settings-changed"));
 };
 
-export { IMPROVE_INSTRUCTIONS, MERGE_INSTRUCTIONS, SUGGEST_INSTRUCTIONS, TRANSCRIBE_INSTRUCTIONS } from "./ai-prompts";
+export {
+  IMPROVE_INSTRUCTIONS,
+  MERGE_INSTRUCTIONS,
+  SUGGEST_INSTRUCTIONS,
+  TRANSCRIBE_INSTRUCTIONS,
+} from "./ai-prompts";
 
-const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
-  const t = setTimeout(resolve, ms);
-  signal.addEventListener("abort", () => { clearTimeout(t); reject(new DOMException("Aborted", "AbortError")); }, { once: true });
-});
+const sleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(t);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
 
 export function geminiErrorMessage(status: number, message = ""): string {
-  if (status === 400 && /key/i.test(message)) return "مفتاح Gemini غير صحيح. راجعه من الإعدادات ⚙️.";
-  if (status === 401 || status === 403) return "مفتاح Gemini غير صالح أو غير مفعّل. راجعه من الإعدادات ⚙️.";
+  if (status === 400 && /key/i.test(message))
+    return "مفتاح Gemini غير صحيح. راجعه من الإعدادات ⚙️.";
+  if (status === 401 || status === 403)
+    return "مفتاح Gemini غير صالح أو غير مفعّل. راجعه من الإعدادات ⚙️.";
   if (status === 429) return "تجاوزت الحد المجاني المؤقت لـ Gemini. حاول بعد دقيقة.";
-  if (status === 500 || status === 503) return "Gemini مشغول الآن. حاول بعد قليل؛ مقالك محفوظ كما هو.";
+  if (status === 500 || status === 503)
+    return "Gemini مشغول الآن. حاول بعد قليل؛ مقالك محفوظ كما هو.";
   return "تعذّر الاتصال بـ Gemini الآن. مقالك محفوظ كما هو.";
 }
 
@@ -46,8 +68,12 @@ class Fallback extends Error {}
 export type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 
 export async function geminiStream(
-  key: string, system: string, user: string | GeminiPart[], signal: AbortSignal,
-  onText: (text: string) => void = () => {}, json?: object,
+  key: string,
+  system: string,
+  user: string | GeminiPart[],
+  signal: AbortSignal,
+  onText: (text: string) => void = () => {},
+  json?: object,
 ): Promise<string> {
   let last: Error = new Error(geminiErrorMessage(0));
   for (const [m, model] of GEMINI_MODELS.entries()) {
@@ -60,7 +86,10 @@ export async function geminiStream(
         if (signal.aborted || !(error instanceof Fallback)) throw error;
         last = new Error(error.message);
         onText("");
-        if (error.cause === "busy" && attempt === 0) { await sleep(2000, signal); continue; }
+        if (error.cause === "busy" && attempt === 0) {
+          await sleep(2000, signal);
+          continue;
+        }
         break;
       }
     }
@@ -69,41 +98,66 @@ export async function geminiStream(
 }
 
 async function streamOnce(
-  key: string, model: (typeof GEMINI_MODELS)[number], system: string, user: string | GeminiPart[], outer: AbortSignal,
-  onText: (text: string) => void, json: object | undefined, isLast: boolean,
+  key: string,
+  model: (typeof GEMINI_MODELS)[number],
+  system: string,
+  user: string | GeminiPart[],
+  outer: AbortSignal,
+  onText: (text: string) => void,
+  json: object | undefined,
+  isLast: boolean,
 ): Promise<string> {
   const controller = new AbortController();
   const stopOuter = () => controller.abort();
   outer.addEventListener("abort", stopOuter, { once: true });
-  let stalled = false, timer: ReturnType<typeof setTimeout> | undefined;
-  const watch = (ms: number) => { clearTimeout(timer); timer = setTimeout(() => { stalled = true; controller.abort(); }, ms); };
-  const stallError = () => new Fallback("Gemini تأخر في الرد. حاول مرة أخرى؛ مقالك محفوظ كما هو.", { cause: "stall" });
+  let stalled = false,
+    timer: ReturnType<typeof setTimeout> | undefined;
+  const watch = (ms: number) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      stalled = true;
+      controller.abort();
+    }, ms);
+  };
+  const stallError = () =>
+    new Fallback("Gemini تأخر في الرد. حاول مرة أخرى؛ مقالك محفوظ كما هو.", { cause: "stall" });
   try {
     watch(FIRST_CHUNK_MS);
     let response: Response;
     try {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model.name}:streamGenerateContent?alt=sse`, {
-        method: "POST", signal: controller.signal,
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: typeof user === "string" ? [{ text: user }] : user }],
-          generationConfig: {
-            maxOutputTokens: 65536,
-            thinkingConfig: { thinkingLevel: model.thinkingLevel },
-            ...(json ? { responseMimeType: "application/json", responseSchema: json } : {}),
-          },
-        }),
-      });
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model.name}:streamGenerateContent?alt=sse`,
+        {
+          method: "POST",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: "user", parts: typeof user === "string" ? [{ text: user }] : user }],
+            generationConfig: {
+              maxOutputTokens: 65536,
+              thinkingConfig: { thinkingLevel: model.thinkingLevel },
+              ...(json ? { responseMimeType: "application/json", responseSchema: json } : {}),
+            },
+          }),
+        },
+      );
     } catch (error) {
       if (stalled) throw stallError();
       if (outer.aborted) throw error;
-      throw new Fallback("تعذّر الوصول إلى Gemini. تأكد من الإنترنت وحاول مرة أخرى.", { cause: "network" });
+      throw new Fallback("تعذّر الوصول إلى Gemini. تأكد من الإنترنت وحاول مرة أخرى.", {
+        cause: "network",
+      });
     }
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       const message = geminiErrorMessage(response.status, error?.error?.message);
-      if (response.status === 401 || response.status === 403 || (response.status === 400 && /api key/i.test(error?.error?.message ?? ""))) throw new Error(message);
+      if (
+        response.status === 401 ||
+        response.status === 403 ||
+        (response.status === 400 && /api key/i.test(error?.error?.message ?? ""))
+      )
+        throw new Error(message);
       if (response.status === 429 && isLast) throw new Error(message);
       throw new Fallback(message, { cause: response.status >= 500 ? "busy" : "model" });
     }
@@ -111,15 +165,19 @@ async function streamOnce(
     watch(FIRST_CHUNK_MS);
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = "", output = "", finish = "";
+    let buffer = "",
+      output = "",
+      finish = "";
     const processLine = (line: string) => {
       if (!line.startsWith("data:")) return;
       const event = JSON.parse(line.slice(5));
-      if (event.promptFeedback?.blockReason) throw new Error("لم يُتح Gemini معالجة هذا النص. لم يتغير مقالك.");
+      if (event.promptFeedback?.blockReason)
+        throw new Error("لم يُتح Gemini معالجة هذا النص. لم يتغير مقالك.");
       const candidate = event.candidates?.[0];
       for (const part of candidate?.content?.parts ?? []) {
         if (part.thought || typeof part.text !== "string" || !part.text) continue;
-        output += part.text; onText(output);
+        output += part.text;
+        onText(output);
       }
       if (candidate?.finishReason) finish = candidate.finishReason;
     };
@@ -142,8 +200,10 @@ async function streamOnce(
       reader.releaseLock();
     }
     if (finish === "MAX_TOKENS") throw new Error("النسخة المقترحة ناقصة، لم نغير مقالك.");
-    if (!finish) throw new Fallback("انقطع الاتصال قبل اكتمال الرد. مقالك محفوظ كما هو.", { cause: "stall" });
-    if (finish !== "STOP" || !output.trim()) throw new Error("لم يُتح Gemini معالجة هذا النص. لم يتغير مقالك.");
+    if (!finish)
+      throw new Fallback("انقطع الاتصال قبل اكتمال الرد. مقالك محفوظ كما هو.", { cause: "stall" });
+    if (finish !== "STOP" || !output.trim())
+      throw new Error("لم يُتح Gemini معالجة هذا النص. لم يتغير مقالك.");
     return output;
   } finally {
     clearTimeout(timer);

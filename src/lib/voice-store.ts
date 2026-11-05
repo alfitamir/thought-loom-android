@@ -26,16 +26,35 @@ export function memoryVoiceStore(): VoiceStore {
   const segs = new Map<string, Segment>();
   const chunks = new Map<string, Blob[]>();
   return {
-    async addSegment(seg) { segs.set(seg.id, { ...seg }); chunks.set(seg.id, []); },
-    async appendChunk(id, c) { chunks.get(id)?.push(c); },
-    async setTranscript(id, text) { const s = segs.get(id); if (s) s.transcript = text; },
-    async listSegments() { return [...segs.values()].map((s) => ({ ...s })).sort(sortSegs); },
-    async segmentAudio(id) { return new Blob(chunks.get(id) ?? [], { type: segs.get(id)?.mime ?? "audio/webm" }); },
-    async deleteSegment(id) { segs.delete(id); chunks.delete(id); },
+    async addSegment(seg) {
+      segs.set(seg.id, { ...seg });
+      chunks.set(seg.id, []);
+    },
+    async appendChunk(id, c) {
+      chunks.get(id)?.push(c);
+    },
+    async setTranscript(id, text) {
+      const s = segs.get(id);
+      if (s) s.transcript = text;
+    },
+    async listSegments() {
+      return [...segs.values()].map((s) => ({ ...s })).sort(sortSegs);
+    },
+    async segmentAudio(id) {
+      return new Blob(chunks.get(id) ?? [], { type: segs.get(id)?.mime ?? "audio/webm" });
+    },
+    async deleteSegment(id) {
+      segs.delete(id);
+      chunks.delete(id);
+    },
   };
 }
 
-const req = <T,>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const req = <T>(r: IDBRequest<T>) =>
+  new Promise<T>((res, rej) => {
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
 
 function openDb(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -54,11 +73,25 @@ function openDb(name: string): Promise<IDBDatabase> {
 export function indexedDbVoiceStore(dbName = "afkari-voice"): VoiceStore {
   let dbp: Promise<IDBDatabase> | null = null;
   const db = () => (dbp ??= openDb(dbName));
-  const tx = async (stores: string[], mode: IDBTransactionMode) => (await db()).transaction(stores, mode);
-  const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+  const tx = async (stores: string[], mode: IDBTransactionMode) =>
+    (await db()).transaction(stores, mode);
+  const done = (t: IDBTransaction) =>
+    new Promise<void>((res, rej) => {
+      t.oncomplete = () => res();
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    });
   return {
-    async addSegment(seg) { const t = await tx(["segments"], "readwrite"); t.objectStore("segments").put(seg); await done(t); },
-    async appendChunk(seg, blob) { const t = await tx(["chunks"], "readwrite"); t.objectStore("chunks").add({ seg, blob }); await done(t); },
+    async addSegment(seg) {
+      const t = await tx(["segments"], "readwrite");
+      t.objectStore("segments").put(seg);
+      await done(t);
+    },
+    async appendChunk(seg, blob) {
+      const t = await tx(["chunks"], "readwrite");
+      t.objectStore("chunks").add({ seg, blob });
+      await done(t);
+    },
     async setTranscript(id, text) {
       const t = await tx(["segments"], "readwrite");
       const s = t.objectStore("segments");
@@ -74,7 +107,10 @@ export function indexedDbVoiceStore(dbName = "afkari-voice"): VoiceStore {
       const t = await tx(["segments", "chunks"], "readonly");
       const seg = (await req(t.objectStore("segments").get(id))) as Segment | undefined;
       const rows = (await req(t.objectStore("chunks").index("seg").getAll(id))) as { blob: Blob }[];
-      return new Blob(rows.map((r) => r.blob), { type: seg?.mime ?? "audio/webm" });
+      return new Blob(
+        rows.map((r) => r.blob),
+        { type: seg?.mime ?? "audio/webm" },
+      );
     },
     async deleteSegment(id) {
       const t = await tx(["segments", "chunks"], "readwrite");
@@ -98,4 +134,7 @@ export const voiceStore = (): VoiceStore =>
  */
 let sharedSong: VoiceStore | null = null;
 export const songVoiceStore = (): VoiceStore =>
-  (sharedSong ??= typeof indexedDB !== "undefined" ? indexedDbVoiceStore("afkari-voice-songs") : memoryVoiceStore());
+  (sharedSong ??=
+    typeof indexedDB !== "undefined"
+      ? indexedDbVoiceStore("afkari-voice-songs")
+      : memoryVoiceStore());

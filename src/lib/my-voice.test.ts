@@ -1,9 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  buildCreateVoiceRequest, bytesToBase64, clearMyVoiceProfile, CONSENT_STATEMENT_AR,
-  createMyVoice, deleteMyVoice, effectiveListenVoice, encodeWav24k, floatToPcm16, getMyVoiceProfile,
-  isMyVoicePublic, MAX_SAMPLE_SECONDS, MIN_SAMPLE_SECONDS, MY_VOICE_PUBLIC, parseCreatedVoiceId, READING_SAMPLE_AR,
-  sampleDurationState, samplesSeconds, saveMyVoiceProfile, trimSamplesToSeconds, voiceCreateErrorMessage,
+  buildCreateVoiceRequest,
+  bytesToBase64,
+  clearMyVoiceProfile,
+  CONSENT_STATEMENT_AR,
+  createMyVoice,
+  deleteMyVoice,
+  effectiveListenVoice,
+  encodeWav24k,
+  floatToPcm16,
+  getMyVoiceProfile,
+  isMyVoicePublic,
+  MAX_SAMPLE_SECONDS,
+  MIN_SAMPLE_SECONDS,
+  MY_VOICE_PUBLIC,
+  parseCreatedVoiceId,
+  READING_SAMPLE_AR,
+  sampleDurationState,
+  samplesSeconds,
+  saveMyVoiceProfile,
+  trimSamplesToSeconds,
+  voiceCreateErrorMessage,
   VOICES_API_URL,
 } from "./my-voice";
 import { base64ToBytes } from "./tts";
@@ -32,7 +49,9 @@ describe("uploaded-file trimming (shared with the recorder's conversion)", () =>
 
   it("cuts an over-long buffer to exactly the requested seconds, keeping the head", () => {
     const samples = new Float32Array(24000 * 45);
-    samples[0] = 0.5; samples[24000 * 30 - 1] = 0.25; samples[24000 * 30] = 0.75;
+    samples[0] = 0.5;
+    samples[24000 * 30 - 1] = 0.25;
+    samples[24000 * 30] = 0.75;
     const trimmed = trimSamplesToSeconds(samples, MAX_SAMPLE_SECONDS);
     expect(trimmed).toHaveLength(24000 * 30);
     expect(trimmed[0]).toBe(0.5);
@@ -84,7 +103,10 @@ describe("buildCreateVoiceRequest + parseCreatedVoiceId", () => {
     expect(req.voice.type).toBe("replicated");
     expect(req.voice.model).toBe("gemini-3.8-flash-tts");
     expect(req.voice.replicated.source_audio).toEqual({ mime_type: "audio/wav", data: "U0FNUExF" });
-    expect(req.voice.replicated.consent_audio).toEqual({ mime_type: "audio/wav", data: "Q09OU0VOVA==" });
+    expect(req.voice.replicated.consent_audio).toEqual({
+      mime_type: "audio/wav",
+      data: "Q09OU0VOVA==",
+    });
   });
 
   it("accepts the documented response shapes and rejects id-less ones", () => {
@@ -102,7 +124,9 @@ describe("createMyVoice", () => {
   const wav = new Uint8Array([1, 2, 3, 4]);
 
   it("posts both WAVs to the Voices endpoint with the personal key and returns the id", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "voice_new1" }), { status: 200 }));
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ id: "voice_new1" }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     await expect(createMyVoice("KEY123", wav, wav)).resolves.toBe("voice_new1");
     const call = fetch.mock.calls[0];
@@ -116,14 +140,26 @@ describe("createMyVoice", () => {
   });
 
   it("gives consent mismatches their own fixable message", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
-      JSON.stringify({ error: { message: "Consent audio does not match the consent statement" } }), { status: 400 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: "Consent audio does not match the consent statement" },
+          }),
+          { status: 400 },
+        ),
+      ),
+    );
     await expect(createMyVoice("k", wav, wav)).rejects.toThrow("الموافقة");
   });
 
   it("maps a plain 403 to the project-not-enabled message and refuses an empty key without fetching", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response(
-      JSON.stringify({ error: { message: "denied" } }), { status: 403 }));
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ error: { message: "denied" } }), { status: 403 }),
+      );
     vi.stubGlobal("fetch", fetch);
     await expect(createMyVoice("bad", wav, wav)).rejects.toThrow("غير مفعّل لمشروع مفتاحك");
     await expect(createMyVoice("", wav, wav)).rejects.toThrow("أضف مفتاح Gemini");
@@ -131,26 +167,44 @@ describe("createMyVoice", () => {
   });
 
   it("surfaces a quota hit as a wait-and-retry message, end to end", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      error: {
-        status: "RESOURCE_EXHAUSTED", message: "Quota exceeded",
-        details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "rateLimitExceeded" }],
-      },
-    }), { status: 403 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              status: "RESOURCE_EXHAUSTED",
+              message: "Quota exceeded",
+              details: [
+                {
+                  "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                  reason: "rateLimitExceeded",
+                },
+              ],
+            },
+          }),
+          { status: 403 },
+        ),
+      ),
+    );
     await expect(createMyVoice("k", wav, wav)).rejects.toThrow("حد إنشاء الأصوات");
   });
 });
 
 describe("voiceCreateErrorMessage", () => {
   const QUOTA = "وصلت لحد إنشاء الأصوات عند Google مؤقتًا — حاول تاني بعد ساعات أو بكرة.";
-  const PERMISSION = "إنشاء الأصوات غير مفعّل لمشروع مفتاحك — راجع حالة المشروع في Google AI Studio (قيود/فوترة/تحقق من العمر).";
-  const VERIFY = "Google ما قدرش يطابق تسجيل الموافقة مع العيّنة — سجّل الاتنين بنفس الميكروفون وفي نفس الجلسة.";
+  const PERMISSION =
+    "إنشاء الأصوات غير مفعّل لمشروع مفتاحك — راجع حالة المشروع في Google AI Studio (قيود/فوترة/تحقق من العمر).";
+  const VERIFY =
+    "Google ما قدرش يطابق تسجيل الموافقة مع العيّنة — سجّل الاتنين بنفس الميكروفون وفي نفس الجلسة.";
 
   it("reads a 403 as quota when a details reason says so", () => {
     const body = {
       error: {
         message: "Quota exceeded for quota metric",
-        details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "rateLimitExceeded" }],
+        details: [
+          { "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "rateLimitExceeded" },
+        ],
       },
     };
     expect(voiceCreateErrorMessage(403, body)).toBe(QUOTA);
@@ -166,24 +220,40 @@ describe("voiceCreateErrorMessage", () => {
 
   it("reads a plain 403 and PERMISSION_DENIED as project-not-enabled", () => {
     expect(voiceCreateErrorMessage(403, { error: { message: "denied" } })).toBe(PERMISSION);
-    expect(voiceCreateErrorMessage(403, { error: { status: "PERMISSION_DENIED" } })).toBe(PERMISSION);
+    expect(voiceCreateErrorMessage(403, { error: { status: "PERMISSION_DENIED" } })).toBe(
+      PERMISSION,
+    );
   });
 
   it("reads FAILED_PRECONDITION and consent/speaker wording as a verification mismatch", () => {
     expect(voiceCreateErrorMessage(400, { error: { status: "FAILED_PRECONDITION" } })).toBe(VERIFY);
-    expect(voiceCreateErrorMessage(400, { error: { message: "Consent audio does not match the consent statement" } })).toBe(VERIFY);
-    expect(voiceCreateErrorMessage(400, { error: { message: "Speaker verification failed for the sample" } })).toBe(VERIFY);
+    expect(
+      voiceCreateErrorMessage(400, {
+        error: { message: "Consent audio does not match the consent statement" },
+      }),
+    ).toBe(VERIFY);
+    expect(
+      voiceCreateErrorMessage(400, {
+        error: { message: "Speaker verification failed for the sample" },
+      }),
+    ).toBe(VERIFY);
   });
 
   it("keeps the shared mapped message for unknown errors and appends Google's text", () => {
-    expect(voiceCreateErrorMessage(500, { error: { message: "Backend exploded while cloning" } }))
-      .toBe("Gemini مشغول الآن. حاول بعد قليل؛ مقالك محفوظ كما هو. (Backend exploded while cloning)");
-    expect(voiceCreateErrorMessage(401, { error: { message: "API key expired" } }))
-      .toBe("مفتاح Gemini غير صالح أو غير مفعّل. راجعه من الإعدادات ⚙️. (API key expired)");
+    expect(
+      voiceCreateErrorMessage(500, { error: { message: "Backend exploded while cloning" } }),
+    ).toBe(
+      "Gemini مشغول الآن. حاول بعد قليل؛ مقالك محفوظ كما هو. (Backend exploded while cloning)",
+    );
+    expect(voiceCreateErrorMessage(401, { error: { message: "API key expired" } })).toBe(
+      "مفتاح Gemini غير صالح أو غير مفعّل. راجعه من الإعدادات ⚙️. (API key expired)",
+    );
   });
 
   it("sanitizes and caps the appended Google text at 140 characters", () => {
-    const out = voiceCreateErrorMessage(500, { error: { message: `  Error\n\twith   spacing ${"x".repeat(300)}` } });
+    const out = voiceCreateErrorMessage(500, {
+      error: { message: `  Error\n\twith   spacing ${"x".repeat(300)}` },
+    });
     const appended = out.slice(out.indexOf("(") + 1, -1);
     expect(appended.length).toBe(140);
     expect(appended.startsWith("Error with spacing")).toBe(true);

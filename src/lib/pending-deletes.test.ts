@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { deleteIdea, loadIdeas, replaceIdeas, saveIdea, type Idea } from "./ideas";
 import {
-  PENDING_DELETE_GRACE_MS, beginPendingDelete, cancelPendingDelete, finalizePendingDelete,
-  isPendingDelete, loadPendingDeletes, loadVisibleIdeas, pendingDeleteIds, sweepPendingDeletes,
+  PENDING_DELETE_GRACE_MS,
+  beginPendingDelete,
+  cancelPendingDelete,
+  finalizePendingDelete,
+  isPendingDelete,
+  loadPendingDeletes,
+  loadVisibleIdeas,
+  pendingDeleteIds,
+  sweepPendingDeletes,
   type DeleteEffects,
 } from "./pending-deletes";
 
@@ -16,7 +23,15 @@ const makeEffects = (): DeleteEffects => ({
 });
 
 const seedSong = (extra: Partial<Idea> = {}): Idea => {
-  const song: Idea = { id: "song-1", text: "كلمات الأغنية", createdAt: 10, song: true, articleTitle: "أغنيتي", driveFileId: "drive-file-1", ...extra };
+  const song: Idea = {
+    id: "song-1",
+    text: "كلمات الأغنية",
+    createdAt: 10,
+    song: true,
+    articleTitle: "أغنيتي",
+    driveFileId: "drive-file-1",
+    ...extra,
+  };
   replaceIdeas([song, ...loadIdeas()]);
   return song;
 };
@@ -94,11 +109,15 @@ describe("pending deletes", () => {
     beginPendingDelete(song.id, 0);
     // The Drive upload pass stamps a NEWER file id during the grace window;
     // finalization must kill the copy that id names, not a stale snapshot.
-    replaceIdeas(loadIdeas().map((i) => (i.id === song.id ? { ...i, driveFileId: "drive-file-2" } : i)));
+    replaceIdeas(
+      loadIdeas().map((i) => (i.id === song.id ? { ...i, driveFileId: "drive-file-2" } : i)),
+    );
     const effects = makeEffects();
     expect(sweepPendingDeletes(effects, PENDING_DELETE_GRACE_MS)).toEqual([song.id]);
     expect(effects.deleteSongAudio).toHaveBeenCalledWith(song.id);
-    expect(effects.deleteSongDriveCopy).toHaveBeenCalledWith(expect.objectContaining({ id: song.id, driveFileId: "drive-file-2" }));
+    expect(effects.deleteSongDriveCopy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: song.id, driveFileId: "drive-file-2" }),
+    );
     expect(effects.deleteCloud).toHaveBeenCalledWith(song.id);
     expect(loadIdeas()).toEqual([]);
   });

@@ -6,7 +6,11 @@ import { randomUUID as nodeRandomUUID } from "node:crypto";
 // it for new idea ids, so guarantee it in the test environment.
 if (typeof globalThis.crypto?.randomUUID !== "function") {
   if (globalThis.crypto) Object.assign(globalThis.crypto, { randomUUID: nodeRandomUUID });
-  else Object.defineProperty(globalThis, "crypto", { configurable: true, value: { randomUUID: nodeRandomUUID } });
+  else
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: { randomUUID: nodeRandomUUID },
+    });
 }
 
 Object.defineProperty(window, "scrollTo", {

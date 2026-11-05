@@ -35,11 +35,17 @@ export function CompileBar({ ideas, onCancel }: { ideas: Idea[]; onCancel: () =>
           <span className="min-w-0 flex-1 text-sm font-medium text-foreground" role="status">
             {count > 0 ? `تم اختيار ${count}` : "لم تُختر مقالات بعد"}
           </span>
-          <Button className="rounded-full px-4" disabled={count === 0} onClick={() => setOpen(true)}>
-            <FileText />تجميع في مستند
+          <Button
+            className="rounded-full px-4"
+            disabled={count === 0}
+            onClick={() => setOpen(true)}
+          >
+            <FileText />
+            تجميع في مستند
           </Button>
           <Button variant="ghost" className="rounded-full px-3" onClick={onCancel}>
-            <X />إلغاء
+            <X />
+            إلغاء
           </Button>
         </div>
       </div>
@@ -47,17 +53,22 @@ export function CompileBar({ ideas, onCancel }: { ideas: Idea[]; onCancel: () =>
         <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
           <DialogTitle className="flex items-center gap-2 text-start font-display">
             <FileText className="size-5 text-primary" />
-            <span>تجميع {count} {count === 1 ? "مقالة" : "مقالات"} في مستند واحد</span>
+            <span>
+              تجميع {count} {count === 1 ? "مقالة" : "مقالات"} في مستند واحد
+            </span>
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            المستند مرتّب حسب الموضوع، والمقالات الأقدم أولًا داخل كل موضوع — والنصوص كما هي تمامًا، دون أي تعديل.
+            المستند مرتّب حسب الموضوع، والمقالات الأقدم أولًا داخل كل موضوع — والنصوص كما هي تمامًا،
+            دون أي تعديل.
           </p>
           <div className="flex flex-col gap-2 pt-1">
             <Button className="w-full rounded-full" onClick={download}>
-              <FileDown />تنزيل Markdown
+              <FileDown />
+              تنزيل Markdown
             </Button>
             <Button variant="outline" className="w-full rounded-full" onClick={print}>
-              <Printer />طباعة / PDF
+              <Printer />
+              طباعة / PDF
             </Button>
           </div>
         </DialogContent>

@@ -60,9 +60,11 @@ export function documentAttribution(idea: Idea): string | undefined {
 export const documentDate = (ts: number): string => new Date(ts).toLocaleDateString("ar");
 
 /** The per-article meta line: creation date + its topic. */
-export const documentMetaLine = (idea: Idea): string => `${documentDate(idea.createdAt)} · ${articleTopic(idea)}`;
+export const documentMetaLine = (idea: Idea): string =>
+  `${documentDate(idea.createdAt)} · ${articleTopic(idea)}`;
 
-const pluralArticles = (n: number): string => (n === 1 ? "مقالة واحدة" : n === 2 ? "مقالتان" : `${n} مقالات`);
+const pluralArticles = (n: number): string =>
+  n === 1 ? "مقالة واحدة" : n === 2 ? "مقالتان" : `${n} مقالات`;
 
 /**
  * Compose the selection into one Markdown document:
@@ -165,8 +167,12 @@ export function composeDocumentHtml(ideas: Idea[], generatedAt: Date = new Date(
           `<div class="body">${paragraphs}</div></article>`,
       );
     }
-    toc.push(`<li>${escapeHtml(group.topic)} (${group.ideas.length})<ul>${items.join("")}</ul></li>`);
-    sections.push(`<section class="group"><h2>${escapeHtml(group.topic)}</h2>${articles.join("")}</section>`);
+    toc.push(
+      `<li>${escapeHtml(group.topic)} (${group.ideas.length})<ul>${items.join("")}</ul></li>`,
+    );
+    sections.push(
+      `<section class="group"><h2>${escapeHtml(group.topic)}</h2>${articles.join("")}</section>`,
+    );
   }
   return [
     "<!doctype html>",
