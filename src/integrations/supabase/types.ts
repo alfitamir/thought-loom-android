@@ -55,6 +55,7 @@ export type Database = {
       }
       ideas: {
         Row: {
+          ai_polished_at: number | null
           article_body: string | null
           article_title: string | null
           created_at: number
@@ -78,6 +79,7 @@ export type Database = {
           versions: Json | null
         }
         Insert: {
+          ai_polished_at?: number | null
           article_body?: string | null
           article_title?: string | null
           created_at?: number
@@ -101,6 +103,7 @@ export type Database = {
           versions?: Json | null
         }
         Update: {
+          ai_polished_at?: number | null
           article_body?: string | null
           article_title?: string | null
           created_at?: number
