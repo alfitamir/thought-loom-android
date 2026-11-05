@@ -91,16 +91,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/manifest.json" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Reem+Kufi:wght@500;700&family=Tajawal:wght@400;500;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Reem+Kufi:wght@500;700&family=Tajawal:wght@400;500;700&display=swap",
+      },
       { rel: "icon", href: "/icons/icon.svg", type: "image/svg+xml" },
     ],
     scripts: [
-      { children: "if('serviceWorker' in navigator && location.hostname!=='localhost' && !location.hostname.includes('id-preview')){navigator.serviceWorker.register('/sw.js').catch(()=>{})}" },
+      {
+        children:
+          "if('serviceWorker' in navigator && location.hostname!=='localhost' && !location.hostname.includes('id-preview')){navigator.serviceWorker.register('/sw.js').catch(()=>{})}",
+      },
       // Appearance: set the `dark` class before first paint so a dark
       // preference never flashes light (mirrors src/lib/theme.ts; the
       // root effect then keeps it in sync). Defensive: any failure
       // leaves the default light rendering untouched.
-      { children: "try{var m=JSON.parse(localStorage.getItem('afkari.theme')||'\"system\"');if(m==='dark'||(m!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}" },
+      {
+        children:
+          "try{var m=JSON.parse(localStorage.getItem('afkari.theme')||'\"system\"');if(m==='dark'||(m!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -128,7 +137,9 @@ function RootComponent() {
 
   // Undoable deletions left pending by an app close settle on startup:
   // anything past its grace deadline finalizes, the rest re-arms its timer.
-  useEffect(() => { initPendingDeletes(); }, []);
+  useEffect(() => {
+    initPendingDeletes();
+  }, []);
 
   // Appearance: apply the stored theme (the head script already set the
   // class pre-paint; this keeps it live — preference changes anywhere in
@@ -139,7 +150,13 @@ function RootComponent() {
   // SEEN, not silently lost with the on-screen state looking saved:
   // ideas.ts reports the first failure of a streak, the toast carries
   // its Arabic explanation (audit F-3.3).
-  useEffect(() => onStorageWriteError((error) => { toast.error(error.message); }), []);
+  useEffect(
+    () =>
+      onStorageWriteError((error) => {
+        toast.error(error.message);
+      }),
+    [],
+  );
 
   return (
     <QueryClientProvider client={queryClient}>

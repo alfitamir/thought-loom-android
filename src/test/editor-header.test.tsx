@@ -6,36 +6,65 @@ import { loadIdeas, type Idea } from "@/lib/ideas";
 // dialogs) are stubbed: this suite covers the editor's LAYOUT contract —
 // what sits beside the title, what stayed at the bottom, and the rules
 // that hide pieces per article kind — plus the section move action.
-vi.mock("@/lib/sync", () => ({ pushIdea: vi.fn(async () => {}), syncNow: vi.fn(async () => 0), deleteIdeaCloud: vi.fn(async () => {}) }));
-vi.mock("@/lib/ai-features", () => ({ getArticleEnrichment: vi.fn(), getFacebookPost: vi.fn(), getEvidence: vi.fn() }));
+vi.mock("@/lib/sync", () => ({
+  pushIdea: vi.fn(async () => {}),
+  syncNow: vi.fn(async () => 0),
+  deleteIdeaCloud: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/ai-features", () => ({
+  getArticleEnrichment: vi.fn(),
+  getFacebookPost: vi.fn(),
+  getEvidence: vi.fn(),
+}));
 vi.mock("@/lib/ai-engine", () => ({ resolveEngine: vi.fn(async () => "x") }));
 vi.mock("@/lib/article-ai", () => ({ improveFull: vi.fn(), cleanFull: vi.fn() }));
 vi.mock("@/lib/gemini", () => ({ getGeminiKey: () => "" }));
 vi.mock("@/lib/tts", () => ({
   GEMINI_TTS_VOICE: "Charon",
-  blobToBytes: vi.fn(), concatPcm: vi.fn(), createTtsSession: vi.fn(), mapWithConcurrency: vi.fn(),
-  modelForVoiceKey: vi.fn(), pcmToWav: vi.fn(), speakWithDevice: vi.fn(), splitForSpeech: () => [],
-  synthesizeGeminiChunkWithModel: vi.fn(), toSpeechText: (t: string) => t,
+  blobToBytes: vi.fn(),
+  concatPcm: vi.fn(),
+  createTtsSession: vi.fn(),
+  mapWithConcurrency: vi.fn(),
+  modelForVoiceKey: vi.fn(),
+  pcmToWav: vi.fn(),
+  speakWithDevice: vi.fn(),
+  splitForSpeech: () => [],
+  synthesizeGeminiChunkWithModel: vi.fn(),
+  toSpeechText: (t: string) => t,
 }));
 vi.mock("@/lib/article-audio", () => ({
   PCM_CHUNK_MIME: "audio/pcm",
   audioFileName: (t: string) => `${t}.wav`,
-  deleteArticleAudioForVoice: vi.fn(), deleteSongAudio: vi.fn(async () => {}),
-  findCachedAudioForVoice: vi.fn(async () => null), getAudioChunk: vi.fn(async () => null),
-  getSongAudio: vi.fn(async () => null), listArticleIdsWithAudio: vi.fn(async () => new Set<string>()),
-  saveAudioChunk: vi.fn(async () => {}), saveAudioManifest: vi.fn(async () => {}),
-  saveSongAudio: vi.fn(async () => {}), songAudioStore: vi.fn(),
+  deleteArticleAudioForVoice: vi.fn(),
+  deleteSongAudio: vi.fn(async () => {}),
+  findCachedAudioForVoice: vi.fn(async () => null),
+  getAudioChunk: vi.fn(async () => null),
+  getSongAudio: vi.fn(async () => null),
+  listArticleIdsWithAudio: vi.fn(async () => new Set<string>()),
+  saveAudioChunk: vi.fn(async () => {}),
+  saveAudioManifest: vi.fn(async () => {}),
+  saveSongAudio: vi.fn(async () => {}),
+  songAudioStore: vi.fn(),
 }));
 vi.mock("@/lib/my-voice", () => ({
-  effectiveListenVoice: (c: string) => c, getMyVoiceProfile: () => null, isMyVoicePublic: () => false,
+  effectiveListenVoice: (c: string) => c,
+  getMyVoiceProfile: () => null,
+  isMyVoicePublic: () => false,
 }));
-vi.mock("@/lib/song-drive", () => ({ downloadSongAudio: vi.fn(), deleteSongDriveCopy: vi.fn(async () => {}) }));
+vi.mock("@/lib/song-drive", () => ({
+  downloadSongAudio: vi.fn(),
+  deleteSongDriveCopy: vi.fn(async () => {}),
+}));
 vi.mock("@/lib/song-lyrics", () => ({
-  applySongLyrics: vi.fn(), decideLyricsApplication: () => "none",
-  isSongLyricsPending: () => false, onSongLyricsPendingChange: () => () => {}, transcribeSong: vi.fn(),
+  applySongLyrics: vi.fn(),
+  decideLyricsApplication: () => "none",
+  isSongLyricsPending: () => false,
+  onSongLyricsPendingChange: () => () => {},
+  transcribeSong: vi.fn(),
 }));
 vi.mock("@/lib/share-card", () => ({
-  deliverCardImage: vi.fn(async () => "shared"), renderShareCardPng: vi.fn(async () => new Blob()),
+  deliverCardImage: vi.fn(async () => "shared"),
+  renderShareCardPng: vi.fn(async () => new Blob()),
   shareCardModel: () => ({}),
 }));
 vi.mock("@/components/evidence-dialog", () => ({ EvidenceDialog: () => null }));
@@ -48,13 +77,28 @@ const FOLLOWS = 4; // Node.DOCUMENT_POSITION_FOLLOWING
 const before = (a: Element, b: Element) => (a.compareDocumentPosition(b) & FOLLOWS) !== 0;
 
 const article: Idea = {
-  id: "a1", text: "نص المقال الأصلي", createdAt: 1000, updatedAt: 5000,
-  articleTitle: "عنوان المقال", articleBody: "متن المقال الطويل الذي يقرأه القارئ هنا بسطور كثيرة",
+  id: "a1",
+  text: "نص المقال الأصلي",
+  createdAt: 1000,
+  updatedAt: 5000,
+  articleTitle: "عنوان المقال",
+  articleBody: "متن المقال الطويل الذي يقرأه القارئ هنا بسطور كثيرة",
 };
 const renderEditor = (idea: Idea, onChange = vi.fn()) =>
-  render(<ArticleEditor idea={idea} topic="متفرقات" online={false} onChange={onChange} onDelete={vi.fn()} />);
+  render(
+    <ArticleEditor
+      idea={idea}
+      topic="متفرقات"
+      online={false}
+      onChange={onChange}
+      onDelete={vi.fn()}
+    />,
+  );
 
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+});
 
 describe("editor header layout (Part B)", () => {
   it("share, share-as-image and smart tools sit beside/under the title — the bottom row no longer carries them", () => {
@@ -76,7 +120,13 @@ describe("editor header layout (Part B)", () => {
     expect(screen.getAllByRole("button", { name: "أدوات ذكية" })).toHaveLength(1);
     // The bottom row still carries edit, listen, merge, pin and the
     // isolated delete — all of them below the body.
-    for (const name of ["تعديل المقال", "استمع للمقال", "دمج يدوي مع مقال آخر", "تثبيت المقال", "حذف المقال"]) {
+    for (const name of [
+      "تعديل المقال",
+      "استمع للمقال",
+      "دمج يدوي مع مقال آخر",
+      "تثبيت المقال",
+      "حذف المقال",
+    ]) {
       const btn = screen.getByRole("button", { name });
       expect(before(body, btn)).toBe(true);
     }
@@ -95,7 +145,14 @@ describe("editor header layout (Part B)", () => {
   });
 
   it("songs: no smart tools, and share-as-image sits at the top of the song section, before delete", () => {
-    const song: Idea = { id: "s1", text: "كلمات الأغنية", createdAt: 1000, updatedAt: 5000, articleTitle: "أغنية", song: true };
+    const song: Idea = {
+      id: "s1",
+      text: "كلمات الأغنية",
+      createdAt: 1000,
+      updatedAt: 5000,
+      articleTitle: "أغنية",
+      song: true,
+    };
     localStorage.setItem("afkari.ideas", JSON.stringify([song]));
     renderEditor(song);
     expect(screen.queryByRole("button", { name: "أدوات ذكية" })).toBeNull();
@@ -131,7 +188,14 @@ describe("section move action (Part A)", () => {
   });
 
   it("songs never offer the move — a song is not a medical article", () => {
-    const song: Idea = { id: "s1", text: "", createdAt: 1000, updatedAt: 5000, articleTitle: "أغنية", song: true };
+    const song: Idea = {
+      id: "s1",
+      text: "",
+      createdAt: 1000,
+      updatedAt: 5000,
+      articleTitle: "أغنية",
+      song: true,
+    };
     localStorage.setItem("afkari.ideas", JSON.stringify([song]));
     renderEditor(song);
     expect(screen.queryByRole("button", { name: "نقل إلى القسم الطبي" })).toBeNull();
@@ -158,15 +222,25 @@ describe("X post chip (feature 5)", () => {
   it("sits beside the Facebook item in the smart-tools menu and copies a locally composed post, offline", async () => {
     localStorage.setItem("afkari.ideas", JSON.stringify([article]));
     const writeText = vi.fn(async () => {});
-    Object.defineProperty(window.navigator, "clipboard", { value: { writeText }, configurable: true });
+    Object.defineProperty(window.navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
     renderEditor(article); // online={false}: the X item must still work — it composes on-device
     openToolsMenu();
     expect(screen.getByRole("menuitem", { name: "منشور فيسبوك" })).toBeTruthy();
     fireEvent.click(screen.getByRole("menuitem", { name: "منشور X" }));
     // The dialog previews exactly what the pure composer builds, with its count.
-    const expected = composeXPost({ title: article.articleTitle!, body: article.articleBody!, medical: false, topic: "متفرقات" });
+    const expected = composeXPost({
+      title: article.articleTitle!,
+      body: article.articleBody!,
+      medical: false,
+      topic: "متفرقات",
+    });
     expect(screen.getByText("منشور X مقترح")).toBeTruthy();
-    expect(screen.getByText((_, el) => el?.tagName === "DIV" && el.textContent === expected)).toBeTruthy();
+    expect(
+      screen.getByText((_, el) => el?.tagName === "DIV" && el.textContent === expected),
+    ).toBeTruthy();
     expect(xCharCount(expected)).toBeLessThanOrEqual(X_POST_LIMIT);
     expect(screen.getByText(/عدد الحروف/).textContent).toContain(`/ ${X_POST_LIMIT}`);
     // Copy mirrors the Facebook chip's confirmation, in the dialog and the editor.
@@ -181,9 +255,16 @@ describe("X post chip (feature 5)", () => {
     renderEditor(med);
     openToolsMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "منشور X" }));
-    const expected = composeXPost({ title: med.articleTitle!, body: med.articleBody!, medical: true, topic: "متفرقات" });
+    const expected = composeXPost({
+      title: med.articleTitle!,
+      body: med.articleBody!,
+      medical: true,
+      topic: "متفرقات",
+    });
     expect(expected.endsWith(X_DISCLAIMER)).toBe(true);
-    expect(screen.getByText((_, el) => el?.tagName === "DIV" && el.textContent === expected)).toBeTruthy();
+    expect(
+      screen.getByText((_, el) => el?.tagName === "DIV" && el.textContent === expected),
+    ).toBeTruthy();
   });
 
   it("mirrors the Facebook chip's exclusions: liked articles and songs never reach it", () => {
@@ -193,7 +274,14 @@ describe("X post chip (feature 5)", () => {
     expect(screen.queryByRole("button", { name: "أدوات ذكية" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "منشور X" })).toBeNull();
     unmount();
-    const song: Idea = { id: "s9", text: "كلمات الأغنية", createdAt: 1000, updatedAt: 5000, articleTitle: "أغنية", song: true };
+    const song: Idea = {
+      id: "s9",
+      text: "كلمات الأغنية",
+      createdAt: 1000,
+      updatedAt: 5000,
+      articleTitle: "أغنية",
+      song: true,
+    };
     localStorage.setItem("afkari.ideas", JSON.stringify([song]));
     renderEditor(song);
     expect(screen.queryByRole("button", { name: "أدوات ذكية" })).toBeNull();
@@ -216,7 +304,14 @@ describe("version history (الإصدارات السابقة)", () => {
     const { unmount } = renderEditor(liked);
     expect(screen.queryByRole("button", { name: "الإصدارات السابقة" })).toBeNull();
     unmount();
-    const song: Idea = { id: "s5", text: "كلمات الأغنية", createdAt: 1000, updatedAt: 5000, articleTitle: "أغنية", song: true };
+    const song: Idea = {
+      id: "s5",
+      text: "كلمات الأغنية",
+      createdAt: 1000,
+      updatedAt: 5000,
+      articleTitle: "أغنية",
+      song: true,
+    };
     localStorage.setItem("afkari.ideas", JSON.stringify([song]));
     renderEditor(song);
     expect(screen.queryByRole("button", { name: "الإصدارات السابقة" })).toBeNull();
@@ -232,7 +327,14 @@ describe("version history (الإصدارات السابقة)", () => {
   it("lists frozen versions and restores one — freezing the current text in turn", async () => {
     const withHistory: Idea = {
       ...article,
-      versions: [{ at: 4000, text: "النص القديم المجمد قبل التحسين", title: "العنوان القديم", source: "improve" }],
+      versions: [
+        {
+          at: 4000,
+          text: "النص القديم المجمد قبل التحسين",
+          title: "العنوان القديم",
+          source: "improve",
+        },
+      ],
     };
     localStorage.setItem("afkari.ideas", JSON.stringify([withHistory]));
     const onChange = vi.fn();

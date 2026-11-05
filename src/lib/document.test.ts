@@ -15,10 +15,40 @@ import {
 const mk = (over: Partial<Idea>): Idea => ({ id: "x", text: "نص", createdAt: 1000, ...over });
 
 // Topics are hand-pinned (topicManual) so classification never interferes.
-const healthOld = mk({ id: "h-old", topic: "الصحة", topicManual: true, articleTitle: "عن النوم", articleBody: "النوم أولًا.\n\nثم كل شيء.", createdAt: 1000 });
-const healthNew = mk({ id: "h-new", topic: "الصحة", topicManual: true, articleTitle: "عن المشي", articleBody: "المشي اليومي علاج.", createdAt: 3000 });
-const workOne = mk({ id: "w-1", topic: "العمل", topicManual: true, articleTitle: "عن الفريق", articleBody: "الفريق قبل الخطة.", createdAt: 2000 });
-const liked = mk({ id: "l-1", topic: "الصحة", topicManual: true, liked: true, source: "مدونة الدكتور س", articleTitle: "مقال أعجبني عن الغذاء", articleBody: "نص الغير كما هو حرفيًا.", createdAt: 1500 });
+const healthOld = mk({
+  id: "h-old",
+  topic: "الصحة",
+  topicManual: true,
+  articleTitle: "عن النوم",
+  articleBody: "النوم أولًا.\n\nثم كل شيء.",
+  createdAt: 1000,
+});
+const healthNew = mk({
+  id: "h-new",
+  topic: "الصحة",
+  topicManual: true,
+  articleTitle: "عن المشي",
+  articleBody: "المشي اليومي علاج.",
+  createdAt: 3000,
+});
+const workOne = mk({
+  id: "w-1",
+  topic: "العمل",
+  topicManual: true,
+  articleTitle: "عن الفريق",
+  articleBody: "الفريق قبل الخطة.",
+  createdAt: 2000,
+});
+const liked = mk({
+  id: "l-1",
+  topic: "الصحة",
+  topicManual: true,
+  liked: true,
+  source: "مدونة الدكتور س",
+  articleTitle: "مقال أعجبني عن الغذاء",
+  articleBody: "نص الغير كما هو حرفيًا.",
+  createdAt: 1500,
+});
 
 describe("documentGroups", () => {
   it("groups by derived topic, busiest group first, oldest → newest inside", () => {
@@ -44,12 +74,16 @@ describe("documentAttribution", () => {
   });
 
   it("a liked article without a source falls back to its accumulated sources, then the external line", () => {
-    expect(documentAttribution(mk({ liked: true, sources: ["موقع ص", "مجلة ع"] }))).toBe("المصدر: موقع ص، مجلة ع");
+    expect(documentAttribution(mk({ liked: true, sources: ["موقع ص", "مجلة ع"] }))).toBe(
+      "المصدر: موقع ص، مجلة ع",
+    );
     expect(documentAttribution(mk({ liked: true }))).toBe("مقال من مصدر خارجي");
   });
 
   it("his own article that absorbed a liked one carries «يتضمن مقالًا من»", () => {
-    expect(documentAttribution(mk({ sources: ["مدونة الدكتور س"] }))).toBe("يتضمن مقالًا من: مدونة الدكتور س");
+    expect(documentAttribution(mk({ sources: ["مدونة الدكتور س"] }))).toBe(
+      "يتضمن مقالًا من: مدونة الدكتور س",
+    );
   });
 
   it("a plain article carries no attribution", () => {
@@ -70,7 +104,8 @@ describe("composeDocument", () => {
     const toc = doc.slice(doc.indexOf("## المحتويات"), doc.indexOf("# الصحة"));
     expect(toc).toContain("- الصحة (3)");
     expect(toc).toContain("- العمل (1)");
-    for (const title of ["عن النوم", "عن المشي", "عن الفريق", "مقال أعجبني عن الغذاء"]) expect(toc).toContain(`  - ${title}`);
+    for (const title of ["عن النوم", "عن المشي", "عن الفريق", "مقال أعجبني عن الغذاء"])
+      expect(toc).toContain(`  - ${title}`);
     // TOC order inside the busiest group is oldest → newest too.
     expect(toc.indexOf("عن النوم")).toBeLessThan(toc.indexOf("مقال أعجبني عن الغذاء"));
     expect(toc.indexOf("مقال أعجبني عن الغذاء")).toBeLessThan(toc.indexOf("عن المشي"));
@@ -79,14 +114,18 @@ describe("composeDocument", () => {
   it("renders each article as ## title + meta line + verbatim body, oldest first in its group", () => {
     const healthSection = doc.slice(doc.indexOf("# الصحة", doc.indexOf("## المحتويات")));
     expect(healthSection.indexOf("## عن النوم")).toBeLessThan(healthSection.indexOf("## عن المشي"));
-    expect(doc).toContain(`## عن النوم\n\n${documentMetaLine(healthOld)}\n\nالنوم أولًا.\n\nثم كل شيء.`);
+    expect(doc).toContain(
+      `## عن النوم\n\n${documentMetaLine(healthOld)}\n\nالنوم أولًا.\n\nثم كل شيء.`,
+    );
     expect(doc).toContain(`## عن الفريق\n\n${documentMetaLine(workOne)}\n\nالفريق قبل الخطة.`);
     // Meta line = date + topic.
     expect(documentMetaLine(healthOld)).toBe(`${new Date(1000).toLocaleDateString("ar")} · الصحة`);
   });
 
   it("places the liked attribution directly under the liked article's meta line", () => {
-    expect(doc).toContain(`## مقال أعجبني عن الغذاء\n\n${documentMetaLine(liked)}\n\nالمصدر: مدونة الدكتور س\n\nنص الغير كما هو حرفيًا.`);
+    expect(doc).toContain(
+      `## مقال أعجبني عن الغذاء\n\n${documentMetaLine(liked)}\n\nالمصدر: مدونة الدكتور س\n\nنص الغير كما هو حرفيًا.`,
+    );
   });
 
   it("an empty selection is the header only — no contents, no groups", () => {
@@ -118,7 +157,13 @@ describe("composeDocumentHtml", () => {
   });
 
   it("escapes HTML in titles and bodies", () => {
-    const evil = mk({ topic: "الصحة", topicManual: true, articleTitle: 'عنوان <script>alert(1)</script>', articleBody: "نص & رموز <b>", createdAt: 5 });
+    const evil = mk({
+      topic: "الصحة",
+      topicManual: true,
+      articleTitle: "عنوان <script>alert(1)</script>",
+      articleBody: "نص & رموز <b>",
+      createdAt: 5,
+    });
     const out = composeDocumentHtml([evil]);
     expect(out).not.toContain("<script>alert(1)</script>");
     expect(out).toContain("&lt;script&gt;");
@@ -143,7 +188,10 @@ describe("selection helpers", () => {
 
   it("selectedIdeas keeps view order and prunes missing ids and songs", () => {
     const song = mk({ id: "s-1", song: true });
-    const out = selectedIdeas([healthNew, song, healthOld], new Set(["h-old", "s-1", "gone", "h-new"]));
+    const out = selectedIdeas(
+      [healthNew, song, healthOld],
+      new Set(["h-old", "s-1", "gone", "h-new"]),
+    );
     expect(out.map((i) => i.id)).toEqual(["h-new", "h-old"]);
   });
 });

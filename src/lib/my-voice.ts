@@ -40,7 +40,8 @@ export function isMyVoicePublic(): boolean {
  * never an error. `pub` is injectable so tests can exercise both states.
  */
 export function effectiveListenVoice(
-  choice: "default" | "mine", pub: boolean = MY_VOICE_PUBLIC,
+  choice: "default" | "mine",
+  pub: boolean = MY_VOICE_PUBLIC,
 ): "default" | "mine" {
   return pub ? choice : "default";
 }
@@ -96,19 +97,32 @@ export function getMyVoiceProfile(): MyVoiceProfile | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<MyVoiceProfile>;
     if (typeof parsed.voiceId !== "string" || !parsed.voiceId) return null;
-    return { voiceId: parsed.voiceId, createdAt: typeof parsed.createdAt === "number" ? parsed.createdAt : 0 };
-  } catch { return null; }
+    return {
+      voiceId: parsed.voiceId,
+      createdAt: typeof parsed.createdAt === "number" ? parsed.createdAt : 0,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function saveMyVoiceProfile(voiceId: string): MyVoiceProfile {
   const profile: MyVoiceProfile = { voiceId, createdAt: Date.now() };
-  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch { /* storage full/blocked: the id is lost, creation can be repeated */ }
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    /* storage full/blocked: the id is lost, creation can be repeated */
+  }
   window.dispatchEvent(new Event("afkari:settings-changed"));
   return profile;
 }
 
 export function clearMyVoiceProfile(): void {
-  try { localStorage.removeItem(PROFILE_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(PROFILE_KEY);
+  } catch {
+    /* ignore */
+  }
   window.dispatchEvent(new Event("afkari:settings-changed"));
 }
 
@@ -150,9 +164,11 @@ export function mixToMono(buffer: AudioBuffer): Float32Array {
  * Browser-only (WebAudio); the pure helpers carry the unit tests.
  */
 export async function blobToSamples24k(blob: Blob): Promise<Float32Array> {
-  const Ctor = typeof window !== "undefined"
-    ? (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
-    : undefined;
+  const Ctor =
+    typeof window !== "undefined"
+      ? (window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
+      : undefined;
   if (!Ctor) throw new Error("تحويل الصوت غير متاح على هذا الجهاز.");
   const bytes = await blob.arrayBuffer();
   const ctx = new Ctor({ sampleRate: GEMINI_TTS_SAMPLE_RATE });
@@ -172,13 +188,17 @@ export async function blobToWav24k(blob: Blob): Promise<Uint8Array> {
 }
 
 /** Seconds of audio in a mono buffer at the given sample rate. */
-export const samplesSeconds = (samples: Float32Array, rate: number = GEMINI_TTS_SAMPLE_RATE): number =>
-  samples.length / rate;
+export const samplesSeconds = (
+  samples: Float32Array,
+  rate: number = GEMINI_TTS_SAMPLE_RATE,
+): number => samples.length / rate;
 
 /** The first `seconds` of a mono buffer — longer input is cut, shorter
  * input passes through untouched (same reference). */
 export function trimSamplesToSeconds(
-  samples: Float32Array, seconds: number, rate: number = GEMINI_TTS_SAMPLE_RATE,
+  samples: Float32Array,
+  seconds: number,
+  rate: number = GEMINI_TTS_SAMPLE_RATE,
 ): Float32Array {
   const max = Math.max(0, Math.floor(seconds * rate));
   return samples.length > max ? samples.slice(0, max) : samples;
@@ -197,7 +217,11 @@ export async function prepareUploadedAudio(file: Blob, isSample: boolean): Promi
   const samples = await blobToSamples24k(file);
   const trimmed = isSample && samplesSeconds(samples) > MAX_SAMPLE_SECONDS;
   const used = trimmed ? trimSamplesToSeconds(samples, MAX_SAMPLE_SECONDS) : samples;
-  return { wav: encodeWav24k(used), seconds: Math.max(1, Math.round(samplesSeconds(used))), trimmed };
+  return {
+    wav: encodeWav24k(used),
+    seconds: Math.max(1, Math.round(samplesSeconds(used))),
+    trimmed,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -236,12 +260,18 @@ export function buildCreateVoiceRequest(sourceWavB64: string, consentWavB64: str
  */
 export function parseCreatedVoiceId(json: unknown): string | null {
   const root = json as {
-    id?: unknown; name?: unknown;
+    id?: unknown;
+    name?: unknown;
     voice?: { id?: unknown };
     replicated_voice?: { id?: unknown };
     replicatedVoice?: { id?: unknown };
   } | null;
-  const candidates = [root?.id, root?.voice?.id, root?.replicated_voice?.id, root?.replicatedVoice?.id];
+  const candidates = [
+    root?.id,
+    root?.voice?.id,
+    root?.replicated_voice?.id,
+    root?.replicatedVoice?.id,
+  ];
   for (const c of candidates) {
     if (typeof c === "string" && c.startsWith("voice_")) return c;
   }
@@ -269,7 +299,11 @@ function googleErrorReasons(details: unknown): string[] {
 /** Google's own error text, made safe to append to a user message:
  * single line, whitespace collapsed, capped at 140 characters. */
 function sanitizeGoogleErrorText(message: string): string {
-  const clean = message.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  const clean = message
+    // eslint-disable-next-line no-control-regex -- intentional: strips C0/DEL control characters from the provider's error text before display
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return clean.length > 140 ? clean.slice(0, 140) : clean;
 }
 
@@ -286,15 +320,19 @@ function sanitizeGoogleErrorText(message: string): string {
  * shared message with nothing appended.
  */
 export function voiceCreateErrorMessage(httpStatus: number, body: unknown): string {
-  const error = (body as {
-    error?: { status?: unknown; message?: unknown; details?: unknown };
-  } | null)?.error;
+  const error = (
+    body as {
+      error?: { status?: unknown; message?: unknown; details?: unknown };
+    } | null
+  )?.error;
   const status = typeof error?.status === "string" ? error.status : "";
   const message = typeof error?.message === "string" ? error.message : "";
   const reasons = googleErrorReasons(error?.details);
   if (
-    httpStatus === 429 || status === "RESOURCE_EXHAUSTED"
-    || reasons.includes("rateLimitExceeded") || reasons.includes("quotaExceeded")
+    httpStatus === 429 ||
+    status === "RESOURCE_EXHAUSTED" ||
+    reasons.includes("rateLimitExceeded") ||
+    reasons.includes("quotaExceeded")
   ) {
     return "وصلت لحد إنشاء الأصوات عند Google مؤقتًا — حاول تاني بعد ساعات أو بكرة.";
   }
@@ -317,7 +355,10 @@ export function voiceCreateErrorMessage(httpStatus: number, body: unknown): stri
  * "key invalid" line.
  */
 export async function createMyVoice(
-  key: string, sourceWav: Uint8Array, consentWav: Uint8Array, signal?: AbortSignal,
+  key: string,
+  sourceWav: Uint8Array,
+  consentWav: Uint8Array,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (!key.trim()) throw new MyVoiceError("أضف مفتاح Gemini من الإعدادات أولًا.");
   let response: Response;
@@ -326,7 +367,9 @@ export async function createMyVoice(
       method: "POST",
       ...(signal ? { signal } : {}),
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify(buildCreateVoiceRequest(bytesToBase64(sourceWav), bytesToBase64(consentWav))),
+      body: JSON.stringify(
+        buildCreateVoiceRequest(bytesToBase64(sourceWav), bytesToBase64(consentWav)),
+      ),
     });
   } catch (error) {
     if (signal?.aborted) throw error;
@@ -354,5 +397,7 @@ export async function deleteMyVoice(key: string, voiceId: string): Promise<boole
       headers: { "x-goog-api-key": key },
     });
     return response.ok;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }

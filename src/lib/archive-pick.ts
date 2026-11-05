@@ -30,7 +30,10 @@ export const archiveLastActivity = (idea: Idea): number => idea.updatedAt ?? ide
  */
 export function archivePool(ideas: Idea[], now = Date.now()): Idea[] {
   return ideas
-    .filter((i) => !i.song && !i.pinned && !i.medical && now - archiveLastActivity(i) >= ARCHIVE_MIN_AGE_MS)
+    .filter(
+      (i) =>
+        !i.song && !i.pinned && !i.medical && now - archiveLastActivity(i) >= ARCHIVE_MIN_AGE_MS,
+    )
     .sort((a, b) => archiveLastActivity(a) - archiveLastActivity(b) || a.id.localeCompare(b.id));
 }
 
@@ -71,7 +74,8 @@ export function pickArchiveIdea(ideas: Idea[], now = Date.now(), offset = 0): Id
 const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 /** A number in Arabic-Indic digits — the app's display convention for
  *  counts (shared with the stats section). */
-export const arabicNumber = (n: number): string => String(n).replace(/\d/g, (d) => AR_DIGITS.charAt(Number(d)));
+export const arabicNumber = (n: number): string =>
+  String(n).replace(/\d/g, (d) => AR_DIGITS.charAt(Number(d)));
 
 /**
  * The warm age line on the card, e.g. «منذ ٣ شهور». Months are 30-day
@@ -84,7 +88,8 @@ export function archiveAgeLabel(idea: Idea, now = Date.now()): string {
   const months = Math.floor(days / 30);
   if (months <= 1) return "منذ شهر";
   if (months === 2) return "منذ شهرين";
-  if (months < 12) return months <= 10 ? `منذ ${arabicNumber(months)} شهور` : `منذ ${arabicNumber(months)} شهرًا`;
+  if (months < 12)
+    return months <= 10 ? `منذ ${arabicNumber(months)} شهور` : `منذ ${arabicNumber(months)} شهرًا`;
   const years = Math.floor(months / 12);
   if (years === 1) return "منذ سنة";
   if (years === 2) return "منذ سنتين";
@@ -108,7 +113,9 @@ export function parseArchiveCycle(raw: string | null, now = Date.now()): number 
     if (v.day === archiveDayKey(now) && typeof v.offset === "number" && Number.isFinite(v.offset)) {
       return Math.max(0, Math.floor(v.offset));
     }
-  } catch { /* fall through to 0 */ }
+  } catch {
+    /* fall through to 0 */
+  }
   return 0;
 }
 

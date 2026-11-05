@@ -18,22 +18,54 @@ type Timers = {
 
 const defaultTimers: Timers = {
   setTimeout: (fn, ms) => setTimeout(fn, ms),
-  clearTimeout: (id) => clearTimeout(id as any),
+  clearTimeout: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
   setInterval: (fn, ms) => setInterval(fn, ms),
-  clearInterval: (id) => clearInterval(id as any),
+  clearInterval: (id) => clearInterval(id as ReturnType<typeof setInterval>),
 };
+
+/** The slice of the Web Speech recognition API this recorder relies on (vendor-prefixed as webkitSpeechRecognition on Android Chrome, so no DOM lib type covers it). */
+export type RecognitionResultLike = {
+  isFinal: boolean;
+  0: { transcript: string };
+};
+export type RecognitionResultEventLike = {
+  resultIndex: number;
+  results: ArrayLike<RecognitionResultLike>;
+};
+export type RecognitionErrorEventLike = { error?: string };
+export type RecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onaudiostart: (() => void) | null;
+  onresult: ((e: RecognitionResultEventLike) => void) | null;
+  onerror: ((e: RecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+export type SpeechRecognitionCtor = new () => RecognitionLike;
 
 export const MIC_DENIED = "اسمح للتطبيق باستخدام المايكروفون من إعدادات الهاتف.";
 export const LANG_MISSING = "نزّل اللغة العربية للتعرف على الصوت من إعدادات الهاتف.";
-export const RECOGNITION_TROUBLE = "التعرف على الصوت يتعثر، التسجيل مستمر. تأكد من تنزيل اللغة العربية للتعرف دون اتصال.";
+export const RECOGNITION_TROUBLE =
+  "التعرف على الصوت يتعثر، التسجيل مستمر. تأكد من تنزيل اللغة العربية للتعرف دون اتصال.";
 
 export function restartDelay(fails: number) {
   return Math.min(150 * 2 ** Math.max(0, fails), 3000);
 }
 
-export function createVoiceRecorder(SR: any, ev: RecorderEvents, lang = "ar-SA", timers: Timers = defaultTimers) {
+export function createVoiceRecorder(
+  SR: SpeechRecognitionCtor,
+  ev: RecorderEvents,
+  lang = "ar-SA",
+  timers: Timers = defaultTimers,
+) {
   let want = false;
-  let current: any = null;
+  let current: RecognitionLike | null = null;
   let active = false;
   let everStarted = false;
   let fails = 0;
@@ -42,17 +74,30 @@ export function createVoiceRecorder(SR: any, ev: RecorderEvents, lang = "ar-SA",
   let watchdogId: unknown = null;
   let endWaiters: Array<() => void> = [];
 
-  const flushWaiters = () => { const w = endWaiters; endWaiters = []; w.forEach((f) => f()); };
+  const flushWaiters = () => {
+    const w = endWaiters;
+    endWaiters = [];
+    w.forEach((f) => f());
+  };
 
   const schedule = (ms: number) => {
     if (!want || restartId !== null) return;
-    restartId = timers.setTimeout(() => { restartId = null; if (want && !active) open(); }, ms);
+    restartId = timers.setTimeout(() => {
+      restartId = null;
+      if (want && !active) open();
+    }, ms);
   };
 
   const finish = (msg?: string) => {
     want = false;
-    if (restartId !== null) { timers.clearTimeout(restartId); restartId = null; }
-    if (watchdogId !== null) { timers.clearInterval(watchdogId); watchdogId = null; }
+    if (restartId !== null) {
+      timers.clearTimeout(restartId);
+      restartId = null;
+    }
+    if (watchdogId !== null) {
+      timers.clearInterval(watchdogId);
+      watchdogId = null;
+    }
     if (msg) ev.onMessage(msg);
     ev.onListening(false);
   };
@@ -64,37 +109,63 @@ export function createVoiceRecorder(SR: any, ev: RecorderEvents, lang = "ar-SA",
     rec.interimResults = true;
     rec.maxAlternatives = 1;
     let interim = "";
-    const commit = (s: string) => { const t = s.trim(); if (t) ev.onText(t); };
+    const commit = (s: string) => {
+      const t = s.trim();
+      if (t) ev.onText(t);
+    };
 
-    rec.onstart = () => { everStarted = true; };
-    rec.onaudiostart = () => { everStarted = true; };
-    rec.onresult = (e: any) => {
+    rec.onstart = () => {
+      everStarted = true;
+    };
+    rec.onaudiostart = () => {
+      everStarted = true;
+    };
+    rec.onresult = (e) => {
       let finals = "";
       let pending = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
+        if (!r) continue;
         if (r.isFinal) finals += r[0].transcript + " ";
         else pending += r[0].transcript + " ";
       }
-      if (finals.trim()) { commit(finals); interim = ""; fails = 0; }
-      else interim = pending;
+      if (finals.trim()) {
+        commit(finals);
+        interim = "";
+        fails = 0;
+      } else interim = pending;
     };
-    rec.onerror = (e: any) => {
+    rec.onerror = (e) => {
       if (rec !== current) return;
       const err = e?.error;
-      if (err === "language-not-supported") { finish(LANG_MISSING); return; }
-      if ((err === "not-allowed" || err === "service-not-allowed") && !everStarted) { finish(MIC_DENIED); return; }
+      if (err === "language-not-supported") {
+        finish(LANG_MISSING);
+        return;
+      }
+      if ((err === "not-allowed" || err === "service-not-allowed") && !everStarted) {
+        finish(MIC_DENIED);
+        return;
+      }
       if (err === "no-speech" || err === "aborted") return;
       fails++;
-      if (fails >= 4 && !warned) { warned = true; ev.onMessage(RECOGNITION_TROUBLE); }
+      if (fails >= 4 && !warned) {
+        warned = true;
+        ev.onMessage(RECOGNITION_TROUBLE);
+      }
     };
     rec.onend = () => {
       if (rec !== current) return;
       // Keep words Android cut off before they became final.
-      if (interim.trim()) { commit(interim); interim = ""; }
+      if (interim.trim()) {
+        commit(interim);
+        interim = "";
+      }
       active = false;
       current = null;
-      if (!want) { flushWaiters(); return; }
+      if (!want) {
+        flushWaiters();
+        return;
+      }
       schedule(restartDelay(fails));
     };
 
@@ -111,8 +182,16 @@ export function createVoiceRecorder(SR: any, ev: RecorderEvents, lang = "ar-SA",
   };
 
   const onVisible = () => {
-    if (typeof document !== "undefined" && document.visibilityState === "visible" && want && !active) {
-      if (restartId !== null) { timers.clearTimeout(restartId); restartId = null; }
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState === "visible" &&
+      want &&
+      !active
+    ) {
+      if (restartId !== null) {
+        timers.clearTimeout(restartId);
+        restartId = null;
+      }
       open();
     }
   };
@@ -121,11 +200,15 @@ export function createVoiceRecorder(SR: any, ev: RecorderEvents, lang = "ar-SA",
     isRecording: () => want,
     start() {
       if (want) return;
-      want = true; fails = 0; warned = false;
+      want = true;
+      fails = 0;
+      warned = false;
       ev.onMessage("");
       ev.onListening(true);
       // Safety net: if Android ever ends a session without telling us, start again.
-      watchdogId = timers.setInterval(() => { if (want && !active) schedule(0); }, 4000);
+      watchdogId = timers.setInterval(() => {
+        if (want && !active) schedule(0);
+      }, 4000);
       if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
       open();
     },
@@ -133,24 +216,40 @@ export function createVoiceRecorder(SR: any, ev: RecorderEvents, lang = "ar-SA",
     stop(): Promise<void> {
       const rec = current;
       finish();
-      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      if (typeof document !== "undefined")
+        document.removeEventListener("visibilitychange", onVisible);
       if (!rec || !active) return Promise.resolve();
       return new Promise<void>((resolve) => {
         let done = false;
-        const end = () => { if (!done) { done = true; resolve(); } };
+        const end = () => {
+          if (!done) {
+            done = true;
+            resolve();
+          }
+        };
         endWaiters.push(end);
         timers.setTimeout(end, 1500);
-        try { rec.stop(); } catch { end(); }
+        try {
+          rec.stop();
+        } catch {
+          end();
+        }
       });
     },
     /** Stops and discards anything still pending. */
     cancel() {
       const rec = current;
-      current = null; active = false;
+      current = null;
+      active = false;
       finish();
-      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      if (typeof document !== "undefined")
+        document.removeEventListener("visibilitychange", onVisible);
       flushWaiters();
-      try { rec?.abort?.(); } catch { /* already closed */ }
+      try {
+        rec?.abort?.();
+      } catch {
+        /* already closed */
+      }
     },
   };
 }

@@ -25,9 +25,17 @@ const sectionText = (heading: string) =>
   screen.getByRole("heading", { name: heading }).closest("section")?.textContent ?? "";
 
 const seedIdeas = (ideas: Idea[]) => localStorage.setItem("afkari.ideas", JSON.stringify(ideas));
-const song = (patch: Partial<Idea> = {}): Idea => ({ id: "s", text: "كلمات", createdAt: 1, song: true, ...patch });
+const song = (patch: Partial<Idea> = {}): Idea => ({
+  id: "s",
+  text: "كلمات",
+  createdAt: 1,
+  song: true,
+  ...patch,
+});
 
-beforeEach(() => { localStorage.clear(); });
+beforeEach(() => {
+  localStorage.clear();
+});
 
 describe("«حالة النسخ الاحتياطي» in Settings (F-8.6)", () => {
   it("on a fresh device every gauge states its never-yet plainly", () => {

@@ -5,7 +5,18 @@ import { TASK_INSTRUCTIONS } from "./ai-prompts";
 import { getLovableAiGatewayResponseHeaders } from "./ai/run-id.ts";
 
 const inputSchema = z.object({
-  task: z.enum(["improve", "clean", "merge", "suggest", "ask", "classify", "insights", "evidence", "enrich", "facebook"]),
+  task: z.enum([
+    "improve",
+    "clean",
+    "merge",
+    "suggest",
+    "ask",
+    "classify",
+    "insights",
+    "evidence",
+    "enrich",
+    "facebook",
+  ]),
   payload: z.string().min(2).max(200000),
 });
 
@@ -19,29 +30,43 @@ export async function improveArticle(request: Request): Promise<Response> {
   let upstreamStatus = 200;
   let upstreamMessage = "تعذّر تحسين المقال الآن. مقالك الأصلي محفوظ.";
   let upstreamHeaders = new Headers();
-  const call = createResponsesCall(request,
+  const call = createResponsesCall(
+    request,
     // A merge must return the near-sum of its sources in one answer, so it gets
     // the same 65536 output budget the personal Gemini path already uses
     // (gemini.ts); other tasks keep the gateway default.
-    { baseURL: "https://ai.gateway.lovable.dev/v1", apiKey: caller.aiKey, model: "openai/gpt-6-astra", ...(parsed.data.task === "merge" ? { maxOutputTokens: 65536 } : {}) },
-    [{ role: "user", content: parsed.data.payload }], TASK_INSTRUCTIONS[parsed.data.task],
+    {
+      baseURL: "https://ai.gateway.lovable.dev/v1",
+      apiKey: caller.aiKey,
+      model: "openai/gpt-6-astra",
+      ...(parsed.data.task === "merge" ? { maxOutputTokens: 65536 } : {}),
+    },
+    [{ role: "user", content: parsed.data.payload }],
+    TASK_INSTRUCTIONS[parsed.data.task],
     async (response) => {
       upstreamHeaders = response.headers;
       upstreamStatus = response.status;
       if (response.ok) return;
-      const error = await response.clone().json().catch(() => ({}));
+      const error = await response
+        .clone()
+        .json()
+        .catch(() => ({}));
       upstreamMessage = error.message ?? error.error?.message ?? upstreamMessage;
       const type = error.type ?? error.error?.type;
       if (response.status === 403 && !NOT_PROVIDER_DENIAL.includes(type)) {
         await caller.rememberDenial(upstreamMessage);
       }
-    });
+    },
+  );
   const iterator = call.result.fullStream[Symbol.asyncIterator]();
   let first;
   try {
     first = await iterator.next();
   } catch {
-    return fail(upstreamMessage, request.signal.aborted ? 499 : upstreamStatus === 200 ? 502 : upstreamStatus);
+    return fail(
+      upstreamMessage,
+      request.signal.aborted ? 499 : upstreamStatus === 200 ? 502 : upstreamStatus,
+    );
   }
   if (upstreamStatus >= 400) {
     await iterator.return?.();
@@ -50,29 +75,50 @@ export async function improveArticle(request: Request): Promise<Response> {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const emit = (event: object) => controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
-      let text = "", failed = false;
+      const emit = (event: object) =>
+        controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      let text = "",
+        failed = false;
       try {
         let next = first;
         while (!next.done) {
           const part = next.value;
-          if (part.type === "text-delta") { text += part.text; emit({ type: "text", text: part.text }); }
-          if (part.type === "error") { failed = true; emit({ type: "error", message: upstreamMessage }); break; }
+          if (part.type === "text-delta") {
+            text += part.text;
+            emit({ type: "text", text: part.text });
+          }
+          if (part.type === "error") {
+            failed = true;
+            emit({ type: "error", message: upstreamMessage });
+            break;
+          }
           next = await iterator.next();
         }
         if (!failed) {
           const reason = await call.result.finishReason;
-          if (reason === "length") emit({ type: "error", message: "النسخة المقترحة ناقصة، لم نغير مقالك." });
-          else if (reason === "content-filter" || !text.trim()) emit({ type: "error", message: "لم تُتح خدمة الذكاء الاصطناعي تحسين هذا المقال. لم يتغير النص الأصلي." });
+          if (reason === "length")
+            emit({ type: "error", message: "النسخة المقترحة ناقصة، لم نغير مقالك." });
+          else if (reason === "content-filter" || !text.trim())
+            emit({
+              type: "error",
+              message: "لم تُتح خدمة الذكاء الاصطناعي تحسين هذا المقال. لم يتغير النص الأصلي.",
+            });
           else emit({ type: "done" });
         }
       } catch {
         if (!request.signal.aborted) emit({ type: "error", message: upstreamMessage });
-      } finally { controller.close(); }
+      } finally {
+        controller.close();
+      }
     },
-    async cancel() { await iterator.return?.(); },
+    async cancel() {
+      await iterator.return?.();
+    },
   });
-  return new Response(stream, { headers: getLovableAiGatewayResponseHeaders(upstreamHeaders, {
-    "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store, no-transform",
-  }) });
+  return new Response(stream, {
+    headers: getLovableAiGatewayResponseHeaders(upstreamHeaders, {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store, no-transform",
+    }),
+  });
 }

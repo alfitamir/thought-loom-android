@@ -1,12 +1,25 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  addVersion, capVersions, loadIdeas, mergeIdeas, mergeSourceVersions, parseVersions,
-  restoreVersion, saveArticleIdea, saveIdea, updateArticle,
-  type Idea, type IdeaVersion,
+  addVersion,
+  capVersions,
+  loadIdeas,
+  mergeIdeas,
+  mergeSourceVersions,
+  parseVersions,
+  restoreVersion,
+  saveArticleIdea,
+  saveIdea,
+  updateArticle,
+  type Idea,
+  type IdeaVersion,
 } from "./ideas";
 
-const v = (at: number, text: string, source: IdeaVersion["source"] = "improve", title?: string): IdeaVersion =>
-  ({ at, text, source, ...(title ? { title } : {}) });
+const v = (
+  at: number,
+  text: string,
+  source: IdeaVersion["source"] = "improve",
+  title?: string,
+): IdeaVersion => ({ at, text, source, ...(title ? { title } : {}) });
 
 describe("version entries", () => {
   it("stores newest first and caps at five, dropping the oldest", () => {
@@ -43,7 +56,9 @@ describe("parseVersions (untrusted data)", () => {
       { at: 100, text: "", source: "improve" },
       { at: 100, text: 42, source: "improve" },
       { at: 100, text: "مصدر مجهول", source: "bogus" },
-      null, "junk", {},
+      null,
+      "junk",
+      {},
       { at: 100, text: "السليم الوحيد", source: "restore", title: "  " },
     ];
     expect(parseVersions(raw)).toEqual([{ at: 100, text: "السليم الوحيد", source: "restore" }]);
@@ -68,10 +83,20 @@ describe("snapshots at the updateArticle write point", () => {
 
   it("an improve apply freezes the pre-replacement text and title", () => {
     const idea = seedArticle();
-    const updated = updateArticle(idea.id, "العنوان المحسّن", "النص المحسّن كاملًا", true, "improve");
+    const updated = updateArticle(
+      idea.id,
+      "العنوان المحسّن",
+      "النص المحسّن كاملًا",
+      true,
+      "improve",
+    );
     expect(updated?.articleBody).toBe("النص المحسّن كاملًا");
     expect(updated?.versions).toHaveLength(1);
-    expect(updated?.versions?.[0]).toMatchObject({ text: "النص الأول كاملًا", title: "العنوان الأول", source: "improve" });
+    expect(updated?.versions?.[0]).toMatchObject({
+      text: "النص الأول كاملًا",
+      title: "العنوان الأول",
+      source: "improve",
+    });
   });
 
   it("a clean apply (the bulk-clean path) records source 'clean'", () => {
@@ -94,7 +119,10 @@ describe("snapshots at the updateArticle write point", () => {
 
   it("the cap holds through the write path: the sixth snapshot pushes the oldest out", () => {
     const idea = seedArticle();
-    let current: Idea = { ...idea, versions: [v(50, "هـ"), v(40, "د"), v(30, "ج"), v(20, "ب"), v(10, "أ")] };
+    const current: Idea = {
+      ...idea,
+      versions: [v(50, "هـ"), v(40, "د"), v(30, "ج"), v(20, "ب"), v(10, "أ")],
+    };
     replaceAll(current);
     const updated = updateArticle(idea.id, "عنوان جديد", "نص جديد", true, "improve")!;
     expect(updated.versions).toHaveLength(5);
@@ -105,11 +133,22 @@ describe("snapshots at the updateArticle write point", () => {
 
   it("liked articles and songs never grow a history, even if a source is passed", () => {
     const liked = saveIdea("نص خارجي");
-    replaceAll({ ...loadIdeas().find((i) => i.id === liked.id)!, liked: true, articleTitle: "خارجي", articleBody: "متن خارجي" });
-    expect(updateArticle(liked.id, "خارجي", "متن خارجي آخر", true, "improve")?.versions).toBeUndefined();
+    replaceAll({
+      ...loadIdeas().find((i) => i.id === liked.id)!,
+      liked: true,
+      articleTitle: "خارجي",
+      articleBody: "متن خارجي",
+    });
+    expect(
+      updateArticle(liked.id, "خارجي", "متن خارجي آخر", true, "improve")?.versions,
+    ).toBeUndefined();
 
     const song = saveIdea("");
-    replaceAll({ ...loadIdeas().find((i) => i.id === song.id)!, song: true, articleTitle: "أغنية" });
+    replaceAll({
+      ...loadIdeas().find((i) => i.id === song.id)!,
+      song: true,
+      articleTitle: "أغنية",
+    });
     expect(updateArticle(song.id, "أغنية", "كلمات", false, "clean")?.versions).toBeUndefined();
   });
 });
@@ -126,7 +165,9 @@ describe("restoreVersion", () => {
     const idea = saveIdea("أصل");
     const withHistory: Idea = {
       ...loadIdeas().find((i) => i.id === idea.id)!,
-      articleTitle: "العنوان الحالي", articleBody: "النص الحالي", updatedAt: 500,
+      articleTitle: "العنوان الحالي",
+      articleBody: "النص الحالي",
+      updatedAt: 500,
       versions: [v(100, "النص القديم", "improve", "العنوان القديم")],
     };
     replaceAll(withHistory);
@@ -138,7 +179,11 @@ describe("restoreVersion", () => {
     const restored = restoreVersion(idea.id, 100);
     expect(restored?.articleTitle).toBe("العنوان القديم");
     expect(restored?.articleBody).toBe("النص القديم");
-    expect(restored?.versions?.[0]).toMatchObject({ text: "النص الحالي", title: "العنوان الحالي", source: "restore" });
+    expect(restored?.versions?.[0]).toMatchObject({
+      text: "النص الحالي",
+      title: "العنوان الحالي",
+      source: "restore",
+    });
     // The restored-from entry itself survives below the new snapshot.
     expect(restored?.versions?.some((e) => e.at === 100 && e.text === "النص القديم")).toBe(true);
   });
@@ -147,7 +192,9 @@ describe("restoreVersion", () => {
     const idea = saveIdea("أصل");
     replaceAll({
       ...loadIdeas().find((i) => i.id === idea.id)!,
-      articleTitle: "يبقى", articleBody: "حالي", updatedAt: 500,
+      articleTitle: "يبقى",
+      articleBody: "حالي",
+      updatedAt: 500,
       versions: [v(100, "قديم بلا عنوان", "clean")],
     });
     const restored = restoreVersion(idea.id, 100);
@@ -167,7 +214,13 @@ describe("restoreVersion", () => {
 
 describe("mergeIdeas unions version history", () => {
   const base = (versions: IdeaVersion[], updatedAt: number): Idea => ({
-    id: "1", text: "أصل", createdAt: 1, updatedAt, articleTitle: "ع", articleBody: "ب", versions,
+    id: "1",
+    text: "أصل",
+    createdAt: 1,
+    updatedAt,
+    articleTitle: "ع",
+    articleBody: "ب",
+    versions,
   });
 
   it("snapshots from BOTH editions survive, deduped by timestamp, newest first", () => {
@@ -196,8 +249,20 @@ describe("mergeSourceVersions + saveArticleIdea", () => {
   beforeEach(() => localStorage.clear());
 
   it("freezes each source's full text, labelled with its title, first source first", () => {
-    const a: Idea = { id: "a", text: "خام أ", createdAt: 1, articleTitle: "مقال أ", articleBody: "متن أ كاملًا" };
-    const b: Idea = { id: "b", text: "خام ب", createdAt: 2, articleTitle: "مقال ب", articleBody: "متن ب كاملًا" };
+    const a: Idea = {
+      id: "a",
+      text: "خام أ",
+      createdAt: 1,
+      articleTitle: "مقال أ",
+      articleBody: "متن أ كاملًا",
+    };
+    const b: Idea = {
+      id: "b",
+      text: "خام ب",
+      createdAt: 2,
+      articleTitle: "مقال ب",
+      articleBody: "متن ب كاملًا",
+    };
     const entries = mergeSourceVersions([a, b], 1000);
     expect(entries).toEqual([
       { at: 1000, text: "متن أ كاملًا", title: "مقال أ", source: "merge" },
@@ -208,13 +273,20 @@ describe("mergeSourceVersions + saveArticleIdea", () => {
   it("skips sources with no article body and caps at five", () => {
     const empty: Idea = { id: "e", text: "", createdAt: 1 };
     const many: Idea[] = Array.from({ length: 6 }, (_, i) => ({
-      id: `s${i}`, text: "خام", createdAt: i, articleTitle: `م${i}`, articleBody: `متن ${i}`,
+      id: `s${i}`,
+      text: "خام",
+      createdAt: i,
+      articleTitle: `م${i}`,
+      articleBody: `متن ${i}`,
     }));
     expect(mergeSourceVersions([empty, ...many], 100)).toHaveLength(5);
   });
 
   it("saveArticleIdea stores the frozen texts as the merged article's history", () => {
-    const entries = mergeSourceVersions([{ id: "a", text: "خام", createdAt: 1, articleTitle: "أ", articleBody: "متن أ" }], 50);
+    const entries = mergeSourceVersions(
+      [{ id: "a", text: "خام", createdAt: 1, articleTitle: "أ", articleBody: "متن أ" }],
+      50,
+    );
     const merged = saveArticleIdea("خام مدمج", "المدمج", "نص مدمج", ["a"], { versions: entries });
     expect(merged.versions).toEqual(entries);
     expect(loadIdeas().find((i) => i.id === merged.id)?.versions).toEqual(entries);

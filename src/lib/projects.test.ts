@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  clearProject, loadIdeas, mergeIdeas, projectOptions, renameProject, replaceIdeas,
-  saveIdea, setProject, updateArticle, type Idea,
+  clearProject,
+  loadIdeas,
+  mergeIdeas,
+  projectOptions,
+  renameProject,
+  replaceIdeas,
+  saveIdea,
+  setProject,
+  updateArticle,
+  type Idea,
 } from "./ideas";
 import { buildBackup, parseBackup } from "./backup";
 import { buildDriveFile, parseDriveFile } from "./drive-merge";
@@ -48,8 +56,19 @@ describe("project assignment", () => {
   });
 
   it("an edition without a project never un-files the winner; the winner keeps its own project", () => {
-    const local: Idea = { id: "1", text: "الأصل", createdAt: 1, updatedAt: 2, articleBody: "محلي", project: "كتابي" };
-    const [winner] = mergeIdeas([local], [{ id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "سحابي" }], []);
+    const local: Idea = {
+      id: "1",
+      text: "الأصل",
+      createdAt: 1,
+      updatedAt: 2,
+      articleBody: "محلي",
+      project: "كتابي",
+    };
+    const [winner] = mergeIdeas(
+      [local],
+      [{ id: "1", text: "الأصل", createdAt: 1, updatedAt: 3, articleBody: "سحابي" }],
+      [],
+    );
     expect(winner?.articleBody).toBe("سحابي");
     expect(winner?.project).toBe("كتابي");
     // Winner already filed: a different project on the losing edition does not move it.
@@ -68,12 +87,13 @@ describe("project assignment", () => {
 
 describe("project rename and dissolve (partition-scoped)", () => {
   beforeEach(() => localStorage.clear());
-  const seed = () => replaceIdeas([
-    { id: "g1", text: "أ", createdAt: 1, updatedAt: 7, project: "ملف" },
-    { id: "g2", text: "ب", createdAt: 2, updatedAt: 7, project: "ملف" },
-    { id: "m1", text: "ج", createdAt: 3, updatedAt: 7, project: "ملف", medical: true },
-    { id: "g3", text: "د", createdAt: 4, updatedAt: 7, project: "آخر" },
-  ]);
+  const seed = () =>
+    replaceIdeas([
+      { id: "g1", text: "أ", createdAt: 1, updatedAt: 7, project: "ملف" },
+      { id: "g2", text: "ب", createdAt: 2, updatedAt: 7, project: "ملف" },
+      { id: "m1", text: "ج", createdAt: 3, updatedAt: 7, project: "ملف", medical: true },
+      { id: "g3", text: "د", createdAt: 4, updatedAt: 7, project: "آخر" },
+    ]);
 
   it("renames only the members of its own partition — the same name elsewhere is untouched", () => {
     seed();
@@ -92,7 +112,9 @@ describe("project rename and dissolve (partition-scoped)", () => {
   it("renaming onto an existing name in the partition merges the two projects", () => {
     seed();
     expect(renameProject(false, "ملف", "آخر")).toBe(2);
-    expect(projectOptions(loadIdeas().filter((i) => !i.medical))).toEqual([{ project: "آخر", count: 3 }]);
+    expect(projectOptions(loadIdeas().filter((i) => !i.medical))).toEqual([
+      { project: "آخر", count: 3 },
+    ]);
   });
 
   it("rename no-ops on an empty or unchanged name", () => {
@@ -131,7 +153,11 @@ describe("project plumbing round-trips", () => {
   });
 
   it("a malformed project value in a backup is dropped, not guessed", () => {
-    const raw = JSON.stringify({ app: "afkari", version: 1, ideas: [{ id: "p1", text: "نص", createdAt: 5, project: 42 }] });
+    const raw = JSON.stringify({
+      app: "afkari",
+      version: 1,
+      ideas: [{ id: "p1", text: "نص", createdAt: 5, project: 42 }],
+    });
     const [back] = parseBackup(raw);
     expect(back).not.toHaveProperty("project");
   });
@@ -140,10 +166,38 @@ describe("project plumbing round-trips", () => {
 describe("whole-project compile content", () => {
   it("composes exactly the member set, with a liked member's attribution intact", () => {
     const members: Idea[] = [
-      { id: "1", text: "نص", createdAt: 1, articleTitle: "فصل أول", articleBody: "متن الفصل الأول", project: "كتابي", topic: "موضوع", topicManual: true },
-      { id: "2", text: "نص", createdAt: 2, articleTitle: "فصل مقتبس", articleBody: "متن مقتبس", project: "كتابي", topic: "موضوع", topicManual: true, liked: true, source: "مجلة الجراحة" },
+      {
+        id: "1",
+        text: "نص",
+        createdAt: 1,
+        articleTitle: "فصل أول",
+        articleBody: "متن الفصل الأول",
+        project: "كتابي",
+        topic: "موضوع",
+        topicManual: true,
+      },
+      {
+        id: "2",
+        text: "نص",
+        createdAt: 2,
+        articleTitle: "فصل مقتبس",
+        articleBody: "متن مقتبس",
+        project: "كتابي",
+        topic: "موضوع",
+        topicManual: true,
+        liked: true,
+        source: "مجلة الجراحة",
+      },
     ];
-    const outsider: Idea = { id: "3", text: "نص", createdAt: 3, articleTitle: "مقالة خارجية", articleBody: "ليست في المشروع", topic: "موضوع", topicManual: true };
+    const outsider: Idea = {
+      id: "3",
+      text: "نص",
+      createdAt: 3,
+      articleTitle: "مقالة خارجية",
+      articleBody: "ليست في المشروع",
+      topic: "موضوع",
+      topicManual: true,
+    };
     const doc = composeDocument(members);
     expect(doc).toContain("فصل أول");
     expect(doc).toContain("فصل مقتبس");

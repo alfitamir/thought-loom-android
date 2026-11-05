@@ -60,6 +60,8 @@ describe("App routing", () => {
     // recorder for a positive number. The route itself still matches.
     const junk = router.matchRoutes("/", { record: "abc" });
     expect(junk.at(-1)?.routeId).not.toBe(rootRouteId);
-    expect(typeof (junk.at(-1)?.search as { record?: unknown } | undefined)?.record).not.toBe("number");
+    expect(typeof (junk.at(-1)?.search as { record?: unknown } | undefined)?.record).not.toBe(
+      "number",
+    );
   });
 });

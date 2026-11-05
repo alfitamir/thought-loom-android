@@ -11,7 +11,11 @@ vi.mock("@/lib/my-voice", async (orig) => ({
   isMyVoicePublic: () => gate.public,
 }));
 // Keep the dialog render away from the cloud/drive plumbing.
-vi.mock("@/lib/sync", () => ({ syncNow: vi.fn(async () => ({ ok: true as const, restored: 0 })), lastCloudSync: () => 0, lastCloudSyncError: () => "" }));
+vi.mock("@/lib/sync", () => ({
+  syncNow: vi.fn(async () => ({ ok: true as const, restored: 0 })),
+  lastCloudSync: () => 0,
+  lastCloudSyncError: () => "",
+}));
 vi.mock("@/lib/drive-sync", () => ({
   lastDriveSync: () => 0,
   syncDrive: vi.fn(async () => ({ ok: true as const })),

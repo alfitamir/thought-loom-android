@@ -22,16 +22,31 @@ describe("merge completeness", () => {
 describe("merge suggestions", () => {
   const ideas: Idea[] = ["1", "2", "3"].map((id) => ({ id, text: "x", createdAt: 1 }));
   it("keeps only known ids, groups of two or more, and each article once", () => {
-    expect(sanitizeSuggestions([
-      { ids: ["1", "2", "9"], title: "العمل", reason: "" },
-      { ids: ["2", "3"], title: "مكرر", reason: "" },
-    ], ideas)).toEqual([{ ids: ["1", "2"], title: "العمل", reason: "" }]);
+    expect(
+      sanitizeSuggestions(
+        [
+          { ids: ["1", "2", "9"], title: "العمل", reason: "" },
+          { ids: ["2", "3"], title: "مكرر", reason: "" },
+        ],
+        ideas,
+      ),
+    ).toEqual([{ ids: ["1", "2"], title: "العمل", reason: "" }]);
   });
 });
 
 describe("backup", () => {
   it("round-trips every idea with its edited article", () => {
-    const ideas: Idea[] = [{ id: "1", text: "أصل", createdAt: 5, articleTitle: "عنوان", articleBody: "نص", updatedAt: 7, aiPolishedAt: 7 }];
+    const ideas: Idea[] = [
+      {
+        id: "1",
+        text: "أصل",
+        createdAt: 5,
+        articleTitle: "عنوان",
+        articleBody: "نص",
+        updatedAt: 7,
+        aiPolishedAt: 7,
+      },
+    ];
     expect(parseBackup(buildBackup(ideas))).toEqual(ideas);
   });
   it("rejects files that are not an afkari backup", () => {

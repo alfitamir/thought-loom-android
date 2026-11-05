@@ -27,23 +27,29 @@ const old = (id: string, title: string, over: Partial<Idea> = {}): Idea => ({
   ...over,
 });
 
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+});
 
 describe("ArchiveCard («من أرشيفك»)", () => {
   it("renders nothing when nothing is old enough", () => {
-    localStorage.setItem("afkari.ideas", JSON.stringify([
-      old("fresh", "فكرة جديدة", { createdAt: Date.now() - DAY, updatedAt: Date.now() - DAY }),
-    ]));
+    localStorage.setItem(
+      "afkari.ideas",
+      JSON.stringify([
+        old("fresh", "فكرة جديدة", { createdAt: Date.now() - DAY, updatedAt: Date.now() - DAY }),
+      ]),
+    );
     const { container } = render(<ArchiveCard />);
     expect(container.firstChild).toBeNull();
     expect(screen.queryByText("من أرشيفك")).toBeNull();
   });
 
   it("shows one old idea with its topic and age, and «واحدة تانية» cycles to the next", () => {
-    localStorage.setItem("afkari.ideas", JSON.stringify([
-      old("a", "المقال الأول"),
-      old("b", "المقال الثاني"),
-    ]));
+    localStorage.setItem(
+      "afkari.ideas",
+      JSON.stringify([old("a", "المقال الأول"), old("b", "المقال الثاني")]),
+    );
     const first = render(<ArchiveCard />);
     expect(screen.getByText("من أرشيفك")).toBeTruthy();
     const firstShown = screen.queryByText("المقال الأول") ? "المقال الأول" : "المقال الثاني";
@@ -60,9 +66,10 @@ describe("ArchiveCard («من أرشيفك»)", () => {
   });
 
   it("shows the source marker for a liked article", () => {
-    localStorage.setItem("afkari.ideas", JSON.stringify([
-      old("liked-1", "مقال أعجبني", { liked: true, source: "مدونة النور" }),
-    ]));
+    localStorage.setItem(
+      "afkari.ideas",
+      JSON.stringify([old("liked-1", "مقال أعجبني", { liked: true, source: "مدونة النور" })]),
+    );
     render(<ArchiveCard />);
     expect(screen.getByText("أعجبني")).toBeTruthy();
     expect(screen.getByText("المصدر: مدونة النور")).toBeTruthy();
@@ -87,7 +94,10 @@ describe("ArchiveCard («من أرشيفك»)", () => {
 
   it("never resurfaces an idea pending deletion", () => {
     localStorage.setItem("afkari.ideas", JSON.stringify([old("a", "المقال الأول")]));
-    localStorage.setItem("afkari.pendingDeletes", JSON.stringify([{ id: "a", deadline: Date.now() + 60_000 }]));
+    localStorage.setItem(
+      "afkari.pendingDeletes",
+      JSON.stringify([{ id: "a", deadline: Date.now() + 60_000 }]),
+    );
     const { container } = render(<ArchiveCard />);
     expect(container.firstChild).toBeNull();
   });

@@ -1,21 +1,40 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  attributionsOf, getArticle, loadIdeas, mergeAttributions, mergeIdeas, needsPolish,
-  saveArticleIdea, saveIdea, saveLikedArticle, type Idea,
+  attributionsOf,
+  getArticle,
+  loadIdeas,
+  mergeAttributions,
+  mergeIdeas,
+  needsPolish,
+  saveArticleIdea,
+  saveIdea,
+  saveLikedArticle,
+  type Idea,
 } from "./ideas";
 
 const own = (id: string, title = `مقالي ${id}`): Idea => ({
-  id, text: `نص ${id}`, createdAt: 1, updatedAt: 1, articleTitle: title, articleBody: `نص ${id}`,
+  id,
+  text: `نص ${id}`,
+  createdAt: 1,
+  updatedAt: 1,
+  articleTitle: title,
+  articleBody: `نص ${id}`,
 });
 const likedIdea = (id: string, source?: string, title = `مقال خارجي ${id}`): Idea => ({
-  ...own(id, title), liked: true, ...(source ? { source } : {}),
+  ...own(id, title),
+  liked: true,
+  ...(source ? { source } : {}),
 });
 
 describe("liked articles: intake", () => {
   beforeEach(() => localStorage.clear());
 
   it("saves the pasted article verbatim, flagged liked, with its source", () => {
-    const idea = saveLikedArticle("  عنوان خارجي ", " مجلة الفكر ", "نص المقال كما نُشر بالضبط.\n\nفقرة ثانية.");
+    const idea = saveLikedArticle(
+      "  عنوان خارجي ",
+      " مجلة الفكر ",
+      "نص المقال كما نُشر بالضبط.\n\nفقرة ثانية.",
+    );
     expect(idea).toMatchObject({ liked: true, source: "مجلة الفكر", articleTitle: "عنوان خارجي" });
     const saved = loadIdeas().find((i) => i.id === idea!.id)!;
     expect(getArticle(saved).body).toBe("نص المقال كما نُشر بالضبط.\n\nفقرة ثانية.");
@@ -73,8 +92,17 @@ describe("liked articles: attribution", () => {
 
   it("saveArticleIdea applies the merge outcome (liked flag, source, sources)", () => {
     localStorage.clear();
-    const merged = saveArticleIdea("نصان", "مدمج", "نص مدمج", ["a", "b"], { liked: true, source: "موقع أ", sources: ["موقع ب"] });
-    expect(merged).toMatchObject({ liked: true, source: "موقع أ", sources: ["موقع ب"], mergedFrom: ["a", "b"] });
+    const merged = saveArticleIdea("نصان", "مدمج", "نص مدمج", ["a", "b"], {
+      liked: true,
+      source: "موقع أ",
+      sources: ["موقع ب"],
+    });
+    expect(merged).toMatchObject({
+      liked: true,
+      source: "موقع أ",
+      sources: ["موقع ب"],
+      mergedFrom: ["a", "b"],
+    });
     expect(loadIdeas()[0]).toMatchObject({ liked: true, source: "موقع أ" });
   });
 });
@@ -82,7 +110,14 @@ describe("liked articles: attribution", () => {
 describe("liked articles: cross-device merge adoption", () => {
   it("an edition without the flag does not un-like the winner; source and sources survive and union", () => {
     const local: Idea = { ...likedIdea("x", "مصدر محلي"), updatedAt: 3, sources: ["واحد"] };
-    const remote: Idea = { id: "x", text: "نص أحدث", createdAt: 1, updatedAt: 5, articleBody: "أحدث", sources: ["اثنان"] };
+    const remote: Idea = {
+      id: "x",
+      text: "نص أحدث",
+      createdAt: 1,
+      updatedAt: 5,
+      articleBody: "أحدث",
+      sources: ["اثنان"],
+    };
     const [winner] = mergeIdeas([local], [remote], []);
     expect(winner).toMatchObject({ liked: true, source: "مصدر محلي", articleBody: "أحدث" });
     expect(winner?.sources).toEqual(expect.arrayContaining(["واحد", "اثنان"]));

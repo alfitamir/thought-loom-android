@@ -69,7 +69,18 @@ function sentencesOf(body: string): string[] {
   return out;
 }
 
-const QUESTION_STARTERS = ["هل", "متى", "لماذا", "كيف", "ماذا", "أيّ", "أي", "أين", "من هو", "من هي"];
+const QUESTION_STARTERS = [
+  "هل",
+  "متى",
+  "لماذا",
+  "كيف",
+  "ماذا",
+  "أيّ",
+  "أي",
+  "أين",
+  "من هو",
+  "من هي",
+];
 
 function startsWithQuestionWord(t: string): boolean {
   return QUESTION_STARTERS.some((w) => t === w || t.startsWith(`${w} `) || t.startsWith(`${w}؟`));

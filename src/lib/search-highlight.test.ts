@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { countOccurrences, splitByQuery } from "./search-highlight";
 
-const joined = (text: string, query: string) => splitByQuery(text, query).map((s) => s.text).join("");
-const matched = (text: string, query: string) => splitByQuery(text, query).filter((s) => s.match).map((s) => s.text);
+const joined = (text: string, query: string) =>
+  splitByQuery(text, query)
+    .map((s) => s.text)
+    .join("");
+const matched = (text: string, query: string) =>
+  splitByQuery(text, query)
+    .filter((s) => s.match)
+    .map((s) => s.text);
 
 describe("splitByQuery", () => {
   it("returns one non-match segment when there is no query", () => {
@@ -15,7 +21,9 @@ describe("splitByQuery", () => {
   });
 
   it("returns one non-match segment when nothing matches", () => {
-    expect(splitByQuery("مرحبا بالعالم", "غائب")).toEqual([{ text: "مرحبا بالعالم", match: false }]);
+    expect(splitByQuery("مرحبا بالعالم", "غائب")).toEqual([
+      { text: "مرحبا بالعالم", match: false },
+    ]);
   });
 
   it("wraps every occurrence and preserves the original text", () => {

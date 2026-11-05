@@ -8,7 +8,9 @@ import { fingerprint, saveSuggestionCache } from "@/lib/merge";
 // explicit «قبول رغم النقص» (which keeps the originals); after two failed AI
 // attempts the lossless manual concatenation is offered and completes.
 vi.mock("@/lib/sync", () => ({ pushIdea: vi.fn(async () => {}) }));
-vi.mock("@/lib/ai-engine", () => ({ resolveEngine: vi.fn(async () => ({ kind: "cloud", token: "T" })) }));
+vi.mock("@/lib/ai-engine", () => ({
+  resolveEngine: vi.fn(async () => ({ kind: "cloud", token: "T" })),
+}));
 vi.mock("@/lib/gemini", () => ({ getGeminiKey: () => "test-key" }));
 vi.mock("@/lib/article-audio", () => ({ deleteSongAudio: vi.fn(async () => {}) }));
 vi.mock("@/lib/song-drive", () => ({ deleteSongDriveCopy: vi.fn(async () => {}) }));
@@ -23,18 +25,35 @@ import { runAi } from "@/lib/article-ai";
 
 const runAiMock = vi.mocked(runAi);
 
-const bodyA = "الدولة القوية تبني مؤسسات عادلة تحفظ للناس حقوقهم وكرامتهم دائمًا. والمجتمع الواعي يراقب الأداء العام ويحاسب المقصرين بلا تردد.";
-const bodyB = "المقاومة فكرة تبدأ من رفض الظلم وتنتهي ببناء الإنسان الحر القادر. والأمة التي تنسى تاريخها تفقد بوصلتها نحو المستقبل القريب.";
-const ideaA: Idea = { id: "a", text: bodyA, createdAt: 1, updatedAt: 10, articleTitle: "مقال الدولة", articleBody: bodyA };
-const ideaB: Idea = { id: "b", text: bodyB, createdAt: 2, updatedAt: 10, articleTitle: "مقال المقاومة", articleBody: bodyB };
+const bodyA =
+  "الدولة القوية تبني مؤسسات عادلة تحفظ للناس حقوقهم وكرامتهم دائمًا. والمجتمع الواعي يراقب الأداء العام ويحاسب المقصرين بلا تردد.";
+const bodyB =
+  "المقاومة فكرة تبدأ من رفض الظلم وتنتهي ببناء الإنسان الحر القادر. والأمة التي تنسى تاريخها تفقد بوصلتها نحو المستقبل القريب.";
+const ideaA: Idea = {
+  id: "a",
+  text: bodyA,
+  createdAt: 1,
+  updatedAt: 10,
+  articleTitle: "مقال الدولة",
+  articleBody: bodyA,
+};
+const ideaB: Idea = {
+  id: "b",
+  text: bodyB,
+  createdAt: 2,
+  updatedAt: 10,
+  articleTitle: "مقال المقاومة",
+  articleBody: bodyB,
+};
 const ideas = [ideaA, ideaB];
 
-const scriptMerge = (text: string) =>
-  runAiMock.mockImplementation(async () => text);
+const scriptMerge = (text: string) => runAiMock.mockImplementation(async () => text);
 
 function openDialog(onChange = vi.fn()) {
   localStorage.setItem("afkari.ideas", JSON.stringify(ideas));
-  saveSuggestionCache(fingerprint(ideas), [{ ids: ["a", "b"], title: "مقال مدمج", reason: "تشابه" }]);
+  saveSuggestionCache(fingerprint(ideas), [
+    { ids: ["a", "b"], title: "مقال مدمج", reason: "تشابه" },
+  ]);
   render(<MergeBanner ideas={ideas} online onChange={onChange} />);
   fireEvent.click(screen.getByText(/نقترح دمج/));
   return onChange;
@@ -50,7 +69,9 @@ describe("MergeDialog completeness states", () => {
     scriptMerge(`مدمج\n\n${bodyA}`);
     openDialog();
     expect(await screen.findByText(/الأسطر غير الموجودة في النسخة المقترحة \(2\)/)).toBeTruthy();
-    expect(screen.getByText("المقاومة فكرة تبدأ من رفض الظلم وتنتهي ببناء الإنسان الحر القادر.")).toBeTruthy();
+    expect(
+      screen.getByText("المقاومة فكرة تبدأ من رفض الظلم وتنتهي ببناء الإنسان الحر القادر."),
+    ).toBeTruthy();
     expect(screen.getByText("قبول رغم النقص")).toBeTruthy();
     // The normal one-tap approvals must NOT be reachable in this state.
     expect(screen.queryByText("اعتماد وحذف الأصول")).toBeNull();

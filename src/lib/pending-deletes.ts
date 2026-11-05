@@ -27,15 +27,23 @@ export const loadPendingDeletes = (): PendingDelete[] => {
   try {
     const list = JSON.parse(localStorage.getItem(KEY) || "[]") as unknown;
     if (!Array.isArray(list)) return [];
-    return list.filter((e): e is PendingDelete =>
-      !!e && typeof e === "object" && typeof (e as PendingDelete).id === "string" && typeof (e as PendingDelete).deadline === "number");
-  } catch { return []; }
+    return list.filter(
+      (e): e is PendingDelete =>
+        !!e &&
+        typeof e === "object" &&
+        typeof (e as PendingDelete).id === "string" &&
+        typeof (e as PendingDelete).deadline === "number",
+    );
+  } catch {
+    return [];
+  }
 };
 const writePendingDeletes = (list: PendingDelete[]) =>
   localStorage.setItem(KEY, JSON.stringify(list));
 
 export const pendingDeleteIds = (): Set<string> => new Set(loadPendingDeletes().map((e) => e.id));
-export const isPendingDelete = (id: string): boolean => loadPendingDeletes().some((e) => e.id === id);
+export const isPendingDelete = (id: string): boolean =>
+  loadPendingDeletes().some((e) => e.id === id);
 
 /** Every idea except the ones pending deletion — what all surfaces read. */
 export const loadVisibleIdeas = (): Idea[] => {

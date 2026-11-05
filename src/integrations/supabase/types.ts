@@ -1,268 +1,256 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.18"
-  }
+    PostgrestVersion: "14.18";
+  };
   public: {
     Tables: {
       ai_access_state: {
         Row: {
-          blocked_at: string
-          message: string
-          status: number
-          user_id: string
-        }
+          blocked_at: string;
+          message: string;
+          status: number;
+          user_id: string;
+        };
         Insert: {
-          blocked_at?: string
-          message: string
-          status: number
-          user_id: string
-        }
+          blocked_at?: string;
+          message: string;
+          status: number;
+          user_id: string;
+        };
         Update: {
-          blocked_at?: string
-          message?: string
-          status?: number
-          user_id?: string
-        }
-        Relationships: []
-      }
+          blocked_at?: string;
+          message?: string;
+          status?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       idea_deletions: {
         Row: {
-          deleted_at: string
-          idea_id: string
-          user_id: string
-        }
+          deleted_at: string;
+          idea_id: string;
+          user_id: string;
+        };
         Insert: {
-          deleted_at?: string
-          idea_id: string
-          user_id: string
-        }
+          deleted_at?: string;
+          idea_id: string;
+          user_id: string;
+        };
         Update: {
-          deleted_at?: string
-          idea_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
+          deleted_at?: string;
+          idea_id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       ideas: {
         Row: {
-          ai_polished_at: number | null
-          article_body: string | null
-          article_title: string | null
-          created_at: number
-          drive_file_id: string | null
-          id: string
-          liked: boolean
-          medical: boolean
-          merged_from: string[] | null
-          pinned: boolean
-          project: string | null
-          song: boolean
-          song_duration: number | null
-          source: string | null
-          sources: string[] | null
-          synced_at: string
-          text: string
-          topic: string | null
-          topic_manual: boolean
-          updated_at: number
-          user_id: string
-          versions: Json | null
-        }
+          ai_polished_at: number | null;
+          article_body: string | null;
+          article_title: string | null;
+          created_at: number;
+          drive_file_id: string | null;
+          id: string;
+          liked: boolean;
+          medical: boolean;
+          merged_from: string[] | null;
+          pinned: boolean;
+          project: string | null;
+          song: boolean;
+          song_duration: number | null;
+          source: string | null;
+          sources: string[] | null;
+          synced_at: string;
+          text: string;
+          topic: string | null;
+          topic_manual: boolean;
+          updated_at: number;
+          user_id: string;
+          versions: Json | null;
+        };
         Insert: {
-          ai_polished_at?: number | null
-          article_body?: string | null
-          article_title?: string | null
-          created_at?: number
-          drive_file_id?: string | null
-          id: string
-          liked?: boolean
-          medical?: boolean
-          merged_from?: string[] | null
-          pinned?: boolean
-          project?: string | null
-          song?: boolean
-          song_duration?: number | null
-          source?: string | null
-          sources?: string[] | null
-          synced_at?: string
-          text: string
-          topic?: string | null
-          topic_manual?: boolean
-          updated_at?: number
-          user_id: string
-          versions?: Json | null
-        }
+          ai_polished_at?: number | null;
+          article_body?: string | null;
+          article_title?: string | null;
+          created_at?: number;
+          drive_file_id?: string | null;
+          id: string;
+          liked?: boolean;
+          medical?: boolean;
+          merged_from?: string[] | null;
+          pinned?: boolean;
+          project?: string | null;
+          song?: boolean;
+          song_duration?: number | null;
+          source?: string | null;
+          sources?: string[] | null;
+          synced_at?: string;
+          text: string;
+          topic?: string | null;
+          topic_manual?: boolean;
+          updated_at?: number;
+          user_id: string;
+          versions?: Json | null;
+        };
         Update: {
-          ai_polished_at?: number | null
-          article_body?: string | null
-          article_title?: string | null
-          created_at?: number
-          drive_file_id?: string | null
-          id?: string
-          liked?: boolean
-          medical?: boolean
-          merged_from?: string[] | null
-          pinned?: boolean
-          project?: string | null
-          song?: boolean
-          song_duration?: number | null
-          source?: string | null
-          sources?: string[] | null
-          synced_at?: string
-          text?: string
-          topic?: string | null
-          topic_manual?: boolean
-          updated_at?: number
-          user_id?: string
-          versions?: Json | null
-        }
-        Relationships: []
-      }
-    }
+          ai_polished_at?: number | null;
+          article_body?: string | null;
+          article_title?: string | null;
+          created_at?: number;
+          drive_file_id?: string | null;
+          id?: string;
+          liked?: boolean;
+          medical?: boolean;
+          merged_from?: string[] | null;
+          pinned?: boolean;
+          project?: string | null;
+          song?: boolean;
+          song_duration?: number | null;
+          source?: string | null;
+          sources?: string[] | null;
+          synced_at?: string;
+          text?: string;
+          topic?: string | null;
+          topic_manual?: boolean;
+          updated_at?: number;
+          user_id?: string;
+          versions?: Json | null;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Enums: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   public: {
     Enums: {},
   },
-} as const
+} as const;

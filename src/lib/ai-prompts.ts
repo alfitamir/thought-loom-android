@@ -80,7 +80,17 @@ export const TRANSCRIBE_INSTRUCTIONS = `فرّغ التسجيل الصوتي ا�
 
 export const SONG_TRANSCRIBE_INSTRUCTIONS = `هذا التسجيل أغنية عربية يغنّيها صاحبها بصوته (قد تكون بالفصحى أو بلهجة عربية). فرّغ الكلمات المغناة فقط، كما غُنّيت تمامًا وبكلماتها ولهجتها، سطرًا واحدًا لكل عبارة مغناة. لا تلخص ولا تحذف ولا تضف ولا تعلق، ولا تكتب أي وصف للموسيقى أو الأداء أو توجيهات مسرحية، ولا تخترع علامات ترقيم إلا ما يعين على القراءة. إن لم يكن في التسجيل غناء مفهوم فأخرج الكلمة: [صمت]. أخرج الكلمات فقط.`;
 
-export type AiTask = "improve" | "clean" | "merge" | "suggest" | "ask" | "classify" | "insights" | "evidence" | "enrich" | "facebook";
+export type AiTask =
+  | "improve"
+  | "clean"
+  | "merge"
+  | "suggest"
+  | "ask"
+  | "classify"
+  | "insights"
+  | "evidence"
+  | "enrich"
+  | "facebook";
 // TASK_INSTRUCTIONS is assembled at the end of this file, after the ported Afkari sections define their instructions.
 
 export const SILENCE = "[صمت]";
@@ -103,7 +113,14 @@ export const ASK_SCHEMA = {
   type: "OBJECT",
   properties: {
     answer: { type: "STRING" },
-    sources: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" }, note: { type: "STRING" } }, required: ["id", "note"] } },
+    sources: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { id: { type: "STRING" }, note: { type: "STRING" } },
+        required: ["id", "note"],
+      },
+    },
   },
   required: ["answer", "sources"],
 };
@@ -111,11 +128,13 @@ export const ASK_SCHEMA = {
 export function sanitizeAsk(raw: unknown, known: Set<string>): AskAnswer {
   const r = (raw ?? {}) as { answer?: unknown; sources?: unknown };
   const seen = new Set<string>();
-  const sources = (Array.isArray(r.sources) ? r.sources : []).flatMap((s: any) => {
-    if (!s || typeof s.id !== "string" || !known.has(s.id) || seen.has(s.id)) return [];
-    seen.add(s.id);
-    return [{ id: s.id, note: String(s.note ?? "").trim() }];
-  });
+  const sources = (Array.isArray(r.sources) ? r.sources : []).flatMap(
+    (s: { id?: unknown; note?: unknown } | null) => {
+      if (!s || typeof s.id !== "string" || !known.has(s.id) || seen.has(s.id)) return [];
+      seen.add(s.id);
+      return [{ id: s.id, note: String(s.note ?? "").trim() }];
+    },
+  );
   const answer = typeof r.answer === "string" ? r.answer.trim() : "";
   if (!answer) throw new Error("لم يصل جواب من Gemini. حاول مرة أخرى.");
   return { answer, sources };
@@ -134,21 +153,37 @@ export const CLASSIFY_SCHEMA = {
   type: "ARRAY",
   items: {
     type: "OBJECT",
-    properties: { id: { type: "STRING" }, topic: { type: "STRING" }, tags: { type: "ARRAY", items: { type: "STRING" } } },
+    properties: {
+      id: { type: "STRING" },
+      topic: { type: "STRING" },
+      tags: { type: "ARRAY", items: { type: "STRING" } },
+    },
     required: ["id", "topic", "tags"],
   },
 };
 
 /** Unknown ids are dropped; an unknown topic falls back to `fallback(id)` so a bad label never hides an article. */
-export function sanitizeLabels(raw: unknown, ids: string[], fallback: (id: string) => string): Record<string, Label> {
+export function sanitizeLabels(
+  raw: unknown,
+  ids: string[],
+  fallback: (id: string) => string,
+): Record<string, Label> {
   const known = new Set(ids);
   const out: Record<string, Label> = {};
   for (const item of Array.isArray(raw) ? raw : []) {
     if (!item || typeof item.id !== "string" || !known.has(item.id) || out[item.id]) continue;
     const topic = TOPIC_LIST.includes(item.topic) ? item.topic : fallback(item.id);
-    const tags = [...new Set((Array.isArray(item.tags) ? item.tags : [])
-      .map((t: unknown) => String(t ?? "").replace(/^#+/, "").trim())
-      .filter((t: string) => t.length > 0 && t.length <= 30))].slice(0, 4) as string[];
+    const tags = [
+      ...new Set(
+        (Array.isArray(item.tags) ? item.tags : [])
+          .map((t: unknown) =>
+            String(t ?? "")
+              .replace(/^#+/, "")
+              .trim(),
+          )
+          .filter((t: string) => t.length > 0 && t.length <= 30),
+      ),
+    ].slice(0, 4) as string[];
     out[item.id] = { topic, tags };
   }
   return out;
@@ -169,8 +204,26 @@ export const INSIGHTS_INSTRUCTIONS = `أنت محرر فكري يقرأ مجمل
 export const INSIGHTS_SCHEMA = {
   type: "OBJECT",
   properties: {
-    themes: { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, summary: { type: "STRING" }, ids: { type: "ARRAY", items: { type: "STRING" } } }, required: ["name", "summary", "ids"] } },
-    prompts: { type: "ARRAY", items: { type: "OBJECT", properties: { title: { type: "STRING" }, angle: { type: "STRING" } }, required: ["title", "angle"] } },
+    themes: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING" },
+          summary: { type: "STRING" },
+          ids: { type: "ARRAY", items: { type: "STRING" } },
+        },
+        required: ["name", "summary", "ids"],
+      },
+    },
+    prompts: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { title: { type: "STRING" }, angle: { type: "STRING" } },
+        required: ["title", "angle"],
+      },
+    },
   },
   required: ["themes", "prompts"],
 };
@@ -178,16 +231,29 @@ export const INSIGHTS_SCHEMA = {
 export function sanitizeInsights(raw: unknown, ids: string[]): Insights {
   const known = new Set(ids);
   const r = (raw ?? {}) as { themes?: unknown; prompts?: unknown };
-  const themes = (Array.isArray(r.themes) ? r.themes : []).flatMap((t: any) => {
-    const tid = [...new Set((Array.isArray(t?.ids) ? t.ids : []).filter((id: unknown): id is string => typeof id === "string" && known.has(id)))] as string[];
-    const name = String(t?.name ?? "").trim();
-    return name && tid.length >= 2 ? [{ name, summary: String(t?.summary ?? "").trim(), ids: tid }] : [];
-  });
-  const prompts = (Array.isArray(r.prompts) ? r.prompts : []).flatMap((p: any) => {
-    const title = String(p?.title ?? "").trim();
-    return title ? [{ title, angle: String(p?.angle ?? "").trim() }] : [];
-  });
-  if (!themes.length && !prompts.length) throw new Error("لم تتوفر رؤى كافية بعد. أضف مقالات أكثر وحاول مجددًا.");
+  const themes = (Array.isArray(r.themes) ? r.themes : []).flatMap(
+    (t: { ids?: unknown; name?: unknown; summary?: unknown } | null) => {
+      const tid = [
+        ...new Set(
+          (Array.isArray(t?.ids) ? t.ids : []).filter(
+            (id: unknown): id is string => typeof id === "string" && known.has(id),
+          ),
+        ),
+      ] as string[];
+      const name = String(t?.name ?? "").trim();
+      return name && tid.length >= 2
+        ? [{ name, summary: String(t?.summary ?? "").trim(), ids: tid }]
+        : [];
+    },
+  );
+  const prompts = (Array.isArray(r.prompts) ? r.prompts : []).flatMap(
+    (p: { title?: unknown; angle?: unknown } | null) => {
+      const title = String(p?.title ?? "").trim();
+      return title ? [{ title, angle: String(p?.angle ?? "").trim() }] : [];
+    },
+  );
+  if (!themes.length && !prompts.length)
+    throw new Error("لم تتوفر رؤى كافية بعد. أضف مقالات أكثر وحاول مجددًا.");
   return { themes, prompts };
 }
 
@@ -206,9 +272,32 @@ export const HADITH_COLLECTIONS = {
 export type HadithCollection = keyof typeof HADITH_COLLECTIONS;
 
 export type EvidenceCandidate =
-  | { kind: "quran"; surah: number; from: number; to: number; opening: string; claim: string; why: string }
-  | { kind: "hadith"; collection: HadithCollection; number: number; opening: string; claim: string; why: string }
-  | { kind: "writing"; author: string; work: string; idea: string; claim: string; why: string; confidence: "high" | "medium" };
+  | {
+      kind: "quran";
+      surah: number;
+      from: number;
+      to: number;
+      opening: string;
+      claim: string;
+      why: string;
+    }
+  | {
+      kind: "hadith";
+      collection: HadithCollection;
+      number: number;
+      opening: string;
+      claim: string;
+      why: string;
+    }
+  | {
+      kind: "writing";
+      author: string;
+      work: string;
+      idea: string;
+      claim: string;
+      why: string;
+      confidence: "high" | "medium";
+    };
 
 export const EVIDENCE_INSTRUCTIONS = `أنت باحث شرعي وفكري أمين يساعد كاتبًا عربيًا على تدعيم أطروحات مقاله بالشواهد. اقرأ المقال واستخرج أهم دعاواه، ثم اقترح لها شواهد من ثلاثة أنواع. دقتك أهم من كثرة الشواهد: شاهد واحد صحيح أفضل من خمسة مشكوك فيها، وإن لم تكن متأكدًا فاترك الشاهد.
 
@@ -225,47 +314,80 @@ export const EVIDENCE_SCHEMA = {
     type: "OBJECT",
     properties: {
       kind: { type: "STRING", enum: ["quran", "hadith", "writing"] },
-      surah: { type: "INTEGER" }, from: { type: "INTEGER" }, to: { type: "INTEGER" },
-      collection: { type: "STRING" }, number: { type: "INTEGER" }, opening: { type: "STRING" },
-      author: { type: "STRING" }, work: { type: "STRING" }, idea: { type: "STRING" }, confidence: { type: "STRING" },
-      claim: { type: "STRING" }, why: { type: "STRING" },
+      surah: { type: "INTEGER" },
+      from: { type: "INTEGER" },
+      to: { type: "INTEGER" },
+      collection: { type: "STRING" },
+      number: { type: "INTEGER" },
+      opening: { type: "STRING" },
+      author: { type: "STRING" },
+      work: { type: "STRING" },
+      idea: { type: "STRING" },
+      confidence: { type: "STRING" },
+      claim: { type: "STRING" },
+      why: { type: "STRING" },
     },
     required: ["kind", "claim", "why"],
   },
 };
 
-const text = (v: unknown, max = 400) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+const text = (v: unknown, max = 400) =>
+  String(v ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
 const int = (v: unknown) => (Number.isInteger(Number(v)) ? Number(v) : NaN);
 
 /** Structural validation only: anything that cannot even be looked up is dropped before any network call. */
 export function sanitizeEvidence(raw: unknown): EvidenceCandidate[] {
   const out: EvidenceCandidate[] = [];
   const seen = new Set<string>();
-  for (const r of (Array.isArray(raw) ? raw : []) as Record<string, any>[]) {
+  for (const r of (Array.isArray(raw) ? raw : []) as Record<string, unknown>[]) {
     if (!r || out.length >= 8) continue;
-    const claim = text(r["claim"]), why = text(r["why"]);
+    const claim = text(r["claim"]),
+      why = text(r["why"]);
     let c: EvidenceCandidate | null = null;
     if (r["kind"] === "quran") {
-      const surah = int(r["surah"]), from = int(r["from"]), to = int(r["to"]) || from;
+      const surah = int(r["surah"]),
+        from = int(r["from"]),
+        to = int(r["to"]) || from;
       const opening = text(r["opening"], 120);
-      if (surah >= 1 && surah <= 114 && from >= 1 && to >= from && to - from <= 4 && opening.split(" ").length >= 2) {
+      if (
+        surah >= 1 &&
+        surah <= 114 &&
+        from >= 1 &&
+        to >= from &&
+        to - from <= 4 &&
+        opening.split(" ").length >= 2
+      ) {
         c = { kind: "quran", surah, from, to, opening, claim, why };
       }
     } else if (r["kind"] === "hadith") {
       const collection = text(r["collection"], 20).toLowerCase() as HadithCollection;
-      const number = int(r["number"]), opening = text(r["opening"], 160);
+      const number = int(r["number"]),
+        opening = text(r["opening"], 160);
       if (collection in HADITH_COLLECTIONS && number >= 1 && opening.split(" ").length >= 3) {
         c = { kind: "hadith", collection, number, opening, claim, why };
       }
     } else if (r["kind"] === "writing") {
-      const author = text(r["author"], 80), work = text(r["work"], 120), idea = text(r["idea"], 500);
-      const confidence = r["confidence"] === "high" ? "high" : r["confidence"] === "medium" ? "medium" : null;
-      if (author && work && idea && confidence) c = { kind: "writing", author, work, idea, claim, why, confidence };
+      const author = text(r["author"], 80),
+        work = text(r["work"], 120),
+        idea = text(r["idea"], 500);
+      const confidence =
+        r["confidence"] === "high" ? "high" : r["confidence"] === "medium" ? "medium" : null;
+      if (author && work && idea && confidence)
+        c = { kind: "writing", author, work, idea, claim, why, confidence };
     }
     if (!c) continue;
-    const key = c.kind === "quran" ? `q${c.surah}:${c.from}-${c.to}` : c.kind === "hadith" ? `h${c.collection}${c.number}` : `w${c.author}|${c.work}`;
+    const key =
+      c.kind === "quran"
+        ? `q${c.surah}:${c.from}-${c.to}`
+        : c.kind === "hadith"
+          ? `h${c.collection}${c.number}`
+          : `w${c.author}|${c.work}`;
     if (seen.has(key)) continue;
-    seen.add(key); out.push(c);
+    seen.add(key);
+    out.push(c);
   }
   return out;
 }
@@ -287,16 +409,20 @@ const stringList = (v: unknown, maxItems: number, maxChars: number): string[] =>
 /** Model output is never trusted: keep only well-shaped, bounded strings; anything else becomes empty arrays. */
 export function sanitizeAdditions(raw: unknown): ArticleAdditions {
   const r = (raw ?? {}) as { additions?: unknown; quotes?: unknown; questions?: unknown };
-  const quotes = (Array.isArray(r.quotes) ? r.quotes : []).flatMap((q: any) => {
-    if (!q || typeof q !== "object") return [];
-    const quote = typeof q.quote === "string" ? q.quote.trim().slice(0, 500) : "";
-    if (!quote) return [];
-    return [{
-      quote,
-      author: typeof q.author === "string" ? q.author.trim().slice(0, 100) : "",
-      context: typeof q.context === "string" ? q.context.trim().slice(0, 300) : "",
-    }];
-  }).slice(0, 8);
+  const quotes = (Array.isArray(r.quotes) ? r.quotes : [])
+    .flatMap((q: { quote?: unknown; author?: unknown; context?: unknown } | null) => {
+      if (!q || typeof q !== "object") return [];
+      const quote = typeof q.quote === "string" ? q.quote.trim().slice(0, 500) : "";
+      if (!quote) return [];
+      return [
+        {
+          quote,
+          author: typeof q.author === "string" ? q.author.trim().slice(0, 100) : "",
+          context: typeof q.context === "string" ? q.context.trim().slice(0, 300) : "",
+        },
+      ];
+    })
+    .slice(0, 8);
   return {
     additions: stringList(r.additions, 10, 500),
     quotes,
@@ -377,8 +503,17 @@ export function sanitizeFacebookPost(raw: unknown): string {
   const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   let post = typeof r["post"] === "string" ? (r["post"] as string) : "";
   post = post.trim();
-  post = post.replace(/^```(?:json|text|markdown|md)?\s*/i, "").replace(/\s*```$/, "").trim();
-  const wraps: [string, string][] = [['"', '"'], ["'", "'"], ["«", "»"], ["“", "”"], ["„", "“"]];
+  post = post
+    .replace(/^```(?:json|text|markdown|md)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  const wraps: [string, string][] = [
+    ['"', '"'],
+    ["'", "'"],
+    ["«", "»"],
+    ["“", "”"],
+    ["„", "“"],
+  ];
   for (const [open, close] of wraps) {
     if (post.length > open.length + close.length && post.startsWith(open) && post.endsWith(close)) {
       post = post.slice(open.length, post.length - close.length).trim();
@@ -413,7 +548,10 @@ export const MERGE_SUGGEST_SCHEMA = {
     type: "OBJECT",
     properties: {
       ids: { type: "ARRAY", items: { type: "STRING" } },
-      title: { type: "STRING" }, thesis: { type: "STRING" }, reason: { type: "STRING" }, strength: { type: "INTEGER" },
+      title: { type: "STRING" },
+      thesis: { type: "STRING" },
+      reason: { type: "STRING" },
+      strength: { type: "INTEGER" },
     },
     required: ["ids", "title", "thesis", "reason", "strength"],
   },
@@ -426,8 +564,14 @@ export const MERGE_SUGGEST_SCHEMA = {
 // button, limited to removing dictation noise and fixing spelling/punctuation —
 // the author's wording, order and style must pass through untouched.
 export const TASK_INSTRUCTIONS: Record<AiTask, string> = {
-  improve: withVoice(IMPROVE_INSTRUCTIONS), clean: CLEAN_INSTRUCTIONS, merge: withVoice(MERGE_INSTRUCTIONS), suggest: SUGGEST_INSTRUCTIONS,
-  ask: withVoice(ASK_INSTRUCTIONS), classify: withVoice(CLASSIFY_INSTRUCTIONS), insights: withVoice(INSIGHTS_INSTRUCTIONS), evidence: EVIDENCE_INSTRUCTIONS,
+  improve: withVoice(IMPROVE_INSTRUCTIONS),
+  clean: CLEAN_INSTRUCTIONS,
+  merge: withVoice(MERGE_INSTRUCTIONS),
+  suggest: SUGGEST_INSTRUCTIONS,
+  ask: withVoice(ASK_INSTRUCTIONS),
+  classify: withVoice(CLASSIFY_INSTRUCTIONS),
+  insights: withVoice(INSIGHTS_INSTRUCTIONS),
+  evidence: EVIDENCE_INSTRUCTIONS,
   enrich: withVoice(ENRICH_INSTRUCTIONS),
   facebook: withVoice(FACEBOOK_INSTRUCTIONS),
 };

@@ -14,8 +14,14 @@
 //   shareable until replaced.
 
 import {
-  CURRENT_TTS_VOICE_KEY, GEMINI_TTS_MODELS, GEMINI_TTS_SAMPLE_RATE, modelForVoiceKey, toSpeechText,
-  ttsVoiceKey, voicePartOfKey, type TtsEngine,
+  CURRENT_TTS_VOICE_KEY,
+  GEMINI_TTS_MODELS,
+  GEMINI_TTS_SAMPLE_RATE,
+  modelForVoiceKey,
+  toSpeechText,
+  ttsVoiceKey,
+  voicePartOfKey,
+  type TtsEngine,
 } from "./tts";
 
 export type ArticleAudioRecord = {
@@ -71,7 +77,8 @@ export const PCM_CHUNK_MIME = "audio/L16";
 export const chunkKey = (baseKey: string, index: number): string => `${baseKey}#${index}`;
 
 export const isChunkedManifest = (rec: StoredAudioRecord): rec is ChunkedAudioManifest =>
-  (rec as ChunkedAudioManifest).version === 2 && (rec as ChunkedAudioManifest).format === "pcm-chunks";
+  (rec as ChunkedAudioManifest).version === 2 &&
+  (rec as ChunkedAudioManifest).format === "pcm-chunks";
 
 export const isAudioChunk = (rec: StoredAudioRecord): rec is AudioChunkRecord =>
   typeof (rec as AudioChunkRecord).index === "number" && "blob" in rec;
@@ -89,7 +96,8 @@ export function textHash(text: string): string {
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
-export const articleTextHash = (title: string, body: string): string => textHash(toSpeechText(title, body));
+export const articleTextHash = (title: string, body: string): string =>
+  textHash(toSpeechText(title, body));
 
 export const audioKey = (articleId: string, engine: TtsEngine, voiceKey: string): string =>
   `${articleId}:${engine}:${voiceKey}`;
@@ -97,8 +105,11 @@ export const audioKey = (articleId: string, engine: TtsEngine, voiceKey: string)
 export const isAudioFresh = (rec: ArticleAudioRecord, title: string, body: string): boolean =>
   rec.textHash === articleTextHash(title, body);
 
-export const isManifestFresh = (manifest: ChunkedAudioManifest, title: string, body: string): boolean =>
-  manifest.textHash === articleTextHash(title, body);
+export const isManifestFresh = (
+  manifest: ChunkedAudioManifest,
+  title: string,
+  body: string,
+): boolean => manifest.textHash === articleTextHash(title, body);
 
 const EXTENSIONS: Record<string, string> = {
   "audio/wav": "wav",
@@ -112,6 +123,7 @@ const EXTENSIONS: Record<string, string> = {
 /** A share/download-safe file name from the article title. */
 export function audioFileName(title: string, mime: string): string {
   const clean = title
+    // eslint-disable-next-line no-control-regex -- intentional: strips C0 control characters so the title is safe as a file name
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -132,11 +144,21 @@ export interface ArticleAudioStore {
 export function memoryArticleAudioStore(): ArticleAudioStore {
   const map = new Map<string, StoredAudioRecord>();
   return {
-    async get(key) { return map.get(key) ?? null; },
-    async put(rec) { map.set(rec.key, rec); },
-    async remove(key) { map.delete(key); },
-    async listForArticle(articleId) { return [...map.values()].filter((r) => r.articleId === articleId); },
-    async listAll() { return [...map.values()]; },
+    async get(key) {
+      return map.get(key) ?? null;
+    },
+    async put(rec) {
+      map.set(rec.key, rec);
+    },
+    async remove(key) {
+      map.delete(key);
+    },
+    async listForArticle(articleId) {
+      return [...map.values()].filter((r) => r.articleId === articleId);
+    },
+    async listAll() {
+      return [...map.values()];
+    },
   };
 }
 
@@ -144,7 +166,11 @@ const DB = "thought-loom-audio";
 const STORE = "article-audio";
 const SONGS_STORE = "songs";
 const SONG_EXPORTS_STORE = "song-exports";
-const req = <T,>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const req = <T>(r: IDBRequest<T>) =>
+  new Promise<T>((res, rej) => {
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
 
 /**
  * One shared open for every store in this database. Version 2 added the
@@ -178,17 +204,32 @@ function openDb(): Promise<IDBDatabase> {
 export function indexedDbArticleAudioStore(): ArticleAudioStore {
   const db = () => openDb();
   const tx = async (mode: IDBTransactionMode) => (await db()).transaction(STORE, mode);
-  const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+  const done = (t: IDBTransaction) =>
+    new Promise<void>((res, rej) => {
+      t.oncomplete = () => res();
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    });
   return {
     async get(key) {
       const t = await tx("readonly");
       return ((await req(t.objectStore(STORE).get(key))) as StoredAudioRecord | undefined) ?? null;
     },
-    async put(rec) { const t = await tx("readwrite"); t.objectStore(STORE).put(rec); await done(t); },
-    async remove(key) { const t = await tx("readwrite"); t.objectStore(STORE).delete(key); await done(t); },
+    async put(rec) {
+      const t = await tx("readwrite");
+      t.objectStore(STORE).put(rec);
+      await done(t);
+    },
+    async remove(key) {
+      const t = await tx("readwrite");
+      t.objectStore(STORE).delete(key);
+      await done(t);
+    },
     async listForArticle(articleId) {
       const t = await tx("readonly");
-      return (await req(t.objectStore(STORE).index("articleId").getAll(articleId))) as StoredAudioRecord[];
+      return (await req(
+        t.objectStore(STORE).index("articleId").getAll(articleId),
+      )) as StoredAudioRecord[];
     },
     async listAll() {
       const t = await tx("readonly");
@@ -199,7 +240,8 @@ export function indexedDbArticleAudioStore(): ArticleAudioStore {
 
 let shared: ArticleAudioStore | null = null;
 export const articleAudioStore = (): ArticleAudioStore =>
-  (shared ??= typeof indexedDB !== "undefined" ? indexedDbArticleAudioStore() : memoryArticleAudioStore());
+  (shared ??=
+    typeof indexedDB !== "undefined" ? indexedDbArticleAudioStore() : memoryArticleAudioStore());
 
 /** What is cached for one article + engine, in either storage format. */
 export type CachedAudio =
@@ -214,7 +256,10 @@ export type CachedAudio =
  * current spoken text.
  */
 async function cachedFromRecord(
-  rec: StoredAudioRecord, articleId: string, title: string, body: string,
+  rec: StoredAudioRecord,
+  articleId: string,
+  title: string,
+  body: string,
   store: ArticleAudioStore,
 ): Promise<CachedAudio | null> {
   if (isChunkedManifest(rec)) {
@@ -230,7 +275,11 @@ async function cachedFromRecord(
 }
 
 export async function getCachedAudio(
-  articleId: string, engine: TtsEngine, voiceKey: string, title: string, body: string,
+  articleId: string,
+  engine: TtsEngine,
+  voiceKey: string,
+  title: string,
+  body: string,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<CachedAudio | null> {
   const rec = await store.get(audioKey(articleId, engine, voiceKey));
@@ -246,13 +295,16 @@ export async function getCachedAudio(
  * and resume it only with that same model.
  */
 export async function findCachedAudio(
-  articleId: string, engine: TtsEngine, title: string, body: string,
+  articleId: string,
+  engine: TtsEngine,
+  title: string,
+  body: string,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<CachedAudio | null> {
   const all = (await store.listForArticle(articleId)).filter((r) => r.engine === engine);
-  const manifests = all.filter(isChunkedManifest)
-    .sort((a, b) => b.createdAt - a.createdAt);
-  const chosenManifest = manifests.find((m) => m.voiceKey === CURRENT_TTS_VOICE_KEY) ?? manifests[0];
+  const manifests = all.filter(isChunkedManifest).sort((a, b) => b.createdAt - a.createdAt);
+  const chosenManifest =
+    manifests.find((m) => m.voiceKey === CURRENT_TTS_VOICE_KEY) ?? manifests[0];
   if (chosenManifest) return cachedFromRecord(chosenManifest, articleId, title, body, store);
   const legacy = all.filter(isLegacyAudio).sort((a, b) => b.createdAt - a.createdAt)[0];
   if (legacy) return cachedFromRecord(legacy, articleId, title, body, store);
@@ -267,13 +319,17 @@ export async function findCachedAudio(
  * `voicePart` is the voice half of a cache voice key (see voicePartOfKey).
  */
 export async function findCachedAudioForVoice(
-  articleId: string, engine: TtsEngine, voicePart: string, title: string, body: string,
+  articleId: string,
+  engine: TtsEngine,
+  voicePart: string,
+  title: string,
+  body: string,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<CachedAudio | null> {
-  const all = (await store.listForArticle(articleId))
-    .filter((r) => r.engine === engine && voicePartOfKey(r.voiceKey) === voicePart);
-  const manifests = all.filter(isChunkedManifest)
-    .sort((a, b) => b.createdAt - a.createdAt);
+  const all = (await store.listForArticle(articleId)).filter(
+    (r) => r.engine === engine && voicePartOfKey(r.voiceKey) === voicePart,
+  );
+  const manifests = all.filter(isChunkedManifest).sort((a, b) => b.createdAt - a.createdAt);
   const preferredKey = ttsVoiceKey(GEMINI_TTS_MODELS[0], voicePart);
   const chosenManifest = manifests.find((m) => m.voiceKey === preferredKey) ?? manifests[0];
   if (chosenManifest) return cachedFromRecord(chosenManifest, articleId, title, body, store);
@@ -287,7 +343,9 @@ export async function findCachedAudioForVoice(
  * AND every chunk record), leaving any other voice's generation intact.
  */
 export async function deleteArticleAudioForVoice(
-  articleId: string, engine: TtsEngine, voicePart: string,
+  articleId: string,
+  engine: TtsEngine,
+  voicePart: string,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<void> {
   const all = await store.listForArticle(articleId);
@@ -307,19 +365,25 @@ export async function listArticleIdsWithAudio(
 ): Promise<Set<string>> {
   const ids = new Set<string>();
   for (const rec of await store.listAll()) {
-    if (rec.engine === "gemini" && (isChunkedManifest(rec) || isLegacyAudio(rec))) ids.add(rec.articleId);
+    if (rec.engine === "gemini" && (isChunkedManifest(rec) || isLegacyAudio(rec)))
+      ids.add(rec.articleId);
   }
   return ids;
 }
 
 /** Sorted indexes of the chunks of one generation that are on this device. */
 export async function listReadyChunks(
-  articleId: string, engine: TtsEngine, voiceKey: string,
+  articleId: string,
+  engine: TtsEngine,
+  voiceKey: string,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<number[]> {
   const all = await store.listForArticle(articleId);
   return all
-    .filter((r): r is AudioChunkRecord => isAudioChunk(r) && r.engine === engine && r.voiceKey === voiceKey)
+    .filter(
+      (r): r is AudioChunkRecord =>
+        isAudioChunk(r) && r.engine === engine && r.voiceKey === voiceKey,
+    )
     .map((r) => r.index)
     .sort((a, b) => a - b);
 }
@@ -327,8 +391,14 @@ export async function listReadyChunks(
 /** Write (or replace) the v2 manifest for a generation of chunkCount chunks. */
 export async function saveAudioManifest(
   input: {
-    articleId: string; engine: TtsEngine; voiceKey: string; title: string; body: string;
-    chunkCount: number; sampleRate?: number; modelId?: string;
+    articleId: string;
+    engine: TtsEngine;
+    voiceKey: string;
+    title: string;
+    body: string;
+    chunkCount: number;
+    sampleRate?: number;
+    modelId?: string;
   },
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<ChunkedAudioManifest> {
@@ -350,7 +420,9 @@ export async function saveAudioManifest(
 }
 
 export async function getAudioManifest(
-  articleId: string, engine: TtsEngine, voiceKey: string,
+  articleId: string,
+  engine: TtsEngine,
+  voiceKey: string,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<ChunkedAudioManifest | null> {
   const rec = await store.get(audioKey(articleId, engine, voiceKey));
@@ -377,7 +449,10 @@ export async function saveAudioChunk(
 
 /** One chunk's raw PCM blob, or null when that chunk was never generated. */
 export async function getAudioChunk(
-  articleId: string, engine: TtsEngine, voiceKey: string, index: number,
+  articleId: string,
+  engine: TtsEngine,
+  voiceKey: string,
+  index: number,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<Blob | null> {
   const rec = await store.get(chunkKey(audioKey(articleId, engine, voiceKey), index));
@@ -385,7 +460,14 @@ export async function getAudioChunk(
 }
 
 export async function saveArticleAudio(
-  input: { articleId: string; engine: TtsEngine; voiceKey: string; title: string; body: string; blob: Blob },
+  input: {
+    articleId: string;
+    engine: TtsEngine;
+    voiceKey: string;
+    title: string;
+    body: string;
+    blob: Blob;
+  },
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<ArticleAudioRecord> {
   const rec: ArticleAudioRecord = {
@@ -408,7 +490,9 @@ export async function saveArticleAudio(
  * legacy record) AND every chunk record belonging to it.
  */
 export async function deleteArticleAudio(
-  articleId: string, engine?: TtsEngine, voiceKey?: string,
+  articleId: string,
+  engine?: TtsEngine,
+  voiceKey?: string,
   store: ArticleAudioStore = articleAudioStore(),
 ): Promise<void> {
   const all = await store.listForArticle(articleId);
@@ -456,24 +540,47 @@ export interface SongAudioStore {
 export function memorySongAudioStore(): SongAudioStore {
   const map = new Map<string, SongAudioRecord>();
   return {
-    async get(ideaId) { return map.get(ideaId) ?? null; },
-    async put(rec) { map.set(rec.key, rec); },
-    async remove(ideaId) { map.delete(ideaId); },
-    async listAll() { return [...map.values()]; },
+    async get(ideaId) {
+      return map.get(ideaId) ?? null;
+    },
+    async put(rec) {
+      map.set(rec.key, rec);
+    },
+    async remove(ideaId) {
+      map.delete(ideaId);
+    },
+    async listAll() {
+      return [...map.values()];
+    },
   };
 }
 
 export function indexedDbSongAudioStore(): SongAudioStore {
   const db = () => openDb();
   const tx = async (mode: IDBTransactionMode) => (await db()).transaction(SONGS_STORE, mode);
-  const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+  const done = (t: IDBTransaction) =>
+    new Promise<void>((res, rej) => {
+      t.oncomplete = () => res();
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    });
   return {
     async get(ideaId) {
       const t = await tx("readonly");
-      return ((await req(t.objectStore(SONGS_STORE).get(ideaId))) as SongAudioRecord | undefined) ?? null;
+      return (
+        ((await req(t.objectStore(SONGS_STORE).get(ideaId))) as SongAudioRecord | undefined) ?? null
+      );
     },
-    async put(rec) { const t = await tx("readwrite"); t.objectStore(SONGS_STORE).put(rec); await done(t); },
-    async remove(ideaId) { const t = await tx("readwrite"); t.objectStore(SONGS_STORE).delete(ideaId); await done(t); },
+    async put(rec) {
+      const t = await tx("readwrite");
+      t.objectStore(SONGS_STORE).put(rec);
+      await done(t);
+    },
+    async remove(ideaId) {
+      const t = await tx("readwrite");
+      t.objectStore(SONGS_STORE).delete(ideaId);
+      await done(t);
+    },
     async listAll() {
       const t = await tx("readonly");
       return (await req(t.objectStore(SONGS_STORE).getAll())) as SongAudioRecord[];
@@ -483,7 +590,8 @@ export function indexedDbSongAudioStore(): SongAudioStore {
 
 let sharedSongStore: SongAudioStore | null = null;
 export const songAudioStore = (): SongAudioStore =>
-  (sharedSongStore ??= typeof indexedDB !== "undefined" ? indexedDbSongAudioStore() : memorySongAudioStore());
+  (sharedSongStore ??=
+    typeof indexedDB !== "undefined" ? indexedDbSongAudioStore() : memorySongAudioStore());
 
 /** Save (or replace) the recording of one song idea. */
 export async function saveSongAudio(
@@ -551,29 +659,52 @@ export interface SongExportStore {
 export function memorySongExportStore(): SongExportStore {
   const map = new Map<string, SongExportRecord>();
   return {
-    async get(ideaId) { return map.get(ideaId) ?? null; },
-    async put(rec) { map.set(rec.key, rec); },
-    async remove(ideaId) { map.delete(ideaId); },
+    async get(ideaId) {
+      return map.get(ideaId) ?? null;
+    },
+    async put(rec) {
+      map.set(rec.key, rec);
+    },
+    async remove(ideaId) {
+      map.delete(ideaId);
+    },
   };
 }
 
 export function indexedDbSongExportStore(): SongExportStore {
   const db = () => openDb();
   const tx = async (mode: IDBTransactionMode) => (await db()).transaction(SONG_EXPORTS_STORE, mode);
-  const done = (t: IDBTransaction) => new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+  const done = (t: IDBTransaction) =>
+    new Promise<void>((res, rej) => {
+      t.oncomplete = () => res();
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    });
   return {
     async get(ideaId) {
       const t = await tx("readonly");
-      return ((await req(t.objectStore(SONG_EXPORTS_STORE).get(ideaId))) as SongExportRecord | undefined) ?? null;
+      return (
+        ((await req(t.objectStore(SONG_EXPORTS_STORE).get(ideaId))) as
+          SongExportRecord | undefined) ?? null
+      );
     },
-    async put(rec) { const t = await tx("readwrite"); t.objectStore(SONG_EXPORTS_STORE).put(rec); await done(t); },
-    async remove(ideaId) { const t = await tx("readwrite"); t.objectStore(SONG_EXPORTS_STORE).delete(ideaId); await done(t); },
+    async put(rec) {
+      const t = await tx("readwrite");
+      t.objectStore(SONG_EXPORTS_STORE).put(rec);
+      await done(t);
+    },
+    async remove(ideaId) {
+      const t = await tx("readwrite");
+      t.objectStore(SONG_EXPORTS_STORE).delete(ideaId);
+      await done(t);
+    },
   };
 }
 
 let sharedExportStore: SongExportStore | null = null;
 export const songExportStore = (): SongExportStore =>
-  (sharedExportStore ??= typeof indexedDB !== "undefined" ? indexedDbSongExportStore() : memorySongExportStore());
+  (sharedExportStore ??=
+    typeof indexedDB !== "undefined" ? indexedDbSongExportStore() : memorySongExportStore());
 
 /** Drop one song's cached MP3 export, if any. */
 export async function deleteSongExport(

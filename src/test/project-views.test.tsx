@@ -7,19 +7,27 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
     ...actual,
-    Link: ({ children, ...props }: Record<string, unknown>) => <a {...props}>{children as React.ReactNode}</a>,
+    Link: ({ children, ...props }: Record<string, unknown>) => (
+      <a {...props}>{children as React.ReactNode}</a>
+    ),
   };
 });
 // The editor card is a heavy surface of its own; these tests cover the
 // VIEWS' project contract, so a stub renders each card's title.
 vi.mock("@/components/article-editor", () => ({
-  ArticleEditor: ({ idea }: { idea: Idea }) => <div data-testid="card">{idea.articleTitle ?? idea.text}</div>,
+  ArticleEditor: ({ idea }: { idea: Idea }) => (
+    <div data-testid="card">{idea.articleTitle ?? idea.text}</div>
+  ),
 }));
 vi.mock("@/components/merge-banner", () => ({ MergeBanner: () => null }));
 vi.mock("@/components/ask-dialog", () => ({ AskDialog: () => null }));
 vi.mock("@/components/insights-dialog", () => ({ InsightsDialog: () => null }));
 vi.mock("@/components/liked-dialog", () => ({ LikedDialog: () => null }));
-vi.mock("@/lib/sync", () => ({ pushIdea: vi.fn(), syncNow: vi.fn(async () => 0), deleteIdeaCloud: vi.fn() }));
+vi.mock("@/lib/sync", () => ({
+  pushIdea: vi.fn(),
+  syncNow: vi.fn(async () => 0),
+  deleteIdeaCloud: vi.fn(),
+}));
 vi.mock("@/lib/article-ai", () => ({ cleanFull: vi.fn(), improveFull: vi.fn() }));
 vi.mock("@/lib/ai-engine", () => ({ resolveEngine: vi.fn(async () => "x") }));
 vi.mock("@/lib/ai-labels", () => ({
@@ -28,7 +36,9 @@ vi.mock("@/lib/ai-labels", () => ({
   unlabeled: () => [],
   labelAll: vi.fn(async () => 0),
 }));
-vi.mock("@/lib/article-audio", () => ({ listArticleIdsWithAudio: vi.fn(async () => new Set<string>()) }));
+vi.mock("@/lib/article-audio", () => ({
+  listArticleIdsWithAudio: vi.fn(async () => new Set<string>()),
+}));
 vi.mock("@/lib/delete-flow", () => ({ requestDelete: vi.fn(), undoDelete: vi.fn(() => true) }));
 vi.mock("sonner", () => ({ toast: vi.fn() }));
 
@@ -43,15 +53,49 @@ const mk = (over: Partial<Idea>): Idea => ({
   updatedAt: 1000,
   ...over,
 });
-const inBook = mk({ articleTitle: "فصل في الكتاب", articleBody: "متن", topic: "موضوع أ", topicManual: true, project: "كتابي" });
-const inBook2 = mk({ articleTitle: "فصل ثانٍ", articleBody: "متن", topic: "موضوع ب", topicManual: true, project: "كتابي" });
-const noProject = mk({ articleTitle: "مقالة حرة", articleBody: "متن", topic: "موضوع أ", topicManual: true });
-const medSameName = mk({ articleTitle: "فصل طبي بنفس الاسم", articleBody: "متن", topic: "موضوع طبي", topicManual: true, project: "كتابي", medical: true });
-const medProject = mk({ articleTitle: "مقالة الملف الطبي", articleBody: "متن", topic: "موضوع طبي", topicManual: true, project: "ملف طبي", medical: true });
+const inBook = mk({
+  articleTitle: "فصل في الكتاب",
+  articleBody: "متن",
+  topic: "موضوع أ",
+  topicManual: true,
+  project: "كتابي",
+});
+const inBook2 = mk({
+  articleTitle: "فصل ثانٍ",
+  articleBody: "متن",
+  topic: "موضوع ب",
+  topicManual: true,
+  project: "كتابي",
+});
+const noProject = mk({
+  articleTitle: "مقالة حرة",
+  articleBody: "متن",
+  topic: "موضوع أ",
+  topicManual: true,
+});
+const medSameName = mk({
+  articleTitle: "فصل طبي بنفس الاسم",
+  articleBody: "متن",
+  topic: "موضوع طبي",
+  topicManual: true,
+  project: "كتابي",
+  medical: true,
+});
+const medProject = mk({
+  articleTitle: "مقالة الملف الطبي",
+  articleBody: "متن",
+  topic: "موضوع طبي",
+  topicManual: true,
+  project: "ملف طبي",
+  medical: true,
+});
 
 const seed = (ideas: Idea[]) => localStorage.setItem("afkari.ideas", JSON.stringify(ideas));
 
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); });
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+});
 
 describe("projects strip discovery", () => {
   it("the library strip lists the MAIN partition's projects with counts — never the medical ones", () => {
@@ -111,7 +155,9 @@ describe("project view", () => {
     const onRenamed = vi.fn();
     render(<ProjectView project="ملف" medical={false} onRenamed={onRenamed} />);
     fireEvent.click(screen.getByRole("button", { name: /إعادة تسمية المشروع/ }));
-    fireEvent.change(screen.getByLabelText("اسم المشروع الجديد"), { target: { value: "الملف الجديد" } });
+    fireEvent.change(screen.getByLabelText("اسم المشروع الجديد"), {
+      target: { value: "الملف الجديد" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "حفظ الاسم الجديد" }));
     const all = loadIdeas();
     expect(all.find((i) => i.id === g.id)?.project).toBe("الملف الجديد");

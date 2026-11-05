@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import { buildBackup, parseBackup, restoreBackup } from "./backup";
 import { loadIdeas, saveIdea, type Idea } from "./ideas";
 
-const sample: Idea[] = [{ id: "x1", text: "نص", createdAt: 5, articleTitle: "ع", articleBody: "ب", updatedAt: 6 }];
+const sample: Idea[] = [
+  { id: "x1", text: "نص", createdAt: 5, articleTitle: "ع", articleBody: "ب", updatedAt: 6 },
+];
 
 describe("backup", () => {
   it("round-trips ideas", () => {
@@ -28,25 +30,30 @@ describe("backup", () => {
     expect(parseBackup(raw)).toHaveLength(1);
   });
   it("round-trips version history, dropping malformed version entries", () => {
-    const withVersions: Idea[] = [{
-      ...sample[0]!,
-      versions: [
-        { at: 10, text: "قديم", title: "ع قديم", source: "improve" },
-        { at: 9, text: "أقدم", source: "merge" },
-      ],
-    }];
+    const withVersions: Idea[] = [
+      {
+        ...sample[0]!,
+        versions: [
+          { at: 10, text: "قديم", title: "ع قديم", source: "improve" },
+          { at: 9, text: "أقدم", source: "merge" },
+        ],
+      },
+    ];
     expect(parseBackup(buildBackup(withVersions))).toEqual(withVersions);
     const dirty = JSON.stringify({
-      app: "afkari", version: 1,
-      ideas: [{
-        ...sample[0],
-        versions: [
-          { at: "x", text: "تالف", source: "improve" },
-          { at: 3, text: "", source: "clean" },
-          { at: 2, text: "مصدر مجهول", source: "bogus" },
-          { at: 1, text: "سليم", source: "restore" },
-        ],
-      }],
+      app: "afkari",
+      version: 1,
+      ideas: [
+        {
+          ...sample[0],
+          versions: [
+            { at: "x", text: "تالف", source: "improve" },
+            { at: 3, text: "", source: "clean" },
+            { at: 2, text: "مصدر مجهول", source: "bogus" },
+            { at: 1, text: "سليم", source: "restore" },
+          ],
+        },
+      ],
     });
     expect(parseBackup(dirty)[0]?.versions).toEqual([{ at: 1, text: "سليم", source: "restore" }]);
   });
@@ -70,7 +77,9 @@ describe("backup", () => {
     expect(fired).toBe(1);
   });
   it("round-trips a hand-pinned topic", () => {
-    const pinned: Idea[] = [{ id: "p1", text: "نص", createdAt: 5, topic: "موضوعي", topicManual: true }];
+    const pinned: Idea[] = [
+      { id: "p1", text: "نص", createdAt: 5, topic: "موضوعي", topicManual: true },
+    ];
     expect(parseBackup(buildBackup(pinned))).toEqual(pinned);
   });
   it("round-trips a library pin", () => {
@@ -88,14 +97,35 @@ describe("backup", () => {
   it("restore brings a hand-pinned topic onto an existing unpinned article", () => {
     const mine = saveIdea("نص محلي");
     restoreBackup([{ ...mine, topic: "موضوعي", topicManual: true }]);
-    expect(loadIdeas().find((i) => i.id === mine.id)).toMatchObject({ topic: "موضوعي", topicManual: true });
+    expect(loadIdeas().find((i) => i.id === mine.id)).toMatchObject({
+      topic: "موضوعي",
+      topicManual: true,
+    });
   });
   it("round-trips a liked article with its source and accumulated sources", () => {
-    const liked: Idea[] = [{ id: "l1", text: "نص خارجي", createdAt: 5, liked: true, source: "مجلة الفكر", sources: ["موقع آخر", "كاتب ضيف"] }];
+    const liked: Idea[] = [
+      {
+        id: "l1",
+        text: "نص خارجي",
+        createdAt: 5,
+        liked: true,
+        source: "مجلة الفكر",
+        sources: ["موقع آخر", "كاتب ضيف"],
+      },
+    ];
     expect(parseBackup(buildBackup(liked))).toEqual(liked);
   });
   it("drops malformed attribution entries but keeps the liked flag and clean sources", () => {
-    const raw = JSON.stringify([{ id: "l2", text: "نص", createdAt: 5, liked: true, source: 42, sources: ["صالح", 7, "", null] }]);
+    const raw = JSON.stringify([
+      {
+        id: "l2",
+        text: "نص",
+        createdAt: 5,
+        liked: true,
+        source: 42,
+        sources: ["صالح", 7, "", null],
+      },
+    ]);
     const [parsed] = parseBackup(raw);
     expect(parsed).toMatchObject({ liked: true, sources: ["صالح"] });
     expect(parsed).not.toHaveProperty("source");

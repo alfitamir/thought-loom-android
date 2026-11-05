@@ -2,8 +2,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Idea } from "./ideas";
 import { loadVisibleIdeas } from "./pending-deletes";
 import {
-  archiveAgeLabel, archiveDayKey, archivePool, isArchiveDismissed,
-  parseArchiveCycle, pickArchiveIdea, serializeArchiveCycle,
+  archiveAgeLabel,
+  archiveDayKey,
+  archivePool,
+  isArchiveDismissed,
+  parseArchiveCycle,
+  pickArchiveIdea,
+  serializeArchiveCycle,
 } from "./archive-pick";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -23,7 +28,10 @@ const mk = (over: Partial<Idea> = {}): Idea => {
 };
 const daysAgo = (n: number) => NOW - n * DAY;
 
-beforeEach(() => { seq = 0; localStorage.clear(); });
+beforeEach(() => {
+  seq = 0;
+  localStorage.clear();
+});
 
 describe("archivePool eligibility", () => {
   it("includes ideas untouched for at least 30 days, boundary included", () => {
@@ -38,7 +46,9 @@ describe("archivePool eligibility", () => {
     const neverEdited = mk({ createdAt: daysAgo(60) });
     delete neverEdited.updatedAt;
     const editedRecently = mk({ createdAt: daysAgo(90), updatedAt: daysAgo(3) });
-    expect(archivePool([neverEdited, editedRecently], NOW).map((i) => i.id)).toEqual([neverEdited.id]);
+    expect(archivePool([neverEdited, editedRecently], NOW).map((i) => i.id)).toEqual([
+      neverEdited.id,
+    ]);
   });
 
   it("excludes pinned ideas — the pin already surfaces them", () => {
@@ -68,7 +78,10 @@ describe("archivePool eligibility", () => {
     const a = mk({ id: "a" });
     const b = mk({ id: "b" });
     localStorage.setItem("afkari.ideas", JSON.stringify([a, b]));
-    localStorage.setItem("afkari.pendingDeletes", JSON.stringify([{ id: "a", deadline: NOW + 60_000 }]));
+    localStorage.setItem(
+      "afkari.pendingDeletes",
+      JSON.stringify([{ id: "a", deadline: NOW + 60_000 }]),
+    );
     const visible = loadVisibleIdeas();
     expect(archivePool(visible, NOW).map((i) => i.id)).toEqual(["b"]);
     expect(pickArchiveIdea(visible, NOW)?.id).toBe("b");

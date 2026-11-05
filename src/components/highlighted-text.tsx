@@ -10,7 +10,12 @@ import { splitByQuery } from "@/lib/search-highlight";
  * whose truncated text echoes the body and must not consume indices).
  * Only React text nodes are rendered — never raw HTML.
  */
-export function HighlightedText({ text, query, startIndex, currentIndex }: {
+export function HighlightedText({
+  text,
+  query,
+  startIndex,
+  currentIndex,
+}: {
   text: string;
   query: string;
   startIndex?: number | undefined;
@@ -28,9 +33,11 @@ export function HighlightedText({ text, query, startIndex, currentIndex }: {
           <mark
             key={i}
             data-match-idx={idx}
-            className={isCurrent
-              ? "rounded-sm bg-orange-400 px-px text-black ring-1 ring-orange-500"
-              : "rounded-sm bg-amber-200/70 px-px text-inherit dark:bg-amber-400/30"}
+            className={
+              isCurrent
+                ? "rounded-sm bg-orange-400 px-px text-black ring-1 ring-orange-500"
+                : "rounded-sm bg-amber-200/70 px-px text-inherit dark:bg-amber-400/30"
+            }
           >
             {seg.text}
           </mark>

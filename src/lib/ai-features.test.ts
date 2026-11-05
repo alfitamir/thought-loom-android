@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Idea } from "./ideas";
 
 const geminiStream = vi.fn();
-vi.mock("./gemini", async (orig) => ({ ...(await orig<typeof import("./gemini")>()), geminiStream: (...a: unknown[]) => geminiStream(...a) }));
+vi.mock("./gemini", async (orig) => ({
+  ...(await orig<typeof import("./gemini")>()),
+  geminiStream: (...a: unknown[]) => geminiStream(...a),
+}));
 
 // Thought Loom adaptation: Afkari's features posted to its Express /api/gemini/* endpoints
 // when no personal key was saved. Here the no-key path resolves the cloud engine
@@ -10,10 +13,27 @@ vi.mock("./gemini", async (orig) => ({ ...(await orig<typeof import("./gemini")>
 // /api/articles/improve; transcription goes to /api/voice/transcribe (SSE).
 vi.mock("./ai-engine", () => ({ resolveEngine: async () => ({ kind: "cloud", token: "T" }) }));
 
-import { askIdeas, classifyBatch, excerptFor, getArticleEnrichment, getEvidence, getFacebookPost, getInsights, retrieveRelevant, transcribeAudio } from "./ai-features";
+import {
+  askIdeas,
+  classifyBatch,
+  excerptFor,
+  getArticleEnrichment,
+  getEvidence,
+  getFacebookPost,
+  getInsights,
+  retrieveRelevant,
+  transcribeAudio,
+} from "./ai-features";
 import { clearEvidenceCache } from "./evidence";
 
-const idea = (id: string, title: string, body: string, createdAt = 1): Idea => ({ id, text: body, createdAt, articleTitle: title, articleBody: body, updatedAt: createdAt });
+const idea = (id: string, title: string, body: string, createdAt = 1): Idea => ({
+  id,
+  text: body,
+  createdAt,
+  articleTitle: title,
+  articleBody: body,
+  updatedAt: createdAt,
+});
 const lib = [
   idea("g", "غزة والمقاومة", "كلام طويل عن غزة والمقاومة والاحتلال.\n\nفقرة ثانية عن الصبر.", 1),
   idea("f", "الأسرة والتربية", "التربية في الأسرة المسلمة مسؤولية مشتركة.", 2),
@@ -21,13 +41,21 @@ const lib = [
 ];
 
 const fetchMock = vi.fn();
-beforeEach(() => { geminiStream.mockReset(); fetchMock.mockReset(); vi.stubGlobal("fetch", fetchMock); });
+beforeEach(() => {
+  geminiStream.mockReset();
+  fetchMock.mockReset();
+  vi.stubGlobal("fetch", fetchMock);
+});
 afterEach(() => vi.unstubAllGlobals());
-const reply = (payload: unknown, ok = true) => fetchMock.mockResolvedValue({ ok, json: async () => payload });
-const ndjson = (text: string) => new Response(
-  `${JSON.stringify({ type: "text", text })}\n${JSON.stringify({ type: "done" })}\n`,
-  { status: 200, headers: { "Content-Type": "application/x-ndjson" } });
-const replyModel = (payload: unknown) => fetchMock.mockResolvedValue(ndjson(JSON.stringify(payload)));
+const reply = (payload: unknown, ok = true) =>
+  fetchMock.mockResolvedValue({ ok, json: async () => payload });
+const ndjson = (text: string) =>
+  new Response(`${JSON.stringify({ type: "text", text })}\n${JSON.stringify({ type: "done" })}\n`, {
+    status: 200,
+    headers: { "Content-Type": "application/x-ndjson" },
+  });
+const replyModel = (payload: unknown) =>
+  fetchMock.mockResolvedValue(ndjson(JSON.stringify(payload)));
 
 describe("retrieveRelevant", () => {
   it("ranks the article whose title/body matches the question first", () => {
@@ -45,7 +73,11 @@ describe("retrieveRelevant", () => {
     expect(retrieveRelevant("zzzz qqqq", lib).map((a) => a.id)).toEqual(["w", "f", "g"]);
   });
   it("respects k and the excerpt size cap", () => {
-    const big = idea("big", "غزة", Array.from({ length: 50 }, (_, i) => `فقرة ${i} عن غزة ${"كلمة ".repeat(40)}`).join("\n\n"));
+    const big = idea(
+      "big",
+      "غزة",
+      Array.from({ length: 50 }, (_, i) => `فقرة ${i} عن غزة ${"كلمة ".repeat(40)}`).join("\n\n"),
+    );
     const [a] = retrieveRelevant("غزة", [big, ...lib], 1, 500);
     expect(retrieveRelevant("غزة", [big, ...lib], 1)).toHaveLength(1);
     expect(a!.excerpt.length).toBeLessThanOrEqual(500);
@@ -61,7 +93,13 @@ describe("excerptFor", () => {
 
 describe("askIdeas routing", () => {
   it("uses the app server route when no personal key is saved", async () => {
-    replyModel({ answer: "جواب", sources: [{ id: "g", note: "n" }, { id: "fake", note: "x" }] });
+    replyModel({
+      answer: "جواب",
+      sources: [
+        { id: "g", note: "n" },
+        { id: "fake", note: "x" },
+      ],
+    });
     const out = await askIdeas("المقاومة", lib);
     expect(fetchMock.mock.calls[0]![0]).toBe("/api/articles/improve");
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body).task).toBe("ask");
@@ -100,7 +138,12 @@ describe("classifyBatch / getInsights / transcribeAudio", () => {
     expect((await classifyBatch(lib))["g"]!.tags).toEqual(["غزة"]);
   });
   it("classifyBatch sanitizes labels from the personal-key path", async () => {
-    geminiStream.mockResolvedValue(JSON.stringify([{ id: "g", topic: "موضوع مخترع", tags: ["#س"] }, { id: "nope", topic: "x", tags: [] }]));
+    geminiStream.mockResolvedValue(
+      JSON.stringify([
+        { id: "g", topic: "موضوع مخترع", tags: ["#س"] },
+        { id: "nope", topic: "x", tags: [] },
+      ]),
+    );
     const out = await classifyBatch(lib, { key: "K" });
     expect(Object.keys(out)).toEqual(["g"]);
     expect(out["g"]!.tags).toEqual(["س"]);
@@ -108,11 +151,18 @@ describe("classifyBatch / getInsights / transcribeAudio", () => {
   });
   it("getInsights needs three articles and validates ids", async () => {
     await expect(getInsights(lib.slice(0, 2))).rejects.toThrow("ثلاثة");
-    replyModel({ themes: [{ name: "م", summary: "s", ids: ["g", "f", "ghost"] }], prompts: [{ title: "ت", angle: "ز" }] });
+    replyModel({
+      themes: [{ name: "م", summary: "s", ids: ["g", "f", "ghost"] }],
+      prompts: [{ title: "ت", angle: "ز" }],
+    });
     expect((await getInsights(lib)).themes[0]!.ids).toEqual(["g", "f"]);
   });
   it("transcribeAudio uploads the audio file with a clean mime type to the voice route", async () => {
-    fetchMock.mockResolvedValue(new Response('data: {"type":"transcript.text.done","text":" نص مفرَّغ "}\n\n', { status: 200 }));
+    fetchMock.mockResolvedValue(
+      new Response('data: {"type":"transcript.text.done","text":" نص مفرَّغ "}\n\n', {
+        status: 200,
+      }),
+    );
     const text = await transcribeAudio(new Blob(["abc"], { type: "audio/webm;codecs=opus" }));
     expect(fetchMock.mock.calls[0]![0]).toBe("/api/voice/transcribe");
     const form = fetchMock.mock.calls[0]![1].body as FormData;
@@ -127,21 +177,41 @@ describe("classifyBatch / getInsights / transcribeAudio", () => {
 });
 
 describe("getEvidence (end to end)", () => {
-  const article = { title: "الأمانة", body: "الأمانة أساس العمران ومن ضيعها ضيع الأمة كلها وهذه دعوى المقال الأولى والأخيرة." };
-  const ayah = { data: { text: "إِنَّا عَرَضْنَا ٱلْأَمَانَةَ عَلَى ٱلسَّمَٰوَٰتِ وَٱلْأَرْضِ", numberInSurah: 72, surah: { number: 33, name: "سُورَةُ الأحزاب" } } };
-  const route = (candidates: unknown) => fetchMock.mockImplementation(async (url: string) => {
-    if (url === "/api/articles/improve") return ndjson(JSON.stringify(candidates));
-    if (url.includes("/33:72/")) return { ok: true, json: async () => ayah };
-    throw new TypeError("offline");
-  });
-  const quran = { kind: "quran", surah: 33, from: 72, to: 72, opening: "إنا عرضنا الأمانة على السماوات", claim: "c", why: "w" };
+  const article = {
+    title: "الأمانة",
+    body: "الأمانة أساس العمران ومن ضيعها ضيع الأمة كلها وهذه دعوى المقال الأولى والأخيرة.",
+  };
+  const ayah = {
+    data: {
+      text: "إِنَّا عَرَضْنَا ٱلْأَمَانَةَ عَلَى ٱلسَّمَٰوَٰتِ وَٱلْأَرْضِ",
+      numberInSurah: 72,
+      surah: { number: 33, name: "سُورَةُ الأحزاب" },
+    },
+  };
+  const route = (candidates: unknown) =>
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/articles/improve") return ndjson(JSON.stringify(candidates));
+      if (url.includes("/33:72/")) return { ok: true, json: async () => ayah };
+      throw new TypeError("offline");
+    });
+  const quran = {
+    kind: "quran",
+    surah: 33,
+    from: 72,
+    to: 72,
+    opening: "إنا عرضنا الأمانة على السماوات",
+    claim: "c",
+    why: "w",
+  };
   beforeEach(() => clearEvidenceCache());
 
   it("returns the SOURCE text for a correct reference", async () => {
     route([quran]);
     const { items } = await getEvidence(article);
     expect(items[0]!).toMatchObject({ kind: "quran", status: "verified" });
-    expect((items[0]! as any).text).toContain("ٱلْأَمَانَةَ");
+    const first = items[0]!;
+    if (first.kind !== "quran") throw new Error("expected a quran item");
+    expect(first.text).toContain("ٱلْأَمَانَةَ");
   });
   it("REGRESSION: a hallucinated reference never reaches the user, and the user is told why", async () => {
     route([{ ...quran, opening: "اقرأ باسم ربك الذي خلق" }]);
@@ -165,7 +235,10 @@ describe("getEvidence (end to end)", () => {
 });
 
 describe("getArticleEnrichment", () => {
-  const art = { title: "المقال", body: "نص المقال الفكري الطويل عن الدولة والمجتمع والمنظومة الحضارية." };
+  const art = {
+    title: "المقال",
+    body: "نص المقال الفكري الطويل عن الدولة والمجتمع والمنظومة الحضارية.",
+  };
   const model = {
     additions: [" زاوية أولى ", 42, "زاوية ثانية"],
     quotes: [
@@ -206,21 +279,29 @@ describe("getArticleEnrichment", () => {
   });
 
   it("refuses an empty article before any request (Afkari's backend guard)", async () => {
-    await expect(getArticleEnrichment({ title: "t", body: "   " })).rejects.toThrow("نص المقال مطلوب");
+    await expect(getArticleEnrichment({ title: "t", body: "   " })).rejects.toThrow(
+      "نص المقال مطلوب",
+    );
     expect(fetchMock).not.toHaveBeenCalled();
     expect(geminiStream).not.toHaveBeenCalled();
   });
 
   it("refuses bodies over Afkari's 50k cap before any request", async () => {
-    await expect(getArticleEnrichment({ title: "t", body: "ن".repeat(50_001) })).rejects.toThrow("أطول من الحد");
+    await expect(getArticleEnrichment({ title: "t", body: "ن".repeat(50_001) })).rejects.toThrow(
+      "أطول من الحد",
+    );
     expect(fetchMock).not.toHaveBeenCalled();
     expect(geminiStream).not.toHaveBeenCalled();
   });
 });
 
 describe("getFacebookPost", () => {
-  const art = { title: "حصوات المرارة", body: "كثيرون يكتشفون حصوات المرارة مصادفة، ولا تعني كل حصوة عملية جراحية؛ القرار يبنى على الأعراض والتقييم الطبي." };
-  const clean = "هل كل حصوة مرارة تعني عملية؟\n\nغالبًا لا؛ القرار يبنى على الأعراض والتقييم الطبي.";
+  const art = {
+    title: "حصوات المرارة",
+    body: "كثيرون يكتشفون حصوات المرارة مصادفة، ولا تعني كل حصوة عملية جراحية؛ القرار يبنى على الأعراض والتقييم الطبي.",
+  };
+  const clean =
+    "هل كل حصوة مرارة تعني عملية؟\n\nغالبًا لا؛ القرار يبنى على الأعراض والتقييم الطبي.";
 
   it("uses the server route with the facebook task when no personal key is saved, and sanitizes the post", async () => {
     // Model wrapped the post in Arabic quotes and padded it with extra blank lines.
@@ -244,7 +325,9 @@ describe("getFacebookPost", () => {
   });
 
   it("strips markdown fences inside the post and hard-caps it at 1500 chars", async () => {
-    geminiStream.mockResolvedValue(JSON.stringify({ post: "```\n" + "كلمة ".repeat(400) + "\n```" }));
+    geminiStream.mockResolvedValue(
+      JSON.stringify({ post: "```\n" + "كلمة ".repeat(400) + "\n```" }),
+    );
     const out = await getFacebookPost(art, { key: "K" });
     expect(out).not.toContain("```");
     expect(out.length).toBeLessThanOrEqual(1500);
@@ -284,7 +367,11 @@ describe("getFacebookPost", () => {
 });
 
 describe("liked articles stay out of every AI corpus", () => {
-  const likedX: Idea = { ...idea("x", "غزة بعيون أخرى", "غزة والمقاومة والاحتلال غزة غزة غزة", 9), liked: true, source: "موقع خارجي" };
+  const likedX: Idea = {
+    ...idea("x", "غزة بعيون أخرى", "غزة والمقاومة والاحتلال غزة غزة غزة", 9),
+    liked: true,
+    source: "موقع خارجي",
+  };
   const mixed = [...lib, likedX];
 
   it("retrieveRelevant never returns a liked article, even on a perfect match", () => {
@@ -306,7 +393,12 @@ describe("liked articles stay out of every AI corpus", () => {
   it("classifyBatch sends no liked article to the model", async () => {
     expect(await classifyBatch([likedX], { key: "K" })).toEqual({});
     expect(geminiStream).not.toHaveBeenCalled();
-    geminiStream.mockResolvedValue(JSON.stringify([{ id: "g", topic: "الأمة والعالم", tags: [] }, { id: "x", topic: "الأمة والعالم", tags: [] }]));
+    geminiStream.mockResolvedValue(
+      JSON.stringify([
+        { id: "g", topic: "الأمة والعالم", tags: [] },
+        { id: "x", topic: "الأمة والعالم", tags: [] },
+      ]),
+    );
     const out = await classifyBatch(mixed, { key: "K" });
     expect(Object.keys(out)).not.toContain("x");
   });

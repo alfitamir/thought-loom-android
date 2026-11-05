@@ -26,12 +26,15 @@ export const isSongLyricsPending = (ideaId: string): boolean => pending.has(idea
 /** Subscribe to pending changes; returns the unsubscribe. */
 export function onSongLyricsPendingChange(cb: () => void): () => void {
   listeners.add(cb);
-  return () => { listeners.delete(cb); };
+  return () => {
+    listeners.delete(cb);
+  };
 }
 
 const setPending = (ideaId: string, on: boolean) => {
   if (on === pending.has(ideaId)) return;
-  if (on) pending.add(ideaId); else pending.delete(ideaId);
+  if (on) pending.add(ideaId);
+  else pending.delete(ideaId);
   listeners.forEach((cb) => cb());
 };
 
@@ -41,7 +44,10 @@ const setPending = (ideaId: string, on: boolean) => {
  *  nothing when the singing yielded no words at all. Pure — the editor's
  *  extraction flow decides through here. */
 export type LyricsDecision = "fill" | "confirm" | "none";
-export const decideLyricsApplication = (currentLyrics: string, extracted: string): LyricsDecision => {
+export const decideLyricsApplication = (
+  currentLyrics: string,
+  extracted: string,
+): LyricsDecision => {
   if (!extracted.trim()) return "none";
   return currentLyrics.trim() ? "confirm" : "fill";
 };
@@ -54,12 +60,17 @@ export const decideLyricsApplication = (currentLyrics: string, extracted: string
  * Returns the updated idea, or undefined when nothing was written. Only
  * the editor's extraction flow calls this — extraction is on request.
  */
-export function applySongLyrics(ideaId: string, lyrics: string, mode: "fill-if-empty" | "replace"): Idea | undefined {
+export function applySongLyrics(
+  ideaId: string,
+  lyrics: string,
+  mode: "fill-if-empty" | "replace",
+): Idea | undefined {
   const current = loadIdeas().find((i) => i.id === ideaId);
   if (!current?.song || !lyrics.trim()) return undefined;
   if (mode === "fill-if-empty" && current.text.trim()) return undefined;
   const updated = updateSong(ideaId, "", lyrics);
-  if (updated && typeof window !== "undefined") window.dispatchEvent(new Event("afkari:ideas-changed"));
+  if (updated && typeof window !== "undefined")
+    window.dispatchEvent(new Event("afkari:ideas-changed"));
   return updated;
 }
 
@@ -85,7 +96,8 @@ export async function transcribeSong(ideaId: string, deps: SongLyricsDeps = {}):
   const idea = loadIdeas().find((i) => i.id === ideaId);
   if (!idea?.song) throw new Error("هذه ليست أغنية مسجلة.");
   const record = await getSongAudio(ideaId, deps.audioStore ?? songAudioStore());
-  if (!record) throw new Error("التسجيل الصوتي على الجهاز اللي سجّلته عليه، فلا يمكن استخراج كلماته من هنا.");
+  if (!record)
+    throw new Error("التسجيل الصوتي على الجهاز اللي سجّلته عليه، فلا يمكن استخراج كلماته من هنا.");
   let engine = deps.engine;
   if (!engine) {
     const resolved = await resolveEngine();

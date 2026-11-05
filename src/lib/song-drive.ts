@@ -18,7 +18,12 @@
 // silent: an upload that fails is simply retried by the next pass, and a
 // Drive file whose deletion failed is tombstoned below and retried too.
 import { supabase } from "@/integrations/supabase/client";
-import { saveSongAudio, songAudioStore, type SongAudioRecord, type SongAudioStore } from "./article-audio";
+import {
+  saveSongAudio,
+  songAudioStore,
+  type SongAudioRecord,
+  type SongAudioStore,
+} from "./article-audio";
 import { getArticle, loadIdeas, replaceIdeas, type Idea } from "./ideas";
 import { getSongMp3, SONG_MP3_MIME } from "./song-export";
 
@@ -49,11 +54,13 @@ export function serverSongDriveClient(): SongDriveClient {
     return res;
   };
   const json = async (body: Record<string, string>): Promise<{ fileId?: string | null }> =>
-    (await (await call({
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })).json()) as { fileId?: string | null };
+    (await (
+      await call({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    ).json()) as { fileId?: string | null };
   return {
     async findSongFile(songId) {
       return (await json({ action: "find", songId })).fileId ?? null;
@@ -64,16 +71,20 @@ export function serverSongDriveClient(): SongDriveClient {
       form.set("songId", songId);
       form.set("name", name);
       form.set("file", new File([blob], name, { type: mime }));
-      const data = (await (await call({ method: "POST", body: form })).json()) as { fileId?: string | null };
+      const data = (await (await call({ method: "POST", body: form })).json()) as {
+        fileId?: string | null;
+      };
       if (!data.fileId) throw new Error("upload returned no file id");
       return data.fileId;
     },
     async downloadSong(fileId) {
-      return (await call({
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "download", fileId }),
-      })).blob();
+      return (
+        await call({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "download", fileId }),
+        })
+      ).blob();
     },
     async deleteSongFile(fileId) {
       await json({ action: "delete", fileId });
@@ -96,11 +107,12 @@ const EXT_BY_MIME: Record<string, string> = {
  * follows the blob's real mime type, never a guess.
  */
 export function songDriveFileName(idea: Idea, mime: string): string {
-  const title = (getArticle(idea).title || "أغنية")
-    .replace(/[/\\:*?"<>|]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 80) || "أغنية";
+  const title =
+    (getArticle(idea).title || "أغنية")
+      .replace(/[/\\:*?"<>|]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80) || "أغنية";
   const date = new Date(idea.createdAt).toISOString().slice(0, 10);
   const ext = EXT_BY_MIME[mime] ?? mime.split("/")[1]?.replace(/[^a-z0-9]/gi, "") ?? "webm";
   return `${title} — ${date}.${ext}`;
@@ -112,10 +124,16 @@ export function songDriveFileName(idea: Idea, mime: string): string {
 // ideas.ts — the list holds Drive FILE ids, not idea ids.
 const TOMBSTONE_KEY = "afkari.songDriveDeleted";
 export const loadSongDriveTombstones = (): string[] => {
-  try { return JSON.parse(localStorage.getItem(TOMBSTONE_KEY) || "[]"); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(TOMBSTONE_KEY) || "[]");
+  } catch {
+    return [];
+  }
 };
-const writeTombstones = (ids: string[]) => localStorage.setItem(TOMBSTONE_KEY, JSON.stringify([...new Set(ids)]));
-export const queueSongDriveDelete = (fileId: string) => writeTombstones([...loadSongDriveTombstones(), fileId]);
+const writeTombstones = (ids: string[]) =>
+  localStorage.setItem(TOMBSTONE_KEY, JSON.stringify([...new Set(ids)]));
+export const queueSongDriveDelete = (fileId: string) =>
+  writeTombstones([...loadSongDriveTombstones(), fileId]);
 
 export interface SongDriveDeps {
   ideas: Idea[];
@@ -142,7 +160,11 @@ export interface SongDriveDeps {
 export async function runSongAudioPass(deps: SongDriveDeps): Promise<number> {
   const stillPending: string[] = [];
   for (const fileId of loadSongDriveTombstones()) {
-    try { await deps.client.deleteSongFile(fileId); } catch { stillPending.push(fileId); }
+    try {
+      await deps.client.deleteSongFile(fileId);
+    } catch {
+      stillPending.push(fileId);
+    }
   }
   writeTombstones(stillPending);
 
@@ -169,7 +191,9 @@ export async function runSongAudioPass(deps: SongDriveDeps): Promise<number> {
       replaceIdeas(ideas);
       if (typeof window !== "undefined") window.dispatchEvent(new Event("afkari:ideas-changed"));
       gained++;
-    } catch { /* silent: retried by the next pass */ }
+    } catch {
+      /* silent: retried by the next pass */
+    }
   }
   return gained;
 }
@@ -185,10 +209,16 @@ let again = false;
  * again when either changes).
  */
 export function syncSongAudio(): Promise<number> {
-  if (running) { again = true; return running; }
+  if (running) {
+    again = true;
+    return running;
+  }
   running = run().finally(() => {
     running = null;
-    if (again) { again = false; void syncSongAudio(); }
+    if (again) {
+      again = false;
+      void syncSongAudio();
+    }
   });
   return running;
 }
@@ -218,7 +248,12 @@ export async function downloadSongAudio(
   const client = deps.client ?? serverSongDriveClient();
   const blob = await client.downloadSong(idea.driveFileId);
   return saveSongAudio(
-    { ideaId: idea.id, blob, ...(blob.type ? { mime: blob.type } : {}), duration: idea.songDuration ?? 0 },
+    {
+      ideaId: idea.id,
+      blob,
+      ...(blob.type ? { mime: blob.type } : {}),
+      duration: idea.songDuration ?? 0,
+    },
     deps.audioStore ?? songAudioStore(),
   );
 }
@@ -236,7 +271,10 @@ export async function deleteSongDriveCopy(
   const fileId = idea.driveFileId;
   if (!fileId) return;
   const online = deps.online ?? (typeof navigator === "undefined" || navigator.onLine);
-  if (!online) { queueSongDriveDelete(fileId); return; }
+  if (!online) {
+    queueSongDriveDelete(fileId);
+    return;
+  }
   try {
     await (deps.client ?? serverSongDriveClient()).deleteSongFile(fileId);
   } catch {

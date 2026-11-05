@@ -6,8 +6,13 @@ import { articleTopic, getArticle, type Idea } from "@/lib/ideas";
 import { loadVisibleIdeas, PENDING_DELETE_GRACE_MS } from "@/lib/pending-deletes";
 import { requestDelete, undoDelete } from "@/lib/delete-flow";
 import {
-  archiveAgeLabel, archiveDayKey, archivePool, isArchiveDismissed,
-  parseArchiveCycle, pickArchiveIdea, serializeArchiveCycle,
+  archiveAgeLabel,
+  archiveDayKey,
+  archivePool,
+  isArchiveDismissed,
+  parseArchiveCycle,
+  pickArchiveIdea,
+  serializeArchiveCycle,
 } from "@/lib/archive-pick";
 
 // «من أرشيفك»: one old idea resurfaces on the home screen each day (the
@@ -18,10 +23,18 @@ const DISMISS_KEY = "afkari.archiveDismissed";
 const CYCLE_KEY = "afkari.archiveCycle";
 
 const readLocal = (key: string): string | null => {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 };
 const writeLocal = (key: string, value: string) => {
-  try { localStorage.setItem(key, value); } catch { /* private mode: the card just forgets */ }
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* private mode: the card just forgets */
+  }
 };
 
 export function ArchiveCard() {
@@ -56,7 +69,12 @@ export function ArchiveCard() {
     requestDelete(idea.id);
     toast(idea.song ? "حُذفت الأغنية" : "حُذف المقال", {
       duration: PENDING_DELETE_GRACE_MS,
-      action: { label: "تراجع", onClick: () => { undoDelete(idea.id); } },
+      action: {
+        label: "تراجع",
+        onClick: () => {
+          undoDelete(idea.id);
+        },
+      },
     });
     if (openedId === idea.id) setOpenedId(null);
     refresh();
@@ -70,14 +88,26 @@ export function ArchiveCard() {
       <section className="w-full max-w-md rounded-2xl border border-border bg-card p-4 text-start shadow-sm">
         <div className="mb-2 flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-            <Archive className="size-4" />من أرشيفك
+            <Archive className="size-4" />
+            من أرشيفك
           </span>
-          <button type="button" aria-label="إغلاق المقال" title="إغلاق المقال" onClick={() => setOpenedId(null)}
-            className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+          <button
+            type="button"
+            aria-label="إغلاق المقال"
+            title="إغلاق المقال"
+            onClick={() => setOpenedId(null)}
+            className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
             <X className="size-4" />
           </button>
         </div>
-        <ArticleEditor idea={opened} topic={articleTopic(opened)} online={online} onChange={refresh} onDelete={() => handleDelete(opened)} />
+        <ArticleEditor
+          idea={opened}
+          topic={articleTopic(opened)}
+          online={online}
+          onChange={refresh}
+          onDelete={() => handleDelete(opened)}
+        />
       </section>
     );
   }
@@ -105,26 +135,44 @@ export function ArchiveCard() {
     <section className="w-full max-w-md rounded-2xl border border-border bg-card p-4 text-start shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-          <Archive className="size-4" />من أرشيفك
+          <Archive className="size-4" />
+          من أرشيفك
         </span>
-        <button type="button" aria-label="إخفاء البطاقة اليوم" title="إخفاء البطاقة اليوم" onClick={dismiss}
-          className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+        <button
+          type="button"
+          aria-label="إخفاء البطاقة اليوم"
+          title="إخفاء البطاقة اليوم"
+          onClick={dismiss}
+          className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
           <X className="size-4" />
         </button>
       </div>
-      <button type="button" onClick={() => setOpenedId(picked.id)} className="block w-full text-start" aria-label={`فتح: ${article.title}`}>
-        <h2 className="break-words font-display text-lg leading-snug text-primary">{article.title}</h2>
+      <button
+        type="button"
+        onClick={() => setOpenedId(picked.id)}
+        className="block w-full text-start"
+        aria-label={`فتح: ${article.title}`}
+      >
+        <h2 className="break-words font-display text-lg leading-snug text-primary">
+          {article.title}
+        </h2>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground">
             التصنيف: {articleTopic(picked)}
           </span>
           {picked.liked && (
             <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-0.5 text-xs font-medium text-rose-600 dark:text-rose-400">
-              <Heart className="size-3.5" />أعجبني
+              <Heart className="size-3.5" />
+              أعجبني
             </span>
           )}
           {(picked.sources ?? []).map((s) => (
-            <span key={s} className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground" title={`يتضمن مقالًا من: ${s}`}>
+            <span
+              key={s}
+              className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground"
+              title={`يتضمن مقالًا من: ${s}`}
+            >
               يتضمن مقالًا من: {s}
             </span>
           ))}
@@ -132,14 +180,22 @@ export function ArchiveCard() {
         {picked.liked && picked.source && (
           <p className="mt-1.5 break-words text-sm text-foreground">المصدر: {picked.source}</p>
         )}
-        {preview && <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{preview}</p>}
+        {preview && (
+          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+            {preview}
+          </p>
+        )}
       </button>
       <div className="mt-3 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{archiveAgeLabel(picked)}</span>
         {poolSize > 1 && (
-          <button type="button" onClick={cycle}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:bg-accent">
-            <RefreshCw className="size-3.5" />واحدة تانية
+          <button
+            type="button"
+            onClick={cycle}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:bg-accent"
+          >
+            <RefreshCw className="size-3.5" />
+            واحدة تانية
           </button>
         )}
       </div>

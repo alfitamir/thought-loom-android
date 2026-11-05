@@ -20,7 +20,12 @@ const FOLDER_MARK = { key: "afkari", value: "songs-folder" };
 export type DriveFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
 class DriveError extends Error {
-  constructor(public status: number, body: string) { super(`Drive request failed [${status}]: ${body}`); }
+  constructor(
+    public status: number,
+    body: string,
+  ) {
+    super(`Drive request failed [${status}]: ${body}`);
+  }
 }
 
 /**
@@ -30,7 +35,9 @@ class DriveError extends Error {
  */
 export function createSongDriveOps(drive: DriveFetch) {
   const search = async (q: string): Promise<{ id: string }[]> => {
-    const res = await drive(`drive/v3/files?spaces=drive&orderBy=modifiedTime%20desc&fields=files(id)&q=${encodeURIComponent(q)}`);
+    const res = await drive(
+      `drive/v3/files?spaces=drive&orderBy=modifiedTime%20desc&fields=files(id)&q=${encodeURIComponent(q)}`,
+    );
     return ((await res.json()).files ?? []) as { id: string }[];
   };
 
@@ -59,12 +66,19 @@ export function createSongDriveOps(drive: DriveFetch) {
 
   /** The Drive file already holding this song's recording, if there is one. */
   const findSongFile = async (songId: string): Promise<string | null> => {
-    const [found] = await search(`trashed=false and appProperties has { key='songId' and value='${songId}' }`);
+    const [found] = await search(
+      `trashed=false and appProperties has { key='songId' and value='${songId}' }`,
+    );
     return found?.id ?? null;
   };
 
   /** Upload one recording into the songs folder; returns the new file id. */
-  const uploadSong = async (input: { songId: string; name: string; blob: Blob; mime: string }): Promise<string> => {
+  const uploadSong = async (input: {
+    songId: string;
+    name: string;
+    blob: Blob;
+    mime: string;
+  }): Promise<string> => {
     const folder = await ensureFolder();
     const boundary = `afkari${crypto.randomUUID()}`;
     const metadata = {
@@ -74,7 +88,9 @@ export function createSongDriveOps(drive: DriveFetch) {
       description: "تسجيلة أغنية من تطبيق أفكاري",
     };
     const head = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${input.mime}\r\n\r\n`;
-    const body = new Blob([head, input.blob, `\r\n--${boundary}--`], { type: `multipart/related; boundary=${boundary}` });
+    const body = new Blob([head, input.blob, `\r\n--${boundary}--`], {
+      type: `multipart/related; boundary=${boundary}`,
+    });
     const res = await drive("upload/drive/v3/files?uploadType=multipart&fields=id", {
       method: "POST",
       headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
@@ -104,26 +120,32 @@ const jsonBody = z.object({
 });
 
 export async function driveSongAudio(request: Request): Promise<Response> {
-  const fail = (message: string, status: number) => Response.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
+  const fail = (message: string, status: number) =>
+    Response.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
   const url = process.env["SUPABASE_URL"];
   const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const driveKey = process.env["GOOGLE_DRIVE_API_KEY"];
   const owner = process.env["DRIVE_OWNER_USER_ID"];
-  if (!url || !key || !lovableKey || !driveKey || !owner) return fail("المزامنة مع Google Drive غير مهيأة الآن.", 503);
+  if (!url || !key || !lovableKey || !driveKey || !owner)
+    return fail("المزامنة مع Google Drive غير مهيأة الآن.", 503);
 
   const bearer = request.headers.get("Authorization");
-  if (!bearer?.startsWith("Bearer ")) return fail("سجّل الدخول أولاً لتفعيل المزامنة مع Google Drive.", 401);
+  if (!bearer?.startsWith("Bearer "))
+    return fail("سجّل الدخول أولاً لتفعيل المزامنة مع Google Drive.", 401);
   const cloud = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { fetch: (input, init) => {
-      const headers = new Headers(init?.headers);
-      headers.set("apikey", key);
-      return fetch(input, { ...init, headers });
-    } },
+    global: {
+      fetch: (input, init) => {
+        const headers = new Headers(init?.headers);
+        headers.set("apikey", key);
+        return fetch(input, { ...init, headers });
+      },
+    },
   });
   const { data: auth, error: authError } = await cloud.auth.getUser(bearer.slice(7));
-  if (authError || !auth.user) return fail("سجّل الدخول مجددًا لتفعيل المزامنة مع Google Drive.", 401);
+  if (authError || !auth.user)
+    return fail("سجّل الدخول مجددًا لتفعيل المزامنة مع Google Drive.", 401);
   // The Drive belongs to the app owner; nobody else may read or write it.
   if (auth.user.id !== owner) return fail("المزامنة مع Google Drive متاحة لصاحب التطبيق فقط.", 403);
 
@@ -148,10 +170,22 @@ export async function driveSongAudio(request: Request): Promise<Response> {
       const file = form?.get("file");
       const songId = form?.get("songId");
       const name = form?.get("name");
-      if (form?.get("action") !== "upload" || typeof songId !== "string" || !songId || typeof name !== "string" || !name || !(file instanceof Blob)) {
+      if (
+        form?.get("action") !== "upload" ||
+        typeof songId !== "string" ||
+        !songId ||
+        typeof name !== "string" ||
+        !name ||
+        !(file instanceof Blob)
+      ) {
         return fail("بيانات الرفع غير صالحة.", 400);
       }
-      const fileId = await ops.uploadSong({ songId, name, blob: file, mime: file.type || "audio/webm" });
+      const fileId = await ops.uploadSong({
+        songId,
+        name,
+        blob: file,
+        mime: file.type || "audio/webm",
+      });
       return Response.json({ fileId }, { headers: { "Cache-Control": "no-store" } });
     }
 
@@ -160,7 +194,10 @@ export async function driveSongAudio(request: Request): Promise<Response> {
     const { action, songId, fileId } = parsed.data;
     if (action === "find") {
       if (!songId) return fail("بيانات الطلب غير صالحة.", 400);
-      return Response.json({ fileId: await ops.findSongFile(songId) }, { headers: { "Cache-Control": "no-store" } });
+      return Response.json(
+        { fileId: await ops.findSongFile(songId) },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     }
     if (!fileId) return fail("بيانات الطلب غير صالحة.", 400);
     if (action === "delete") {
@@ -176,8 +213,10 @@ export async function driveSongAudio(request: Request): Promise<Response> {
     });
   } catch (error) {
     if (error instanceof DriveError) {
-      if (error.status === 401 || error.status === 403) return fail("انقطع الربط مع Google Drive. أعد ربطه ثم حاول مرة أخرى.", 502);
-      if (error.status === 429) return fail("Google Drive مشغول الآن. سنحاول مرة أخرى لاحقًا.", 503);
+      if (error.status === 401 || error.status === 403)
+        return fail("انقطع الربط مع Google Drive. أعد ربطه ثم حاول مرة أخرى.", 502);
+      if (error.status === 429)
+        return fail("Google Drive مشغول الآن. سنحاول مرة أخرى لاحقًا.", 503);
       return fail(`تعذّرت المزامنة مع Google Drive الآن (${error.status}).`, 502);
     }
     console.error("Drive song audio failed", error);

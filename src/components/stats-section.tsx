@@ -29,7 +29,10 @@ export function StatsSection() {
       </p>
       <dl className="grid grid-cols-2 gap-2">
         {totals.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-2 rounded-md bg-card px-3 py-2">
+          <div
+            key={label}
+            className="flex items-baseline justify-between gap-2 rounded-md bg-card px-3 py-2"
+          >
             <dt className="text-sm text-muted-foreground">{label}</dt>
             <dd className="font-display text-base">{arabicNumber(value)}</dd>
           </div>
@@ -39,7 +42,10 @@ export function StatsSection() {
         <div className="space-y-1">
           <p className="text-sm font-medium">أكثر المواضيع</p>
           {stats.topTopics.map(({ topic, count }) => (
-            <p key={topic} className="flex items-baseline justify-between gap-2 text-sm text-muted-foreground">
+            <p
+              key={topic}
+              className="flex items-baseline justify-between gap-2 text-sm text-muted-foreground"
+            >
               <span>{topic}</span>
               <span>{arabicNumber(count)}</span>
             </p>
@@ -47,7 +53,8 @@ export function StatsSection() {
         </div>
       )}
       <p className="text-sm text-muted-foreground">
-        سلسلة الكتابة: الحالي {arabicNumber(stats.currentStreak)} يوم · الأطول {arabicNumber(stats.longestStreak)} يوم
+        سلسلة الكتابة: الحالي {arabicNumber(stats.currentStreak)} يوم · الأطول{" "}
+        {arabicNumber(stats.longestStreak)} يوم
       </p>
     </section>
   );

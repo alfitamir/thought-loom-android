@@ -4,9 +4,19 @@ import { Button } from "@/components/ui/button";
 import { getGeminiKey } from "@/lib/gemini";
 import { MIC_DENIED, pickMime } from "@/lib/audio-recorder";
 import {
-  blobToWav24k, clearMyVoiceProfile, CONSENT_STATEMENT_AR, createMyVoice, deleteMyVoice,
-  getMyVoiceProfile, MAX_SAMPLE_SECONDS, MIN_SAMPLE_SECONDS, prepareUploadedAudio, READING_SAMPLE_AR,
-  sampleDurationState, saveMyVoiceProfile, type MyVoiceProfile,
+  blobToWav24k,
+  clearMyVoiceProfile,
+  CONSENT_STATEMENT_AR,
+  createMyVoice,
+  deleteMyVoice,
+  getMyVoiceProfile,
+  MAX_SAMPLE_SECONDS,
+  MIN_SAMPLE_SECONDS,
+  prepareUploadedAudio,
+  READING_SAMPLE_AR,
+  sampleDurationState,
+  saveMyVoiceProfile,
+  type MyVoiceProfile,
 } from "@/lib/my-voice";
 
 type Clip = { blob: Blob; seconds: number; url: string; trimmed?: boolean };
@@ -47,7 +57,10 @@ export function MyVoiceSection() {
   useEffect(() => {
     setProfile(getMyVoiceProfile());
     setHasKey(!!getGeminiKey());
-    const update = () => { setProfile(getMyVoiceProfile()); setHasKey(!!getGeminiKey()); };
+    const update = () => {
+      setProfile(getMyVoiceProfile());
+      setHasKey(!!getGeminiKey());
+    };
     window.addEventListener("afkari:settings-changed", update);
     return () => window.removeEventListener("afkari:settings-changed", update);
   }, []);
@@ -64,14 +77,18 @@ export function MyVoiceSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recording]);
 
-  useEffect(() => () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    if (sampleRef.current) URL.revokeObjectURL(sampleRef.current.url);
-    if (consentRef.current) URL.revokeObjectURL(consentRef.current.url);
-  }, []);
+  useEffect(
+    () => () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      if (sampleRef.current) URL.revokeObjectURL(sampleRef.current.url);
+      if (consentRef.current) URL.revokeObjectURL(consentRef.current.url);
+    },
+    [],
+  );
 
   const startRecording = async (kind: RecordingKind) => {
-    setError(""); setMsg("");
+    setError("");
+    setMsg("");
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setError("التسجيل الصوتي غير متاح على هذا الجهاز.");
       return;
@@ -86,10 +103,13 @@ export function MyVoiceSection() {
     }
     const mime = pickMime((m) => MediaRecorder.isTypeSupported(m));
     const rec = new MediaRecorder(streamRef.current, {
-      ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 128000,
+      ...(mime ? { mimeType: mime } : {}),
+      audioBitsPerSecond: 128000,
     });
     chunksRef.current = [];
-    rec.ondataavailable = (e) => { if (e.data?.size) chunksRef.current.push(e.data); };
+    rec.ondataavailable = (e) => {
+      if (e.data?.size) chunksRef.current.push(e.data);
+    };
     rec.onstop = () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -98,7 +118,8 @@ export function MyVoiceSection() {
       const clip: Clip = { blob, seconds, url: URL.createObjectURL(blob) };
       const prev = kindRef.current === "sample" ? sampleRef.current : consentRef.current;
       if (prev) URL.revokeObjectURL(prev.url);
-      if (kindRef.current === "sample") setSample(clip); else setConsent(clip);
+      if (kindRef.current === "sample") setSample(clip);
+      else setConsent(clip);
       setRecording(null);
     };
     recorderRef.current = rec;
@@ -110,7 +131,11 @@ export function MyVoiceSection() {
   };
 
   const stopRecording = () => {
-    try { recorderRef.current?.stop(); } catch { setRecording(null); }
+    try {
+      recorderRef.current?.stop();
+    } catch {
+      setRecording(null);
+    }
   };
 
   /**
@@ -121,14 +146,21 @@ export function MyVoiceSection() {
    */
   const onFile = async (kind: RecordingKind, file: File | undefined) => {
     if (!file) return;
-    setError(""); setMsg("");
+    setError("");
+    setMsg("");
     try {
       const prep = await prepareUploadedAudio(file, kind === "sample");
       const blob = new Blob([prep.wav.buffer as ArrayBuffer], { type: "audio/wav" });
-      const clip: Clip = { blob, seconds: prep.seconds, url: URL.createObjectURL(blob), trimmed: prep.trimmed };
+      const clip: Clip = {
+        blob,
+        seconds: prep.seconds,
+        url: URL.createObjectURL(blob),
+        trimmed: prep.trimmed,
+      };
       const prev = kind === "sample" ? sampleRef.current : consentRef.current;
       if (prev) URL.revokeObjectURL(prev.url);
-      if (kind === "sample") setSample(clip); else setConsent(clip);
+      if (kind === "sample") setSample(clip);
+      else setConsent(clip);
     } catch {
       setError("تعذّرت قراءة الملف الصوتي — جرّب ملفًا آخر (mp3 أو wav أو m4a).");
     }
@@ -140,15 +172,24 @@ export function MyVoiceSection() {
   const create = async () => {
     if (!sample || !consent) return;
     const key = getGeminiKey();
-    if (!key) { setError("أضف مفتاح Gemini أعلاه أولًا."); return; }
-    setCreating(true); setError(""); setMsg("جارٍ إنشاء صوتك… تُرسل التسجيلتان إلى Google للتحقق من الموافقة وإنشاء الصوت.");
+    if (!key) {
+      setError("أضف مفتاح Gemini أعلاه أولًا.");
+      return;
+    }
+    setCreating(true);
+    setError("");
+    setMsg("جارٍ إنشاء صوتك… تُرسل التسجيلتان إلى Google للتحقق من الموافقة وإنشاء الصوت.");
     try {
-      const [sourceWav, consentWav] = await Promise.all([blobToWav24k(sample.blob), blobToWav24k(consent.blob)]);
+      const [sourceWav, consentWav] = await Promise.all([
+        blobToWav24k(sample.blob),
+        blobToWav24k(consent.blob),
+      ]);
       const voiceId = await createMyVoice(key, sourceWav, consentWav);
       setProfile(saveMyVoiceProfile(voiceId));
       if (sampleRef.current) URL.revokeObjectURL(sampleRef.current.url);
       if (consentRef.current) URL.revokeObjectURL(consentRef.current.url);
-      setSample(null); setConsent(null);
+      setSample(null);
+      setConsent(null);
       setMsg("صار صوتك جاهزًا ✓ من «استمع» في أي مقال اختر «صوتي» لتسمعه بصوتك.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذّر إنشاء الصوت الآن.");
@@ -172,35 +213,56 @@ export function MyVoiceSection() {
       <div className="flex flex-wrap items-center gap-2">
         {recording === kind ? (
           <Button variant="outline" className="[&_svg]:size-5" onClick={stopRecording}>
-            <Square />إيقاف ({fmt(elapsed)})
+            <Square />
+            إيقاف ({fmt(elapsed)})
           </Button>
         ) : (
-          <Button variant="outline" className="[&_svg]:size-5" onClick={() => void startRecording(kind)} disabled={recording !== null || creating}>
-            <Mic />{clip ? "إعادة التسجيل" : "تسجيل"}
+          <Button
+            variant="outline"
+            className="[&_svg]:size-5"
+            onClick={() => void startRecording(kind)}
+            disabled={recording !== null || creating}
+          >
+            <Mic />
+            {clip ? "إعادة التسجيل" : "تسجيل"}
           </Button>
         )}
         {recording !== kind && (
           <>
             <Button
-              variant="outline" className="[&_svg]:size-5" disabled={recording !== null || creating}
+              variant="outline"
+              className="[&_svg]:size-5"
+              disabled={recording !== null || creating}
               onClick={() => (kind === "sample" ? sampleFileRef : consentFileRef).current?.click()}
             >
-              <Upload />رفع ملف صوتي
+              <Upload />
+              رفع ملف صوتي
             </Button>
             <input
               ref={kind === "sample" ? sampleFileRef : consentFileRef}
-              type="file" accept="audio/*" className="hidden"
-              onChange={(e) => { void onFile(kind, e.target.files?.[0]); e.target.value = ""; }}
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={(e) => {
+                void onFile(kind, e.target.files?.[0]);
+                e.target.value = "";
+              }}
             />
           </>
         )}
-        {clip && recording !== kind && <span className="text-xs text-muted-foreground">المدة: {fmt(clip.seconds)}</span>}
+        {clip && recording !== kind && (
+          <span className="text-xs text-muted-foreground">المدة: {fmt(clip.seconds)}</span>
+        )}
       </div>
       {clip?.trimmed && (
-        <p className="text-xs text-muted-foreground">الملف أطول من {MAX_SAMPLE_SECONDS} ثانية — هنستخدم أول {MAX_SAMPLE_SECONDS} ثانية بس.</p>
+        <p className="text-xs text-muted-foreground">
+          الملف أطول من {MAX_SAMPLE_SECONDS} ثانية — هنستخدم أول {MAX_SAMPLE_SECONDS} ثانية بس.
+        </p>
       )}
       {kind === "consent" && (
-        <p className="text-xs text-muted-foreground">سواء سجّلت أو رفعت ملفًا: لازم يكون بصوتك إنت، وبتقول فيه الجملة اللي فوق بالنص.</p>
+        <p className="text-xs text-muted-foreground">
+          سواء سجّلت أو رفعت ملفًا: لازم يكون بصوتك إنت، وبتقول فيه الجملة اللي فوق بالنص.
+        </p>
       )}
       {clip && recording !== kind && <audio src={clip.url} controls className="w-full" />}
     </div>
@@ -218,14 +280,20 @@ export function MyVoiceSection() {
       {profile ? (
         <>
           <p className="text-sm text-muted-foreground">
-            صوتك المُستنسخ جاهز منذ {new Date(profile.createdAt).toLocaleDateString("ar-EG", { dateStyle: "medium" })}.
-            من «استمع» في أي مقال، اختر «صوتي» لتوليد القراءة بصوتك ومشاركتها.
+            صوتك المُستنسخ جاهز منذ{" "}
+            {new Date(profile.createdAt).toLocaleDateString("ar-EG", { dateStyle: "medium" })}. من
+            «استمع» في أي مقال، اختر «صوتي» لتوليد القراءة بصوتك ومشاركتها.
           </p>
           <p className="text-sm text-muted-foreground">
             لو الصوت مش شبهك، امسحه وسجّل من جديد بالإرشادات دي — جودة العيّنة هي أكبر عامل.
           </p>
-          <Button variant="ghost" className="text-destructive [&_svg]:size-5" onClick={() => void remove()}>
-            <Trash2 />حذف صوتي
+          <Button
+            variant="ghost"
+            className="text-destructive [&_svg]:size-5"
+            onClick={() => void remove()}
+          >
+            <Trash2 />
+            حذف صوتي
           </Button>
         </>
       ) : (
@@ -234,10 +302,13 @@ export function MyVoiceSection() {
             سجّل عيّنة قصيرة من قراءتك، وسيقرأ Gemini مقالاتك بصوتك أنت بدل الصوت الافتراضي.
           </p>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            تُرسل التسجيلتان إلى Google لإنشاء الصوت والتحقق من الموافقة، وفق شروط حسابك في Google AI — ولا يبقى منهما شيء على هذا الهاتف بعد الإنشاء.
+            تُرسل التسجيلتان إلى Google لإنشاء الصوت والتحقق من الموافقة، وفق شروط حسابك في Google
+            AI — ولا يبقى منهما شيء على هذا الهاتف بعد الإنشاء.
           </p>
           {!hasKey && (
-            <p className="text-sm text-muted-foreground">أضف مفتاح Gemini أعلاه أولًا — إنشاء الصوت يتم بمفتاحك.</p>
+            <p className="text-sm text-muted-foreground">
+              أضف مفتاح Gemini أعلاه أولًا — إنشاء الصوت يتم بمفتاحك.
+            </p>
           )}
           <div className="space-y-1 rounded-lg bg-muted/40 px-3 py-2">
             <p className="text-sm font-medium">لأقرب شبه لصوتك الحقيقي</p>
@@ -251,25 +322,46 @@ export function MyVoiceSection() {
             </ul>
           </div>
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">١. عيّنة القراءة ({MIN_SAMPLE_SECONDS}–{MAX_SAMPLE_SECONDS} ثانية)</h4>
-            <p className="rounded-lg bg-muted/40 px-3 py-2 text-sm leading-loose">{READING_SAMPLE_AR}</p>
-            <p className="text-xs text-muted-foreground">اقرأ النص بصوتك الطبيعي في مكان هادئ، وبالميكروفون نفسه الذي ستسجل به الموافقة.</p>
+            <h4 className="text-sm font-medium">
+              ١. عيّنة القراءة ({MIN_SAMPLE_SECONDS}–{MAX_SAMPLE_SECONDS} ثانية)
+            </h4>
+            <p className="rounded-lg bg-muted/40 px-3 py-2 text-sm leading-loose">
+              {READING_SAMPLE_AR}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              اقرأ النص بصوتك الطبيعي في مكان هادئ، وبالميكروفون نفسه الذي ستسجل به الموافقة.
+            </p>
             {recordRow("sample", sample)}
-            {sampleState === "short" && <p className="text-xs text-destructive">العيّنة أقصر من {MIN_SAMPLE_SECONDS} ثوانٍ — أعد التسجيل واقرأ النص كاملًا.</p>}
+            {sampleState === "short" && (
+              <p className="text-xs text-destructive">
+                العيّنة أقصر من {MIN_SAMPLE_SECONDS} ثوانٍ — أعد التسجيل واقرأ النص كاملًا.
+              </p>
+            )}
             {sampleState === "ok" && <p className="text-xs text-primary">العيّنة مناسبة ✓</p>}
           </div>
           <div className="space-y-2">
             <h4 className="text-sm font-medium">٢. الموافقة (اقرأها كما هي تمامًا)</h4>
-            <p className="rounded-lg bg-muted/40 px-3 py-2 text-sm leading-loose">{CONSENT_STATEMENT_AR}</p>
+            <p className="rounded-lg bg-muted/40 px-3 py-2 text-sm leading-loose">
+              {CONSENT_STATEMENT_AR}
+            </p>
             {recordRow("consent", consent)}
           </div>
           <Button className="[&_svg]:size-5" onClick={() => void create()} disabled={!canCreate}>
-            <Mic />إنشاء صوتي
+            <Mic />
+            إنشاء صوتي
           </Button>
         </>
       )}
-      {msg && <p role="status" className="break-words text-sm text-muted-foreground">{msg}</p>}
-      {error && <p role="alert" className="break-words text-sm text-destructive">{error}</p>}
+      {msg && (
+        <p role="status" className="break-words text-sm text-muted-foreground">
+          {msg}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="break-words text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

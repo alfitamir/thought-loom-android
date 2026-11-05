@@ -63,8 +63,13 @@ export function loadReadingPrefs(): ReadingPrefs {
     if (!raw) return { ...DEFAULT_READING_PREFS };
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) return { ...DEFAULT_READING_PREFS };
-    const { fontSize, lineHeight, bgTint } = parsed as { fontSize?: unknown; lineHeight?: unknown; bgTint?: unknown };
-    if (!isFontSizeStep(fontSize) || !isLineHeightStep(lineHeight)) return { ...DEFAULT_READING_PREFS };
+    const { fontSize, lineHeight, bgTint } = parsed as {
+      fontSize?: unknown;
+      lineHeight?: unknown;
+      bgTint?: unknown;
+    };
+    if (!isFontSizeStep(fontSize) || !isLineHeightStep(lineHeight))
+      return { ...DEFAULT_READING_PREFS };
     if (bgTint !== undefined && !isBgTintStep(bgTint)) return { ...DEFAULT_READING_PREFS };
     return { fontSize, lineHeight, bgTint: bgTint ?? 0 };
   } catch {

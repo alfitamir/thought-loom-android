@@ -100,7 +100,8 @@ export function capVersions(versions: IdeaVersion[]): IdeaVersion[] {
 export function addVersion(versions: IdeaVersion[] | undefined, entry: IdeaVersion): IdeaVersion[] {
   const list = versions ?? [];
   const newest = list[0];
-  if (newest && newest.text === entry.text && (newest.title ?? "") === (entry.title ?? "")) return list;
+  if (newest && newest.text === entry.text && (newest.title ?? "") === (entry.title ?? ""))
+    return list;
   return capVersions([entry, ...list]);
 }
 
@@ -119,7 +120,9 @@ export function parseVersions(raw: unknown): IdeaVersion[] | undefined {
     if (typeof e.text !== "string" || !e.text) continue;
     if (typeof e.source !== "string" || !VERSION_SOURCES.includes(e.source)) continue;
     out.push({
-      at: e.at, text: e.text, source: e.source as VersionSource,
+      at: e.at,
+      text: e.text,
+      source: e.source as VersionSource,
       ...(typeof e.title === "string" && e.title.trim() ? { title: e.title } : {}),
     });
   }
@@ -128,13 +131,37 @@ export function parseVersions(raw: unknown): IdeaVersion[] | undefined {
 
 export const TOPICS: Record<string, string[]> = {
   "الإيمان والروح": ["الله", "صلاة", "دين", "إيمان", "قرآن", "دعاء", "رمضان", "الجنة", "روح"],
-  "العمل والنجاح": ["عمل", "شغل", "وظيفة", "مشروع", "نجاح", "إدارة", "فريق", "شركة", "هدف", "إنتاجية"],
-  "الأسرة والعلاقات": ["أسرة", "عائلة", "زوج", "زوجة", "أولاد", "ابن", "بنت", "أب", "أم", "صديق", "أصدقاء", "حب"],
-  "الصحة": ["صحة", "رياضة", "نوم", "أكل", "طعام", "مرض", "جسم", "مشي", "رجيم"],
-  "المال": ["مال", "فلوس", "استثمار", "ادخار", "راتب", "تجارة", "سعر", "ربح"],
-  "التقنية": ["تقنية", "ذكاء", "برنامج", "تطبيق", "هاتف", "إنترنت", "كمبيوتر", "برمجة"],
+  "العمل والنجاح": [
+    "عمل",
+    "شغل",
+    "وظيفة",
+    "مشروع",
+    "نجاح",
+    "إدارة",
+    "فريق",
+    "شركة",
+    "هدف",
+    "إنتاجية",
+  ],
+  "الأسرة والعلاقات": [
+    "أسرة",
+    "عائلة",
+    "زوج",
+    "زوجة",
+    "أولاد",
+    "ابن",
+    "بنت",
+    "أب",
+    "أم",
+    "صديق",
+    "أصدقاء",
+    "حب",
+  ],
+  الصحة: ["صحة", "رياضة", "نوم", "أكل", "طعام", "مرض", "جسم", "مشي", "رجيم"],
+  المال: ["مال", "فلوس", "استثمار", "ادخار", "راتب", "تجارة", "سعر", "ربح"],
+  التقنية: ["تقنية", "ذكاء", "برنامج", "تطبيق", "هاتف", "إنترنت", "كمبيوتر", "برمجة"],
   "النفس والتأمل": ["نفس", "شعور", "حزن", "سعادة", "قلق", "خوف", "تفكير", "حياة", "صبر", "أمل"],
-  "المجتمع": ["مجتمع", "ناس", "وطن", "تعليم", "مدرسة", "ثقافة", "سياسة"],
+  المجتمع: ["مجتمع", "ناس", "وطن", "تعليم", "مدرسة", "ثقافة", "سياسة"],
 };
 export const OTHER = "متفرقات";
 
@@ -142,13 +169,19 @@ const strip = (s: string) => s.replace(/[\u064B-\u0652]/g, "").replace(/[أإآ]
 
 export function classify(text: string): string {
   const t = strip(text);
-  let best = OTHER, score = 0;
+  let best = OTHER,
+    score = 0;
   for (const [topic, words] of Object.entries(TOPICS)) {
     const n = words.filter((w) => {
       const word = strip(w);
-      return word.length > 2 ? t.includes(word) : new RegExp(`(^|\\s)(ال)?${word}(?=\\s|[،.!؟?]|$)`).test(t);
+      return word.length > 2
+        ? t.includes(word)
+        : new RegExp(`(^|\\s)(ال)?${word}(?=\\s|[،.!؟?]|$)`).test(t);
     }).length;
-    if (n > score) { score = n; best = topic; }
+    if (n > score) {
+      score = n;
+      best = topic;
+    }
   }
   return best;
 }
@@ -164,11 +197,19 @@ export function toArticle(text: string): { title: string; paragraphs: string[] }
   for (const s of sentences) {
     cur.push(s);
     words += s.split(" ").length;
-    if (words >= 35) { paragraphs.push(cur.join(" ")); cur = []; words = 0; }
+    if (words >= 35) {
+      paragraphs.push(cur.join(" "));
+      cur = [];
+      words = 0;
+    }
   }
   if (cur.length) paragraphs.push(cur.join(" "));
   const fixed = paragraphs.map((p) => (/[.!؟?]$/.test(p) ? p : p.replace(/[،,]$/, "") + "."));
-  const title = clean.split(" ").slice(0, 6).join(" ").replace(/[.،,!؟?]+$/, "");
+  const title = clean
+    .split(" ")
+    .slice(0, 6)
+    .join(" ")
+    .replace(/[.،,!؟?]+$/, "");
   return { title: title || "فكرة", paragraphs: fixed };
 }
 
@@ -206,9 +247,11 @@ export class StorageWriteError extends Error {
   readonly quota: boolean;
   readonly originalError?: unknown;
   constructor(quota: boolean, originalError?: unknown) {
-    super(quota
-      ? "مساحة تخزين الجهاز امتلأت — تعذّر حفظ آخر التغييرات. حرّر بعض المساحة أو خذ نسخة احتياطية من الإعدادات."
-      : "تعذّر الحفظ في تخزين الجهاز — آخر التغييرات ظاهرة على الشاشة لكنها قد لا تبقى بعد إغلاق التطبيق.");
+    super(
+      quota
+        ? "مساحة تخزين الجهاز امتلأت — تعذّر حفظ آخر التغييرات. حرّر بعض المساحة أو خذ نسخة احتياطية من الإعدادات."
+        : "تعذّر الحفظ في تخزين الجهاز — آخر التغييرات ظاهرة على الشاشة لكنها قد لا تبقى بعد إغلاق التطبيق.",
+    );
     this.name = "StorageWriteError";
     this.quota = quota;
     this.originalError = originalError;
@@ -218,7 +261,11 @@ export class StorageWriteError extends Error {
 const isQuotaError = (e: unknown): boolean => {
   if (!e || typeof e !== "object") return false;
   const err = e as { name?: string; code?: number; message?: string };
-  return err.name === "QuotaExceededError" || err.code === 22 || /quota/i.test(`${err.name ?? ""} ${err.message ?? ""}`);
+  return (
+    err.name === "QuotaExceededError" ||
+    err.code === 22 ||
+    /quota/i.test(`${err.name ?? ""} ${err.message ?? ""}`)
+  );
 };
 
 type StorageWriteListener = (error: StorageWriteError) => void;
@@ -228,7 +275,9 @@ let currentWriteError: StorageWriteError | null = null;
 /** Hear about library writes localStorage refused. Returns an unsubscribe. */
 export const onStorageWriteError = (listener: StorageWriteListener): (() => void) => {
   storageWriteListeners.add(listener);
-  return () => { storageWriteListeners.delete(listener); };
+  return () => {
+    storageWriteListeners.delete(listener);
+  };
 };
 
 /** The latest unsaved-changes failure, or null once a write succeeds again. */
@@ -239,7 +288,11 @@ const noteWriteFailure = (error: StorageWriteError) => {
   currentWriteError = error;
   if (!firstOfStreak) return;
   for (const listener of storageWriteListeners) {
-    try { listener(error); } catch { /* a listener must never break a write path */ }
+    try {
+      listener(error);
+    } catch {
+      /* a listener must never break a write path */
+    }
   }
 };
 
@@ -248,11 +301,17 @@ const parseIdeas = (raw: string | null): Idea[] | null => {
   try {
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as Idea[]) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 };
 
 const getRaw = (key: string): string | null => {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 };
 
 /** Preserve corrupt raw values for possible recovery instead of overwriting them unseen. */
@@ -262,7 +321,9 @@ const quarantine = (entries: Array<{ key: string; raw: string }>) => {
     const list = Array.isArray(prior) ? prior : [];
     for (const e of entries) list.push({ ...e, at: Date.now() });
     localStorage.setItem(QUARANTINE_KEY, JSON.stringify(list.slice(-5)));
-  } catch { /* quarantine is best effort — it must never break a read */ }
+  } catch {
+    /* quarantine is best effort — it must never break a read */
+  }
 };
 
 /**
@@ -282,7 +343,11 @@ const writeIdeas = (all: Idea[]): boolean => {
   currentWriteError = null;
   // The mirror updates only after the main value is stored: a failed main
   // write leaves the previous good mirror untouched.
-  try { localStorage.setItem(LAST_GOOD_KEY, json); } catch { /* best effort */ }
+  try {
+    localStorage.setItem(LAST_GOOD_KEY, json);
+  } catch {
+    /* best effort */
+  }
   return true;
 };
 
@@ -298,7 +363,11 @@ export const loadIdeas = (): Idea[] => {
   const mirror = parseIdeas(mirrorRaw);
   if (mirror) {
     // Repair the main value from the mirror so later reads stay cheap.
-    try { localStorage.setItem(KEY, mirrorRaw as string); } catch { /* best effort */ }
+    try {
+      localStorage.setItem(KEY, mirrorRaw as string);
+    } catch {
+      /* best effort */
+    }
     return mirror;
   }
   quarantine([
@@ -308,14 +377,18 @@ export const loadIdeas = (): Idea[] => {
   return [];
 };
 
-export const replaceIdeas = (all: Idea[]) => { writeIdeas(all); };
+export const replaceIdeas = (all: Idea[]) => {
+  writeIdeas(all);
+};
 
 /** Byte size of the stored library blob — the Settings backup-health gauge. */
 export const storedIdeasBytes = (): number => {
   try {
     const raw = localStorage.getItem(KEY);
     return raw ? new TextEncoder().encode(raw).length : 0;
-  } catch { return 0; }
+  } catch {
+    return 0;
+  }
 };
 
 export function getArticle(idea: Idea): { title: string; body: string } {
@@ -329,7 +402,12 @@ export function getArticle(idea: Idea): { title: string; body: string } {
 export function matchesArticle(idea: Idea, query: string): boolean {
   const article = getArticle(idea);
   const normalized = strip(query).trim().toLocaleLowerCase();
-  return !normalized || strip(`${article.title}\n${article.body}\n${idea.text}`).toLocaleLowerCase().includes(normalized);
+  return (
+    !normalized ||
+    strip(`${article.title}\n${article.body}\n${idea.text}`)
+      .toLocaleLowerCase()
+      .includes(normalized)
+  );
 }
 
 /**
@@ -341,7 +419,13 @@ export function matchesArticle(idea: Idea, query: string): boolean {
  * and are never snapshotted. Songs and liked articles are ineligible:
  * their text is never AI-replaced in the first place.
  */
-export function updateArticle(id: string, title: string, body: string, polished = false, snapshotSource?: VersionSource): Idea | undefined {
+export function updateArticle(
+  id: string,
+  title: string,
+  body: string,
+  polished = false,
+  snapshotSource?: VersionSource,
+): Idea | undefined {
   if (!title.trim() || !body.trim()) return;
   const all = loadIdeas();
   const current = all.find((idea) => idea.id === id);
@@ -365,8 +449,9 @@ export function updateArticle(id: string, title: string, body: string, polished 
       });
     }
   }
-  if (polished && updated.updatedAt !== undefined) updated.aiPolishedAt = updated.updatedAt; else delete updated.aiPolishedAt;
-  replaceIdeas(all.map((idea) => idea.id === id ? updated : idea));
+  if (polished && updated.updatedAt !== undefined) updated.aiPolishedAt = updated.updatedAt;
+  else delete updated.aiPolishedAt;
+  replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
   return updated;
 }
 
@@ -408,18 +493,32 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
   for (const idea of remote) {
     if (tombstones.has(idea.id)) continue;
     const existing = merged.get(idea.id);
-    if (!existing) { merged.set(idea.id, idea); continue; }
+    if (!existing) {
+      merged.set(idea.id, idea);
+      continue;
+    }
     let winner = (idea.updatedAt ?? 0) > (existing.updatedAt ?? 0) ? idea : existing;
     const loser = winner === idea ? existing : idea;
     const localWon = winner === existing;
     // A hand-pinned topic is metadata a text edition must not silently erase: it rides
     // onto the winning edition unless that edition carries a pin of its own.
-    if (!winner.topicManual && loser.topicManual && loser.topic) winner = { ...winner, topic: loser.topic, topicManual: true };
+    if (!winner.topicManual && loser.topicManual && loser.topic)
+      winner = { ...winner, topic: loser.topic, topicManual: true };
     // Same for the song flag: an edition that lacks it must not un-song the winner,
     // and a winner without the recording's length adopts the loser's.
     if (!winner.song && loser.song) {
-      winner = { ...winner, song: true, ...(winner.songDuration === undefined && loser.songDuration !== undefined ? { songDuration: loser.songDuration } : {}) };
-    } else if (winner.song && winner.songDuration === undefined && loser.songDuration !== undefined) {
+      winner = {
+        ...winner,
+        song: true,
+        ...(winner.songDuration === undefined && loser.songDuration !== undefined
+          ? { songDuration: loser.songDuration }
+          : {}),
+      };
+    } else if (
+      winner.song &&
+      winner.songDuration === undefined &&
+      loser.songDuration !== undefined
+    ) {
       winner = { ...winner, songDuration: loser.songDuration };
     }
     // A liked article is liked on every device: an edition that lacks the flag
@@ -428,11 +527,13 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
     if (!winner.source && loser.source) winner = { ...winner, source: loser.source };
     if (winner.sources?.length || loser.sources?.length) {
       const union = [...new Set([...(winner.sources ?? []), ...(loser.sources ?? [])])];
-      if (union.join("\n") !== (winner.sources ?? []).join("\n")) winner = { ...winner, sources: union };
+      if (union.join("\n") !== (winner.sources ?? []).join("\n"))
+        winner = { ...winner, sources: union };
     }
     // A Drive copy is metadata like the pin: an edition that lacks the file id
     // must not orphan the winner's backed-up recording.
-    if (!winner.driveFileId && loser.driveFileId) winner = { ...winner, driveFileId: loser.driveFileId };
+    if (!winner.driveFileId && loser.driveFileId)
+      winner = { ...winner, driveFileId: loser.driveFileId };
     // The library pin is metadata too: an edition that lacks it must not
     // silently unpin the winner.
     if (!winner.pinned && loser.pinned) winner = { ...winner, pinned: true };
@@ -452,10 +553,12 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
       for (const v of loser.versions ?? []) byAt.set(v.at, v);
       for (const v of winner.versions ?? []) byAt.set(v.at, v);
       const union = capVersions([...byAt.values()]);
-      if (JSON.stringify(union) !== JSON.stringify(winner.versions ?? [])) winner = { ...winner, versions: union };
+      if (JSON.stringify(union) !== JSON.stringify(winner.versions ?? []))
+        winner = { ...winner, versions: union };
     }
     // As before: a local winner that was never polished adopts the remote polish stamp.
-    if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined) winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
+    if (localWon && winner.aiPolishedAt === undefined && idea.aiPolishedAt !== undefined)
+      winner = { ...winner, aiPolishedAt: idea.aiPolishedAt };
     merged.set(idea.id, winner);
   }
   return [...merged.values()].sort((a, b) => b.createdAt - a.createdAt);
@@ -463,7 +566,11 @@ export function mergeIdeas(local: Idea[], remote: Idea[], deleted: string[]): Id
 
 // Ids deleted on this device — used to propagate offline deletions to the cloud backup.
 export const loadDeleted = (): string[] => {
-  try { return JSON.parse(localStorage.getItem(DEL_KEY) || "[]"); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(DEL_KEY) || "[]");
+  } catch {
+    return [];
+  }
 };
 export const clearDeleted = (ids: string[]) =>
   localStorage.setItem(DEL_KEY, JSON.stringify(loadDeleted().filter((d) => !ids.includes(d))));
@@ -477,26 +584,45 @@ export const markDeleted = (ids: string[]) => {
 const DRIVE_DEL_KEY = "afkari.driveDeleted";
 const DRIVE_REVIVED_KEY = "afkari.driveRevived";
 const readList = (key: string): string[] => {
-  try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(key) || "[]");
+  } catch {
+    return [];
+  }
 };
-const writeList = (key: string, ids: string[]) => localStorage.setItem(key, JSON.stringify([...new Set(ids)]));
+const writeList = (key: string, ids: string[]) =>
+  localStorage.setItem(key, JSON.stringify([...new Set(ids)]));
 export const loadDriveDeleted = () => readList(DRIVE_DEL_KEY);
 export const loadDriveRevived = () => readList(DRIVE_REVIVED_KEY);
 /** Deleted elsewhere (cloud record): the Drive file must learn about it too. */
-export const markDriveDeleted = (ids: string[]) => writeList(DRIVE_DEL_KEY, [...loadDriveDeleted(), ...ids]);
+export const markDriveDeleted = (ids: string[]) =>
+  writeList(DRIVE_DEL_KEY, [...loadDriveDeleted(), ...ids]);
 // Restored ideas whose cloud deletion record must be lifted on the next cloud sync.
 const CLOUD_REVIVED_KEY = "afkari.cloudRevived";
 export const loadCloudRevived = () => readList(CLOUD_REVIVED_KEY);
-export const clearCloudRevived = (ids: string[]) => writeList(CLOUD_REVIVED_KEY, loadCloudRevived().filter((d) => !ids.includes(d)));
+export const clearCloudRevived = (ids: string[]) =>
+  writeList(
+    CLOUD_REVIVED_KEY,
+    loadCloudRevived().filter((d) => !ids.includes(d)),
+  );
 /** A restore brings ideas back everywhere, including ones deleted on another device. */
 export const markRevived = (ids: string[]) => {
   writeList(DRIVE_REVIVED_KEY, [...loadDriveRevived(), ...ids]);
   writeList(CLOUD_REVIVED_KEY, [...loadCloudRevived(), ...ids]);
-  writeList(DRIVE_DEL_KEY, loadDriveDeleted().filter((d) => !ids.includes(d)));
+  writeList(
+    DRIVE_DEL_KEY,
+    loadDriveDeleted().filter((d) => !ids.includes(d)),
+  );
 };
 export const clearDriveMarks = (deleted: string[], revived: string[]) => {
-  writeList(DRIVE_DEL_KEY, loadDriveDeleted().filter((d) => !deleted.includes(d)));
-  writeList(DRIVE_REVIVED_KEY, loadDriveRevived().filter((d) => !revived.includes(d)));
+  writeList(
+    DRIVE_DEL_KEY,
+    loadDriveDeleted().filter((d) => !deleted.includes(d)),
+  );
+  writeList(
+    DRIVE_REVIVED_KEY,
+    loadDriveRevived().filter((d) => !revived.includes(d)),
+  );
 };
 
 export const saveIdea = (text: string, opts?: { medical?: boolean }): Idea => {
@@ -514,7 +640,10 @@ export const deleteIdea = (id: string) => {
   const del = loadDeleted();
   if (!del.includes(id)) localStorage.setItem(DEL_KEY, JSON.stringify([...del, id]));
   writeList(DRIVE_DEL_KEY, [...loadDriveDeleted(), id]);
-  writeList(DRIVE_REVIVED_KEY, loadDriveRevived().filter((d) => d !== id));
+  writeList(
+    DRIVE_REVIVED_KEY,
+    loadDriveRevived().filter((d) => d !== id),
+  );
 };
 
 /** The topic an article is filed under: the user's hand-set topic while pinned, otherwise the keyword classification of its body. */
@@ -563,7 +692,8 @@ export function setPinned(id: string, pinned: boolean): Idea | undefined {
   if (!current) return;
   if (!!current.pinned === pinned) return current;
   const updated: Idea = { ...current };
-  if (pinned) updated.pinned = true; else delete updated.pinned;
+  if (pinned) updated.pinned = true;
+  else delete updated.pinned;
   replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
   return updated;
 }
@@ -586,7 +716,8 @@ export function setMedical(id: string, medical: boolean): Idea | undefined {
   if (current.song) return current;
   if (!!current.medical === medical) return current;
   const updated: Idea = { ...current };
-  if (medical) updated.medical = true; else delete updated.medical;
+  if (medical) updated.medical = true;
+  else delete updated.medical;
   replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
   return updated;
 }
@@ -604,7 +735,8 @@ export function setProject(id: string, name: string | null): Idea | undefined {
   const next = (name ?? "").trim();
   if ((current.project ?? "") === next) return current;
   const updated: Idea = { ...current };
-  if (next) updated.project = next; else delete updated.project;
+  if (next) updated.project = next;
+  else delete updated.project;
   replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
   return updated;
 }
@@ -640,7 +772,10 @@ export function renameProject(medical: boolean, from: string, to: string): numbe
   const all = loadIdeas();
   let n = 0;
   const next = all.map((idea) => {
-    if (!!idea.medical === medical && idea.project === from) { n++; return { ...idea, project: target }; }
+    if (!!idea.medical === medical && idea.project === from) {
+      n++;
+      return { ...idea, project: target };
+    }
     return idea;
   });
   if (n) replaceIdeas(next);
@@ -700,12 +835,33 @@ export function topicOptions(ideas: Idea[]): { topic: string; count: number }[] 
 }
 
 /** A liked article is someone else's text: the AI polish must never run on it. */
-export const needsPolish = (idea: Idea) => !idea.liked && (idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0));
+export const needsPolish = (idea: Idea) =>
+  !idea.liked && (idea.aiPolishedAt === undefined || idea.aiPolishedAt < (idea.updatedAt ?? 0));
 
 /** Save a ready article (e.g. a merge) as a new idea; `text` keeps the combined originals. */
-export const saveArticleIdea = (text: string, title: string, body: string, mergedFrom?: string[], extra?: { liked?: boolean; source?: string; sources?: string[]; medical?: boolean; versions?: IdeaVersion[] }): Idea => {
+export const saveArticleIdea = (
+  text: string,
+  title: string,
+  body: string,
+  mergedFrom?: string[],
+  extra?: {
+    liked?: boolean;
+    source?: string;
+    sources?: string[];
+    medical?: boolean;
+    versions?: IdeaVersion[];
+  },
+): Idea => {
   const now = Date.now();
-  const idea: Idea = { id: crypto.randomUUID(), text, createdAt: now, articleTitle: title.trim(), articleBody: body.trim(), updatedAt: now, aiPolishedAt: now };
+  const idea: Idea = {
+    id: crypto.randomUUID(),
+    text,
+    createdAt: now,
+    articleTitle: title.trim(),
+    articleBody: body.trim(),
+    updatedAt: now,
+    aiPolishedAt: now,
+  };
   if (mergedFrom?.length) idea.mergedFrom = [...new Set(mergedFrom)];
   // An AI merge that consumes its sources carries their frozen texts as
   // its version history (built by mergeSourceVersions before deletion).
@@ -715,7 +871,8 @@ export const saveArticleIdea = (text: string, title: string, body: string, merge
   // partners are partition-scoped, so the section is unambiguous).
   if (extra?.medical) idea.medical = true;
   if (extra?.source?.trim()) idea.source = extra.source.trim();
-  if (extra?.sources?.length) idea.sources = [...new Set(extra.sources.map((s) => s.trim()).filter(Boolean))];
+  if (extra?.sources?.length)
+    idea.sources = [...new Set(extra.sources.map((s) => s.trim()).filter(Boolean))];
   replaceIdeas([idea, ...loadIdeas()]);
   return idea;
 };
@@ -729,8 +886,13 @@ export const saveLikedArticle = (title: string, source: string, body: string): I
   if (!title.trim() || !body.trim()) return;
   const now = Date.now();
   const idea: Idea = {
-    id: crypto.randomUUID(), text: body.trim(), createdAt: now,
-    articleTitle: title.trim(), articleBody: body.trim(), updatedAt: now, liked: true,
+    id: crypto.randomUUID(),
+    text: body.trim(),
+    createdAt: now,
+    articleTitle: title.trim(),
+    articleBody: body.trim(),
+    updatedAt: now,
+    liked: true,
   };
   if (source.trim()) idea.source = source.trim();
   replaceIdeas([idea, ...loadIdeas()]);
@@ -741,7 +903,11 @@ export const saveLikedArticle = (title: string, source: string, body: string): I
  *  sources it accumulated from merges. A liked article with neither falls
  *  back to its title — a merge must never leave it unattributed. */
 export function attributionsOf(idea: Idea): string[] {
-  const out = [...new Set([idea.source, ...(idea.sources ?? [])].map((s) => s?.trim()).filter((s): s is string => !!s))];
+  const out = [
+    ...new Set(
+      [idea.source, ...(idea.sources ?? [])].map((s) => s?.trim()).filter((s): s is string => !!s),
+    ),
+  ];
   if (!out.length && idea.liked) out.push(getArticle(idea).title);
   return out;
 }
@@ -753,20 +919,34 @@ export function attributionsOf(idea: Idea): string[] {
  * attribution; when the result itself stays liked, the first consumed source
  * remains its primary `source` and the rest ride in `sources`.
  */
-export function mergeAttributions(consumed: Idea[]): { liked: boolean; source?: string; sources: string[] } {
+export function mergeAttributions(consumed: Idea[]): {
+  liked: boolean;
+  source?: string;
+  sources: string[];
+} {
   const liked = consumed.length > 0 && consumed.every((i) => i.liked);
   const collected: string[] = [];
-  for (const idea of consumed) for (const a of attributionsOf(idea)) if (!collected.includes(a)) collected.push(a);
+  for (const idea of consumed)
+    for (const a of attributionsOf(idea)) if (!collected.includes(a)) collected.push(a);
   if (!liked) return { liked: false, sources: collected };
   const source = consumed.map((i) => i.source?.trim()).find(Boolean);
-  return { liked: true, ...(source ? { source } : {}), sources: collected.filter((a) => a !== source) };
+  return {
+    liked: true,
+    ...(source ? { source } : {}),
+    sources: collected.filter((a) => a !== source),
+  };
 }
 
 /**
  * Build (not yet saved) a song idea. The recording is the content; `text`
  * starts empty and later holds the lyrics the user writes by hand.
  */
-export const buildSongIdea = (input: { id?: string; title: string; durationSeconds?: number; createdAt?: number }): Idea => {
+export const buildSongIdea = (input: {
+  id?: string;
+  title: string;
+  durationSeconds?: number;
+  createdAt?: number;
+}): Idea => {
   const now = input.createdAt ?? Date.now();
   const idea: Idea = {
     id: input.id ?? crypto.randomUUID(),
@@ -776,7 +956,8 @@ export const buildSongIdea = (input: { id?: string; title: string; durationSecon
     song: true,
     updatedAt: now,
   };
-  if (input.durationSeconds && input.durationSeconds > 0) idea.songDuration = Math.round(input.durationSeconds);
+  if (input.durationSeconds && input.durationSeconds > 0)
+    idea.songDuration = Math.round(input.durationSeconds);
   return idea;
 };
 
@@ -801,4 +982,4 @@ export function updateSong(id: string, title: string, lyrics: string): Idea | un
   delete updated.aiPolishedAt;
   replaceIdeas(all.map((idea) => (idea.id === id ? updated : idea)));
   return updated;
-};
+}

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { memoryVoiceStore, type Segment } from "./voice-store";
-import { finishedSegments, formatElapsed, joinTranscript, transcribeFinished } from "./voice-session";
+import {
+  finishedSegments,
+  formatElapsed,
+  joinTranscript,
+  transcribeFinished,
+} from "./voice-session";
 
 describe("formatElapsed", () => {
   it("formats mm:ss with zero padding", () => {
@@ -32,7 +37,13 @@ describe("joinTranscript", () => {
 
 async function seed(store = memoryVoiceStore(), session = "s1", sizes = [4096, 4096, 4096]) {
   for (let i = 0; i < sizes.length; i++) {
-    const seg: Segment = { id: `${session}-${i}`, session, seq: i, mime: "audio/webm", createdAt: 1000 + i };
+    const seg: Segment = {
+      id: `${session}-${i}`,
+      session,
+      seq: i,
+      mime: "audio/webm",
+      createdAt: 1000 + i,
+    };
     await store.addSegment(seg);
     await store.appendChunk(seg.id, new Blob([new Uint8Array(sizes[i]!)], { type: "audio/webm" }));
   }
@@ -56,7 +67,10 @@ describe("transcribeFinished", () => {
   it("transcribes finished segments once, in order, and stores their text", async () => {
     const store = await seed();
     const seen: string[] = [];
-    const transcribe = vi.fn(async (audio: Blob) => { seen.push(String(audio.size)); return `نص ${seen.length}`; });
+    const transcribe = vi.fn(async (audio: Blob) => {
+      seen.push(String(audio.size));
+      return `نص ${seen.length}`;
+    });
     const texts = await transcribeFinished(store, "s1", transcribe);
     expect(texts).toEqual(["نص 1", "نص 2"]);
     expect(transcribe).toHaveBeenCalledTimes(2);

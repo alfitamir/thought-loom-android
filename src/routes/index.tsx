@@ -5,8 +5,17 @@ import { partitionIdeas, saveIdea } from "@/lib/ideas";
 import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { supabase } from "@/integrations/supabase/client";
 import { pushIdea, syncNow } from "@/lib/sync";
-import { createVoiceRecorder, type VoiceRecorder } from "@/lib/voice-recorder";
-import { browserRecorderDeps, createAudioRecorder, NO_RECORDING, type AudioRecorder } from "@/lib/audio-recorder";
+import {
+  createVoiceRecorder,
+  type SpeechRecognitionCtor,
+  type VoiceRecorder,
+} from "@/lib/voice-recorder";
+import {
+  browserRecorderDeps,
+  createAudioRecorder,
+  NO_RECORDING,
+  type AudioRecorder,
+} from "@/lib/audio-recorder";
 import { songVoiceStore, voiceStore } from "@/lib/voice-store";
 import { deleteSession, processPending, transcribeSession } from "@/lib/transcribe";
 import { transcribeAudio } from "@/lib/ai-features";
@@ -36,7 +45,10 @@ export const Route = createFileRoute("/")({
       { title: "أفكاري — سجّل فكرتك" },
       { name: "description", content: "سجّل أفكارك بالصوت أو الكتابة لتتحول إلى مقالات مبوبة." },
       { property: "og:title", content: "أفكاري — سجّل فكرتك" },
-      { property: "og:description", content: "سجّل أفكارك بالصوت أو الكتابة لتتحول إلى مقالات مبوبة." },
+      {
+        property: "og:description",
+        content: "سجّل أفكارك بالصوت أو الكتابة لتتحول إلى مقالات مبوبة.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -74,8 +86,12 @@ function Index() {
   const [medicalCtx, setMedicalCtx] = useState(false);
   // The home doors to the medical section and the songs section, with
   // their counts — each section is a world of its own off this screen.
-  const [medicalCount, setMedicalCount] = useState(() => partitionIdeas(loadVisibleIdeas()).medical.length);
-  const [songsCount, setSongsCount] = useState(() => partitionIdeas(loadVisibleIdeas()).songs.length);
+  const [medicalCount, setMedicalCount] = useState(
+    () => partitionIdeas(loadVisibleIdeas()).medical.length,
+  );
+  const [songsCount, setSongsCount] = useState(
+    () => partitionIdeas(loadVisibleIdeas()).songs.length,
+  );
   useEffect(() => {
     const recount = () => {
       const parts = partitionIdeas(loadVisibleIdeas());
@@ -145,14 +161,24 @@ function Index() {
 
   // Recording runs until the user presses stop (see createVoiceRecorder).
   const textRef = useRef("");
-  useEffect(() => { textRef.current = text; }, [text]);
-  useEffect(() => () => { recRef.current?.cancel(); }, []);
-  useEffect(() => () => {
-    abortRef.current?.abort();
-    if (drainTimerRef.current) clearInterval(drainTimerRef.current);
-    // Release the microphone; the audio saved so far stays on the phone for the resume pass.
-    void audioRef.current?.stop().catch(() => {});
-  }, []);
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
+  useEffect(
+    () => () => {
+      recRef.current?.cancel();
+    },
+    [],
+  );
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      if (drainTimerRef.current) clearInterval(drainTimerRef.current);
+      // Release the microphone; the audio saved so far stays on the phone for the resume pass.
+      void audioRef.current?.stop().catch(() => {});
+    },
+    [],
+  );
 
   // Recordings left on the phone by an earlier session (their transcription was
   // interrupted) become ideas on a later open — the pipeline's resume pass.
@@ -162,10 +188,19 @@ function Index() {
       resumedRef.current = true;
       try {
         const engine = await resolveEngine();
-        if (typeof engine === "string") { resumedRef.current = false; return; }
-        const made = await processPending(voiceStore(), engine, new AbortController().signal, "", (t) => {
-          pushIdea(saveIdea(t));
-        });
+        if (typeof engine === "string") {
+          resumedRef.current = false;
+          return;
+        }
+        const made = await processPending(
+          voiceStore(),
+          engine,
+          new AbortController().signal,
+          "",
+          (t) => {
+            pushIdea(saveIdea(t));
+          },
+        );
         if (made > 0) setMsg("تمت استعادة تسجيل محفوظ وتحويله إلى فكرة ✓");
       } catch {
         resumedRef.current = false; // audio stays on the phone; retried on the next open/online
@@ -218,7 +253,9 @@ function Index() {
     try {
       const engine = await engineOrThrow().catch(() => null);
       if (!engine) return; // no key/login yet — the stop pass below will say so
-      const texts = await transcribeFinished(voiceStore(), session, (audio) => transcribeAudio(audio, { engine }));
+      const texts = await transcribeFinished(voiceStore(), session, (audio) =>
+        transcribeAudio(audio, { engine }),
+      );
       if (texts.length) setTextBoth((cur) => joinTranscript(cur, texts.join(" ")));
     } catch {
       // A failed piece keeps no text and is retried by the stop pass, which reports it.
@@ -228,10 +265,15 @@ function Index() {
   };
   const startDrain = () => {
     if (drainTimerRef.current) clearInterval(drainTimerRef.current);
-    drainTimerRef.current = setInterval(() => { void drainOnce(); }, 5000);
+    drainTimerRef.current = setInterval(() => {
+      void drainOnce();
+    }, 5000);
   };
   const stopDrain = () => {
-    if (drainTimerRef.current) { clearInterval(drainTimerRef.current); drainTimerRef.current = null; }
+    if (drainTimerRef.current) {
+      clearInterval(drainTimerRef.current);
+      drainTimerRef.current = null;
+    }
   };
 
   // After stop: transcribe whatever is left and rebuild the box as
@@ -244,14 +286,23 @@ function Index() {
     setTranscribing(true);
     try {
       const engine = await engineOrThrow();
-      const full = await transcribeSession(voiceStore(), session, engine, ctrl.signal,
-        (blob, _mime, eng, signal) => transcribeAudio(blob, { engine: eng, signal }));
+      const full = await transcribeSession(
+        voiceStore(),
+        session,
+        engine,
+        ctrl.signal,
+        (blob, _mime, eng, signal) => transcribeAudio(blob, { engine: eng, signal }),
+      );
       setTextBoth(joinTranscript(baseTextRef.current, full));
       await deleteSession(voiceStore(), session);
       sessionRef.current = "";
     } catch (e) {
       if (!ctrl.signal.aborted) {
-        setMsg(e instanceof Error ? e.message : "تعذّر تحويل الصوت إلى نص الآن. التسجيل محفوظ على هاتفك.");
+        setMsg(
+          e instanceof Error
+            ? e.message
+            : "تعذّر تحويل الصوت إلى نص الآن. التسجيل محفوظ على هاتفك.",
+        );
       }
       // The audio stays in the store: the resume pass turns it into an idea later.
     } finally {
@@ -297,7 +348,10 @@ function Index() {
       const session = await rec.stop();
       setMediaMode(false);
       setElapsed(0);
-      if (kind === "song") { await finishSong(session, duration); return; }
+      if (kind === "song") {
+        await finishSong(session, duration);
+        return;
+      }
       await finishTranscription(session);
       return;
     }
@@ -306,13 +360,18 @@ function Index() {
   const runStop = () => {
     const p = stopActive();
     stopPromiseRef.current = p;
-    void p.finally(() => { if (stopPromiseRef.current === p) stopPromiseRef.current = null; });
+    void p.finally(() => {
+      if (stopPromiseRef.current === p) stopPromiseRef.current = null;
+    });
     return p;
   };
 
   const toggleMic = async () => {
     if (transcribing) return;
-    if (listening) { await runStop(); return; }
+    if (listening) {
+      await runStop();
+      return;
+    }
     // Primary path: record the microphone itself (MediaRecorder). There is no
     // recognition session for Android to kill, so recording runs until «إيقاف».
     // Song mode records into its own store and never starts the transcription
@@ -322,11 +381,17 @@ function Index() {
     if (deps) {
       recRef.current?.cancel();
       baseTextRef.current = textRef.current;
-      const rec = createAudioRecorder({ ...deps, segmentMs: 60_000 }, {
-        onRecording: setListening,
-        onMessage: setMsg,
-        onElapsed: (s) => { elapsedRef.current = s; setElapsed(s); },
-      });
+      const rec = createAudioRecorder(
+        { ...deps, segmentMs: 60_000 },
+        {
+          onRecording: setListening,
+          onMessage: setMsg,
+          onElapsed: (s) => {
+            elapsedRef.current = s;
+            setElapsed(s);
+          },
+        },
+      );
       audioRef.current = rec;
       modeRef.current = "media";
       recKindRef.current = kind;
@@ -334,7 +399,8 @@ function Index() {
       elapsedRef.current = 0;
       setMediaMode(true);
       const ok = await rec.start();
-      if (!ok) { // mic refused — MIC_DENIED was already shown
+      if (!ok) {
+        // mic refused — MIC_DENIED was already shown
         audioRef.current = null;
         modeRef.current = null;
         recKindRef.current = "idea";
@@ -347,13 +413,28 @@ function Index() {
     }
     // Song mode has no speech-recognition fallback: recognition would turn
     // the singing into text, and a song must stay audio.
-    if (kind === "song") { setMsg(NO_RECORDING); return; }
+    if (kind === "song") {
+      setMsg(NO_RECORDING);
+      return;
+    }
     // Fallback: the browser's speech recognition, as before.
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { setMsg("التسجيل الصوتي غير متاح على هذا الجهاز، اكتب فكرتك."); return; }
+    const speechWindow = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const SR = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!SR) {
+      setMsg("التسجيل الصوتي غير متاح على هذا الجهاز، اكتب فكرتك.");
+      return;
+    }
     recRef.current?.cancel();
     recRef.current = createVoiceRecorder(SR, {
-      onText: (s) => setText((t) => { const n = (t + " " + s).trim(); textRef.current = n; return n; }),
+      onText: (s) =>
+        setText((t) => {
+          const n = (t + " " + s).trim();
+          textRef.current = n;
+          return n;
+        }),
       onListening: setListening,
       onMessage: setMsg,
     });
@@ -364,13 +445,18 @@ function Index() {
     if (stopPromiseRef.current) await stopPromiseRef.current;
     // In song mode there is no text to save: stopping the recording saves
     // the song itself (see finishSong).
-    if (recMode === "song") { if (listening) await runStop(); return; }
+    if (recMode === "song") {
+      if (listening) await runStop();
+      return;
+    }
     if (listening) await runStop();
     const body = textRef.current.trim();
     if (!body) return;
     const idea = saveIdea(body, medicalCtx ? { medical: true } : undefined);
     textRef.current = "";
-    setText(""); setOpen(false); setMedicalCtx(false);
+    setText("");
+    setOpen(false);
+    setMedicalCtx(false);
     setMsg(medicalCtx ? "حُفظت الفكرة في القسم الطبي ✓" : "حُفظت الفكرة ✓");
     pushIdea(idea);
   };
@@ -391,7 +477,8 @@ function Index() {
       await rec.cancel().catch(() => {});
       setListening(false);
       sessionRef.current = "";
-      setOpen(false); setMedicalCtx(false);
+      setOpen(false);
+      setMedicalCtx(false);
       return;
     }
     if (modeRef.current === "media" && audioRef.current) {
@@ -409,7 +496,9 @@ function Index() {
       if (session) {
         const store = voiceStore();
         const segs = (await store.listSegments()).filter((s) => s.session === session);
-        await Promise.all(segs.filter((s) => s.transcript !== undefined).map((s) => store.deleteSegment(s.id)));
+        await Promise.all(
+          segs.filter((s) => s.transcript !== undefined).map((s) => store.deleteSegment(s.id)),
+        );
       }
       sessionRef.current = "";
     } else {
@@ -417,61 +506,129 @@ function Index() {
     }
     // Leaving the recorder clears the medical context with it: the next
     // session starts general unless it arrives through the section again.
-    setOpen(false); setMedicalCtx(false);
+    setOpen(false);
+    setMedicalCtx(false);
   };
 
   return (
-    <main dir="rtl" className="paper flex min-h-screen flex-col items-center justify-center gap-10 px-6 pb-24">
+    <main
+      dir="rtl"
+      className="paper flex min-h-screen flex-col items-center justify-center gap-10 px-6 pb-24"
+    >
       <h1 className="font-display text-4xl text-foreground">أفكاري</h1>
       {!open ? (
-        <button onClick={() => { setMedicalCtx(false); setOpen(true); }} className="record-btn">سجّل فكرة</button>
+        <button
+          onClick={() => {
+            setMedicalCtx(false);
+            setOpen(true);
+          }}
+          className="record-btn"
+        >
+          سجّل فكرة
+        </button>
       ) : (
         <div className="w-full max-w-md space-y-4">
-          <div className="flex rounded-lg border border-border bg-muted/30 p-1" role="group" aria-label="وضع التسجيل">
-            <button type="button" aria-pressed={recMode === "idea"} disabled={listening || transcribing} onClick={() => setRecMode("idea")}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-all disabled:opacity-50 ${recMode === "idea" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-              <Mic className="size-4" />فكرة
+          <div
+            className="flex rounded-lg border border-border bg-muted/30 p-1"
+            role="group"
+            aria-label="وضع التسجيل"
+          >
+            <button
+              type="button"
+              aria-pressed={recMode === "idea"}
+              disabled={listening || transcribing}
+              onClick={() => setRecMode("idea")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-all disabled:opacity-50 ${recMode === "idea" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Mic className="size-4" />
+              فكرة
             </button>
-            <button type="button" aria-pressed={recMode === "song"} disabled={listening || transcribing} onClick={() => setRecMode("song")}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-all disabled:opacity-50 ${recMode === "song" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-              <Music className="size-4" />أغنية
+            <button
+              type="button"
+              aria-pressed={recMode === "song"}
+              disabled={listening || transcribing}
+              onClick={() => setRecMode("song")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-all disabled:opacity-50 ${recMode === "song" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Music className="size-4" />
+              أغنية
             </button>
           </div>
           {medicalCtx && recMode === "idea" && (
             <p className="flex items-center justify-center gap-1.5 text-center text-sm font-medium text-primary">
-              <Stethoscope className="size-4" />القسم الطبي — الفكرة دي هتتحفظ في القسم الطبي
+              <Stethoscope className="size-4" />
+              القسم الطبي — الفكرة دي هتتحفظ في القسم الطبي
             </p>
           )}
           {recMode === "idea" ? (
-            <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={8}
-              placeholder="اكتب أو تكلم..." className="w-full rounded-2xl border border-border bg-card p-4 text-lg leading-relaxed text-card-foreground outline-none focus:ring-2 focus:ring-ring" />
+            <textarea
+              autoFocus
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={8}
+              placeholder="اكتب أو تكلم..."
+              className="w-full rounded-2xl border border-border bg-card p-4 text-lg leading-relaxed text-card-foreground outline-none focus:ring-2 focus:ring-ring"
+            />
           ) : (
             <p className="rounded-2xl border border-border bg-card p-4 text-center leading-relaxed text-muted-foreground">
-              غنِّ أغنيتك كاملة — ستُحفظ بصوتك كما هي، من غير أن تتحول إلى نص. الكلمات يمكنك إضافتها لاحقًا من المكتبة.
+              غنِّ أغنيتك كاملة — ستُحفظ بصوتك كما هي، من غير أن تتحول إلى نص. الكلمات يمكنك إضافتها
+              لاحقًا من المكتبة.
             </p>
           )}
           {listening && (
             <p className="text-center text-sm text-destructive">
-              ● جاري التسجيل…{mediaMode && <> <span dir="ltr">{formatElapsed(elapsed)}</span> —</>} لن يتوقف إلا بضغطك على «إيقاف التسجيل»
+              ● جاري التسجيل…
+              {mediaMode && (
+                <>
+                  {" "}
+                  <span dir="ltr">{formatElapsed(elapsed)}</span> —
+                </>
+              )}{" "}
+              لن يتوقف إلا بضغطك على «إيقاف التسجيل»
             </p>
           )}
-          {transcribing && <p className="text-center text-sm text-muted-foreground">جارٍ تحويل الصوت إلى نص…</p>}
+          {transcribing && (
+            <p className="text-center text-sm text-muted-foreground">جارٍ تحويل الصوت إلى نص…</p>
+          )}
           <div className="flex gap-3">
-            <button onClick={toggleMic} disabled={transcribing} aria-pressed={listening} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 font-semibold ${listening ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-secondary text-secondary-foreground"}`}>
+            <button
+              onClick={toggleMic}
+              disabled={transcribing}
+              aria-pressed={listening}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 font-semibold ${listening ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-secondary text-secondary-foreground"}`}
+            >
               {listening ? <Square className="size-5" /> : <Mic className="size-5" />}
               {transcribing ? "جارٍ التحويل…" : listening ? "إيقاف التسجيل" : "ابدأ التسجيل"}
             </button>
-            {recMode === "idea" && <button onClick={save} className="flex-1 rounded-full bg-primary py-3 font-semibold text-primary-foreground">حفظ</button>}
+            {recMode === "idea" && (
+              <button
+                onClick={save}
+                className="flex-1 rounded-full bg-primary py-3 font-semibold text-primary-foreground"
+              >
+                حفظ
+              </button>
+            )}
           </div>
-          <button onClick={cancel} className="w-full text-sm text-muted-foreground">إلغاء</button>
+          <button onClick={cancel} className="w-full text-sm text-muted-foreground">
+            إلغاء
+          </button>
         </div>
       )}
       {!open && (
-        <Link to="/medical" className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-start shadow-sm transition-colors hover:bg-accent">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Stethoscope className="size-6" /></span>
+        <Link
+          to="/medical"
+          className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-start shadow-sm transition-colors hover:bg-accent"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Stethoscope className="size-6" />
+          </span>
           <span className="min-w-0 flex-1">
             <span className="block font-display text-lg text-foreground">القسم الطبي</span>
-            <span className="block text-sm text-muted-foreground">{medicalCount > 0 ? `${medicalCount} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل` : "قسم مستقل لمقالاتك الطبية"}</span>
+            <span className="block text-sm text-muted-foreground">
+              {medicalCount > 0
+                ? `${medicalCount} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل`
+                : "قسم مستقل لمقالاتك الطبية"}
+            </span>
           </span>
           <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
         </Link>
@@ -479,8 +636,13 @@ function Index() {
       {/* The songs door: songs live in their own section now, never in the
           article library — this card appears once a first song exists. */}
       {!open && songsCount > 0 && (
-        <Link to="/songs" className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-start shadow-sm transition-colors hover:bg-accent">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Music className="size-6" /></span>
+        <Link
+          to="/songs"
+          className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-start shadow-sm transition-colors hover:bg-accent"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Music className="size-6" />
+          </span>
           <span className="min-w-0 flex-1">
             <span className="block font-display text-lg text-foreground">الأغاني</span>
             <span className="block text-sm text-muted-foreground">{`${songsCount} ${songsCount === 1 ? "أغنية مسجلة" : "أغاني مسجلة"} في قسم مستقل`}</span>
@@ -495,7 +657,9 @@ function Index() {
       ) : cloud === "syncing" ? (
         <p className="text-center text-sm text-muted-foreground">☁️ جاري مزامنة أفكارك...</p>
       ) : (
-        <Link to="/auth" className="text-center text-sm text-primary underline">☁️ فعّل الحفظ في السحابة</Link>
+        <Link to="/auth" className="text-center text-sm text-primary underline">
+          ☁️ فعّل الحفظ في السحابة
+        </Link>
       )}
     </main>
   );

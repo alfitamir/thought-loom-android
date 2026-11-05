@@ -1,25 +1,45 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  deleteSongAudio, getSongAudio, memorySongAudioStore, saveSongAudio,
+  deleteSongAudio,
+  getSongAudio,
+  memorySongAudioStore,
+  saveSongAudio,
 } from "./article-audio";
 import { buildBackup, parseBackup } from "./backup";
 import { buildDriveFile, mergeDriveState, parseDriveFile } from "./drive-merge";
 import { buildSongIdea, loadIdeas, mergeIdeas, updateSong, type Idea } from "./ideas";
 import {
-  assembleSongAudio, defaultSongTitle, deriveSongAudioState, recoverPendingSongs,
-  saveRecordedSong, songDurationLabel, songRecordedLabel,
+  assembleSongAudio,
+  defaultSongTitle,
+  deriveSongAudioState,
+  recoverPendingSongs,
+  saveRecordedSong,
+  songDurationLabel,
+  songRecordedLabel,
 } from "./songs";
 import { blobToBytes } from "./tts";
 import { memoryVoiceStore, type VoiceStore } from "./voice-store";
 
 /** Blob contents as text (jsdom's Blob has no .text()). */
-const blobText = async (blob: Blob): Promise<string> => new TextDecoder().decode(await blobToBytes(blob));
+const blobText = async (blob: Blob): Promise<string> =>
+  new TextDecoder().decode(await blobToBytes(blob));
 
 /** Seed one recording session's segments, in order, into a voice store. */
-const seedSession = async (store: VoiceStore, session: string, parts: string[], startAt = 1_700_000_000_000) => {
+const seedSession = async (
+  store: VoiceStore,
+  session: string,
+  parts: string[],
+  startAt = 1_700_000_000_000,
+) => {
   for (let i = 0; i < parts.length; i++) {
     const id = `${session}-seg-${i}`;
-    await store.addSegment({ id, session, seq: i, mime: "audio/webm", createdAt: startAt + i * 60_000 });
+    await store.addSegment({
+      id,
+      session,
+      seq: i,
+      mime: "audio/webm",
+      createdAt: startAt + i * 60_000,
+    });
     await store.appendChunk(id, new Blob([parts[i] ?? ""], { type: "audio/webm" }));
   }
 };
@@ -50,7 +70,7 @@ describe("assembleSongAudio", () => {
     await seedSession(store, "other", ["XXX"]);
     const out = await assembleSongAudio(store, "s1");
     expect(out?.mime).toBe("audio/webm");
-    expect(out && await blobText(out.blob)).toBe("AAABBBCCC");
+    expect(out && (await blobText(out.blob))).toBe("AAABBBCCC");
   });
 
   it("returns null for an unknown session and for a session with no audio", async () => {
@@ -68,7 +88,13 @@ describe("saveRecordedSong", () => {
     const voice = memoryVoiceStore();
     const audio = memorySongAudioStore();
     await seedSession(voice, "s1", ["hello ", "world"]);
-    const idea = await saveRecordedSong({ store: voice, session: "s1", durationSeconds: 83.6, audioStore: audio, now: 1_700_000_000_000 });
+    const idea = await saveRecordedSong({
+      store: voice,
+      session: "s1",
+      durationSeconds: 83.6,
+      audioStore: audio,
+      now: 1_700_000_000_000,
+    });
     expect(idea).not.toBeNull();
     expect(idea?.song).toBe(true);
     expect(idea?.text).toBe("");
@@ -78,7 +104,7 @@ describe("saveRecordedSong", () => {
     const rec = await getSongAudio(idea?.id ?? "", audio);
     expect(rec?.mime).toBe("audio/webm");
     expect(rec?.duration).toBe(83.6);
-    expect(rec && await blobText(rec.blob)).toBe("hello world");
+    expect(rec && (await blobText(rec.blob))).toBe("hello world");
     // The session's segments are gone once the song is saved.
     expect(await voice.listSegments()).toEqual([]);
   });
@@ -86,14 +112,19 @@ describe("saveRecordedSong", () => {
   it("saves nothing when the session has no audio", async () => {
     const voice = memoryVoiceStore();
     const audio = memorySongAudioStore();
-    expect(await saveRecordedSong({ store: voice, session: "ghost", audioStore: audio })).toBeNull();
+    expect(
+      await saveRecordedSong({ store: voice, session: "ghost", audioStore: audio }),
+    ).toBeNull();
     expect(loadIdeas()).toEqual([]);
     expect(await audio.listAll()).toEqual([]);
   });
 
   it("deleting the song's audio removes the blob from the store", async () => {
     const audio = memorySongAudioStore();
-    await saveSongAudio({ ideaId: "s1", blob: new Blob(["x"], { type: "audio/webm" }), duration: 10 }, audio);
+    await saveSongAudio(
+      { ideaId: "s1", blob: new Blob(["x"], { type: "audio/webm" }), duration: 10 },
+      audio,
+    );
     expect(await getSongAudio("s1", audio)).not.toBeNull();
     await deleteSongAudio("s1", audio);
     expect(await getSongAudio("s1", audio)).toBeNull();
@@ -126,18 +157,35 @@ describe("song derivations", () => {
   it("derives the editor's audio state from the record lookup", () => {
     expect(deriveSongAudioState(undefined)).toBe("checking");
     expect(deriveSongAudioState(null)).toBe("missing");
-    expect(deriveSongAudioState({
-      key: "s1", ideaId: "s1", mime: "audio/webm", blob: new Blob(["x"]), duration: 5, createdAt: 1,
-    })).toBe("ready");
+    expect(
+      deriveSongAudioState({
+        key: "s1",
+        ideaId: "s1",
+        mime: "audio/webm",
+        blob: new Blob(["x"]),
+        duration: 5,
+        createdAt: 1,
+      }),
+    ).toBe("ready");
   });
 
   it("derives the Drive state when the recording is absent here but backed up", () => {
     expect(deriveSongAudioState(null, true)).toBe("drive");
     expect(deriveSongAudioState(null, false)).toBe("missing");
     expect(deriveSongAudioState(undefined, true)).toBe("checking"); // lookup first, Drive second
-    expect(deriveSongAudioState({
-      key: "s1", ideaId: "s1", mime: "audio/webm", blob: new Blob(["x"]), duration: 5, createdAt: 1,
-    }, true)).toBe("ready"); // a local copy always wins over the Drive copy
+    expect(
+      deriveSongAudioState(
+        {
+          key: "s1",
+          ideaId: "s1",
+          mime: "audio/webm",
+          blob: new Blob(["x"]),
+          duration: 5,
+          createdAt: 1,
+        },
+        true,
+      ),
+    ).toBe("ready"); // a local copy always wins over the Drive copy
   });
 
   it("labels durations as mm:ss and stays silent without one", () => {
@@ -205,7 +253,9 @@ describe("song flag in serializers", () => {
   });
 
   it("drops a non-boolean flag and a non-positive duration from a backup", () => {
-    const raw = JSON.stringify([{ id: "x", text: "t", createdAt: 1, song: "yes", songDuration: -3 }]);
+    const raw = JSON.stringify([
+      { id: "x", text: "t", createdAt: 1, song: "yes", songDuration: -3 },
+    ]);
     const parsed = parseBackup(raw);
     expect(parsed[0]?.song).toBeUndefined();
     expect(parsed[0]?.songDuration).toBeUndefined();

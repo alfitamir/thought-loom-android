@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { Idea } from "./ideas";
-import { cardExcerpt, clampLines, shareCardFileName, shareCardModel, wrapLines } from "./share-card";
+import {
+  cardExcerpt,
+  clampLines,
+  shareCardFileName,
+  shareCardModel,
+  wrapLines,
+} from "./share-card";
 
 const base: Idea = { id: "1", text: "نص الفكرة", createdAt: 0 };
 const fixed = (s: string) => s.length * 10; // 10px per char
 
 describe("shareCardModel", () => {
   it("composes a plain article card: kind, topic, excerpt, no attribution", () => {
-    const m = shareCardModel({ ...base, articleTitle: "عنواني", articleBody: "سطر أول\n\nسطر ثانٍ" }, "الصحة");
+    const m = shareCardModel(
+      { ...base, articleTitle: "عنواني", articleBody: "سطر أول\n\nسطر ثانٍ" },
+      "الصحة",
+    );
     expect(m.kind).toBe("article");
     expect(m.kindLabel).toBe("مقال");
     expect(m.title).toBe("عنواني");
@@ -19,7 +28,10 @@ describe("shareCardModel", () => {
   });
 
   it("marks songs with the «أغنية» chip and takes the excerpt from the lyrics", () => {
-    const m = shareCardModel({ ...base, song: true, text: "كلمات الأغنية\nسطر ثانٍ من الغنا", songDuration: 42 }, "متفرقات");
+    const m = shareCardModel(
+      { ...base, song: true, text: "كلمات الأغنية\nسطر ثانٍ من الغنا", songDuration: 42 },
+      "متفرقات",
+    );
     expect(m.kind).toBe("song");
     expect(m.kindLabel).toBe("أغنية");
     expect(m.excerpt).toContain("كلمات الأغنية");
@@ -27,14 +39,20 @@ describe("shareCardModel", () => {
   });
 
   it("REQUIRES the source line on a liked card (explicit source)", () => {
-    const m = shareCardModel({ ...base, liked: true, source: "مدونة فلان", articleTitle: "مقال جميل", articleBody: "نص" }, "المجتمع");
+    const m = shareCardModel(
+      { ...base, liked: true, source: "مدونة فلان", articleTitle: "مقال جميل", articleBody: "نص" },
+      "المجتمع",
+    );
     expect(m.kind).toBe("liked");
     expect(m.kindLabel).toBe("مقال أعجبني");
     expect(m.attribution).toBe("المصدر: مدونة فلان");
   });
 
   it("falls back to accumulated merge attributions, then to a generic source line", () => {
-    const withSources = shareCardModel({ ...base, liked: true, sources: ["موقع أ", "كاتب ب"], articleBody: "نص" }, "متفرقات");
+    const withSources = shareCardModel(
+      { ...base, liked: true, sources: ["موقع أ", "كاتب ب"], articleBody: "نص" },
+      "متفرقات",
+    );
     expect(withSources.attribution).toBe("المصدر: موقع أ، كاتب ب");
     const bare = shareCardModel({ ...base, liked: true, articleBody: "نص" }, "متفرقات");
     expect(bare.attribution).toBe("مقال من مصدر خارجي");
@@ -87,7 +105,7 @@ describe("wrapLines / clampLines", () => {
 
 describe("shareCardFileName", () => {
   it("strips path-hostile characters and adds .png", () => {
-    expect(shareCardFileName('مقال: الصحة/الجسم؟')).toBe("مقال الصحة الجسم؟.png");
+    expect(shareCardFileName("مقال: الصحة/الجسم؟")).toBe("مقال الصحة الجسم؟.png");
     expect(shareCardFileName("   ")).toBe("مقال.png");
   });
 });
