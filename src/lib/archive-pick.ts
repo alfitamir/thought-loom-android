@@ -7,6 +7,11 @@
 // today gets. No storage, no AI, no schema: the only inputs are the ideas
 // and the clock.
 import type { Idea } from "./ideas";
+import { arabicNumber } from "./format";
+
+// The digit formatter moved to the shared formatting module (lib/format);
+// re-exported here so existing imports from this module keep working.
+export { arabicNumber } from "./format";
 
 /** An idea counts as "archive" once it has been untouched for 30 days. */
 export const ARCHIVE_MIN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -70,12 +75,6 @@ export function pickArchiveIdea(ideas: Idea[], now = Date.now(), offset = 0): Id
   const idx = (((start + offset) % pool.length) + pool.length) % pool.length;
   return pool[idx] ?? null;
 }
-
-const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-/** A number in Arabic-Indic digits — the app's display convention for
- *  counts (shared with the stats section). */
-export const arabicNumber = (n: number): string =>
-  String(n).replace(/\d/g, (d) => AR_DIGITS.charAt(Number(d)));
 
 /**
  * The warm age line on the card, e.g. «منذ ٣ شهور». Months are 30-day

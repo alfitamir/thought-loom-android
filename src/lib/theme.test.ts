@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  THEME_COLOR_DARK,
+  THEME_COLOR_LIGHT,
   THEME_KEY,
   applyThemeMode,
   initTheme,
   loadThemeMode,
   resolveThemeDark,
   saveThemeMode,
+  themeColorFor,
 } from "@/lib/theme";
 
 // A controllable prefers-color-scheme: `systemDark` is the device state,
@@ -21,6 +24,7 @@ const fireMediaChange = () => {
 beforeEach(() => {
   localStorage.clear();
   document.documentElement.classList.remove("dark");
+  document.head.querySelector('meta[name="theme-color"]')?.remove();
   systemDark = false;
   mediaListeners = [];
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -82,6 +86,32 @@ describe("theme preference (device-local appearance)", () => {
     systemDark = false;
     applyThemeMode("light");
     expect(isDark()).toBe(false);
+  });
+
+  it("themeColorFor pairs the chrome color with the resolved theme", () => {
+    expect(themeColorFor(true)).toBe(THEME_COLOR_DARK);
+    expect(themeColorFor(false)).toBe(THEME_COLOR_LIGHT);
+    // The dark chrome color is the brand navy the meta always carried.
+    expect(THEME_COLOR_DARK).toBe("#1F243D");
+    expect(THEME_COLOR_LIGHT).not.toBe(THEME_COLOR_DARK);
+  });
+
+  it("applyThemeMode keeps the theme-color meta in sync with the theme", () => {
+    const meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    meta.setAttribute("content", THEME_COLOR_DARK);
+    document.head.appendChild(meta);
+    applyThemeMode("light");
+    expect(meta.getAttribute("content")).toBe(THEME_COLOR_LIGHT);
+    applyThemeMode("dark");
+    expect(meta.getAttribute("content")).toBe(THEME_COLOR_DARK);
+    systemDark = true;
+    applyThemeMode("system");
+    expect(meta.getAttribute("content")).toBe(THEME_COLOR_DARK);
+    // A missing meta is not an error — nothing to sync.
+    meta.remove();
+    applyThemeMode("light");
+    expect(document.head.querySelector('meta[name="theme-color"]')).toBeNull();
   });
 
   it("initTheme applies the stored mode immediately", () => {

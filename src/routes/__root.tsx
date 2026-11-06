@@ -103,12 +103,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "if('serviceWorker' in navigator && location.hostname!=='localhost' && !location.hostname.includes('id-preview')){navigator.serviceWorker.register('/sw.js').catch(()=>{})}",
       },
       // Appearance: set the `dark` class before first paint so a dark
-      // preference never flashes light (mirrors src/lib/theme.ts; the
-      // root effect then keeps it in sync). Defensive: any failure
-      // leaves the default light rendering untouched.
+      // preference never flashes light, and point the `theme-color` meta
+      // (statically the dark navy above) at the resolved theme's chrome
+      // color (mirrors src/lib/theme.ts; the root effect then keeps both
+      // in sync). Defensive: any failure leaves the default untouched.
       {
         children:
-          "try{var m=JSON.parse(localStorage.getItem('afkari.theme')||'\"system\"');if(m==='dark'||(m!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}",
+          "try{var m=JSON.parse(localStorage.getItem('afkari.theme')||'\"system\"');var d=m==='dark'||(m!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');var tc=document.querySelector('meta[name=theme-color]');if(tc)tc.setAttribute('content',d?'#1F243D':'#F9F1E3')}catch(e){}",
       },
     ],
   }),

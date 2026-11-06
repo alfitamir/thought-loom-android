@@ -35,7 +35,7 @@ export function HighlightedText({
             data-match-idx={idx}
             className={
               isCurrent
-                ? "rounded-sm bg-orange-400 px-px text-black ring-1 ring-orange-500"
+                ? "rounded-sm bg-orange-400 px-px text-black ring-1 ring-orange-500 dark:bg-orange-500/85 dark:ring-orange-300"
                 : "rounded-sm bg-amber-200/70 px-px text-inherit dark:bg-amber-400/30"
             }
           >
