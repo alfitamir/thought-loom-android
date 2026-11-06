@@ -115,16 +115,16 @@ export const escapeHtml = (s: string): string =>
 
 const PRINT_CSS = `
   * { box-sizing: border-box; }
-  body { font-family: "Amiri", "Traditional Arabic", serif; color: #1c1a17; margin: 0; padding: 32px 28px; line-height: 1.9; }
+  body { font-family: "Almarai", sans-serif; color: #1c1a17; margin: 0; padding: 32px 28px; line-height: 1.9; }
   header.doc { text-align: center; margin-bottom: 8px; }
-  header.doc h1 { font-family: "Tajawal", sans-serif; font-size: 26px; margin: 0 0 4px; }
+  header.doc h1 { font-family: "Almarai", sans-serif; font-size: 26px; margin: 0 0 4px; }
   header.doc p { margin: 0; color: #6b675f; font-size: 14px; }
   nav.toc { border: 1px solid #ddd6c8; border-radius: 12px; padding: 16px 22px; margin: 24px 0 8px; }
-  nav.toc h2 { font-family: "Tajawal", sans-serif; font-size: 18px; margin: 0 0 8px; }
+  nav.toc h2 { font-family: "Almarai", sans-serif; font-size: 18px; margin: 0 0 8px; }
   nav.toc ul { margin: 0; padding-inline-start: 20px; }
   nav.toc a { color: inherit; text-decoration: none; }
-  section.group > h2 { font-family: "Tajawal", sans-serif; font-size: 21px; border-bottom: 2px solid #c9a227; padding-bottom: 6px; margin: 28px 0 4px; }
-  article h3 { font-family: "Tajawal", sans-serif; font-size: 19px; margin: 18px 0 2px; }
+  section.group > h2 { font-family: "Almarai", sans-serif; font-size: 21px; border-bottom: 2px solid #c9a227; padding-bottom: 6px; margin: 28px 0 4px; }
+  article h3 { font-family: "Almarai", sans-serif; font-size: 19px; margin: 18px 0 2px; }
   article p.meta { margin: 0 0 2px; color: #6b675f; font-size: 13.5px; }
   article p.source { margin: 0 0 6px; font-weight: bold; font-size: 15px; }
   article .body p { margin: 0 0 10px; font-size: 17.5px; text-align: justify; }
