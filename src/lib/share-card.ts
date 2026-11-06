@@ -171,8 +171,8 @@ const BODY = "#E9E2D0";
 const MARGIN = 84;
 
 /** Draw the card on a 1080×1350 canvas and return the PNG blob. Uses
- *  the page's own Arabic webfonts (Tajawal / Amiri / Reem Kufi) so the
- *  text is shaped and RTL-correct. */
+ *  the page's own bundled Arabic webfont (Almarai, via Fontsource) so
+ *  the text is shaped and RTL-correct. */
 export async function renderShareCardPng(model: ShareCardModel): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = SHARE_CARD_WIDTH;
@@ -181,9 +181,9 @@ export async function renderShareCardPng(model: ShareCardModel): Promise<Blob> {
   if (!ctx) throw new Error("canvas unavailable");
   try {
     await Promise.allSettled([
-      document.fonts.load('700 68px "Tajawal"'),
-      document.fonts.load('400 42px "Amiri"'),
-      document.fonts.load('700 40px "Reem Kufi"'),
+      document.fonts.load('700 68px "Almarai"'),
+      document.fonts.load('400 42px "Almarai"'),
+      document.fonts.load('500 34px "Almarai"'),
     ]);
   } catch {
     /* fall back to whatever is loaded */
@@ -208,7 +208,7 @@ export async function renderShareCardPng(model: ShareCardModel): Promise<Blob> {
 
   // Chips row (kind + topic), laid out from the right edge.
   const chip = (text: string, xRight: number, y: number): number => {
-    ctx.font = '500 34px "Tajawal", sans-serif';
+    ctx.font = '500 34px "Almarai", sans-serif';
     const w = ctx.measureText(text).width + 44;
     const x = xRight - w;
     ctx.beginPath();
@@ -233,13 +233,13 @@ export async function renderShareCardPng(model: ShareCardModel): Promise<Blob> {
   let titleLines: string[] = [];
   let titleSize = 46;
   for (const size of [68, 60, 52, 46]) {
-    ctx.font = `700 ${size}px "Tajawal", sans-serif`;
+    ctx.font = `700 ${size}px "Almarai", sans-serif`;
     const wrapped = wrapLines(model.title, contentW, measure);
     titleSize = size;
     titleLines = wrapped;
     if (wrapped.length <= 3) break;
   }
-  ctx.font = `700 ${titleSize}px "Tajawal", sans-serif`;
+  ctx.font = `700 ${titleSize}px "Almarai", sans-serif`;
   titleLines = clampLines(titleLines, 3, contentW, measure);
   ctx.fillStyle = PAPER;
   ctx.textAlign = "right";
@@ -261,7 +261,7 @@ export async function renderShareCardPng(model: ShareCardModel): Promise<Blob> {
 
   // Excerpt in the article font.
   if (model.excerpt) {
-    ctx.font = '400 42px "Amiri", serif';
+    ctx.font = '400 42px "Almarai", sans-serif';
     const lines = clampLines(wrapLines(model.excerpt, contentW, measure), 6, contentW, measure);
     ctx.fillStyle = BODY;
     y += 42;
@@ -273,7 +273,7 @@ export async function renderShareCardPng(model: ShareCardModel): Promise<Blob> {
 
   // Attribution (required on liked cards).
   if (model.attribution) {
-    ctx.font = '500 36px "Tajawal", sans-serif';
+    ctx.font = '500 36px "Almarai", sans-serif';
     const lines = clampLines(wrapLines(model.attribution, contentW, measure), 2, contentW, measure);
     ctx.fillStyle = GOLD_LIGHT;
     y += 48;
@@ -286,10 +286,10 @@ export async function renderShareCardPng(model: ShareCardModel): Promise<Blob> {
   // Footer: author + app name, centered.
   ctx.textAlign = "center";
   ctx.fillStyle = PAPER;
-  ctx.font = '700 46px "Tajawal", sans-serif';
+  ctx.font = '700 46px "Almarai", sans-serif';
   ctx.fillText(model.authorLine, W / 2, H - 148);
   ctx.fillStyle = GOLD_LIGHT;
-  ctx.font = '700 40px "Reem Kufi", "Tajawal", sans-serif';
+  ctx.font = '700 40px "Almarai", sans-serif';
   ctx.fillText(model.appLine, W / 2, H - 88);
 
   return await new Promise<Blob>((resolve, reject) =>

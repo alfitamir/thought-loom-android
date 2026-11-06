@@ -1,3 +1,7 @@
+@import "@fontsource/almarai/300.css";
+@import "@fontsource/almarai/400.css";
+@import "@fontsource/almarai/700.css";
+@import "@fontsource/almarai/800.css";
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -160,9 +164,9 @@
 }
 
 @theme inline {
-  --font-sans: "Tajawal", system-ui, sans-serif;
-  --font-display: "Reem Kufi", "Tajawal", sans-serif;
-  --font-article: "Amiri", serif;
+  --font-sans: "Almarai", system-ui, sans-serif;
+  --font-display: "Almarai", system-ui, sans-serif;
+  --font-article: "Almarai", sans-serif;
 }
 
 @layer base {
