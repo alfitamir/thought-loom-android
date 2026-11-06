@@ -1,5 +1,4 @@
 # Article tools
-
 - [x] Search within articles, edit and share offline.
 - [x] Preserve original ideas and back up edited articles.
 - [x] Add online Arabic proofreading with preview and approval.

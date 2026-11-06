@@ -1,5 +1,4 @@
 <!-- LOVABLE:BEGIN -->
-
 > [!IMPORTANT]
 > This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
 > published git history — force pushing, or rebasing/amending/squashing commits
@@ -8,13 +7,11 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
-
 <!-- LOVABLE:END -->
 
 # AGENTS.md
 
 ## Architecture decisions
-
 - Cloud backup lives in `src/lib/sync.ts`; `src/lib/ideas.ts` stays pure localStorage storage (no supabase imports, no cycles). Why: sync needs local storage access, and the reverse import would create a module cycle.
 - The Idea shape has ONE canonical zod schema (`src/lib/idea-schema.ts`, browser-safe: zod + the erased `Idea` type only). The Drive sync route extends it with payload caps; the backup parser (which also reads Drive files) validates field-by-field against it; the Supabase row mapping in `sync.ts` is guarded indirectly — a parity tripwire in the schema module plus `idea-schema.test.ts` fails tsc/the suite if a field is added to the `Idea` type without landing in the schema. Why: three integrity bugs (audit F-3.1, F-3.2, the PR #25/#41-era strip fixes) were the same accident — a field added to two persistence paths and missed in the third, where zod's unknown-key stripping silently deleted it.
 - The library blob has a storage safety net inside `src/lib/ideas.ts`: every write goes through one guarded path that mirrors the value to `afkari.ideas.lastGood` only AFTER the main write lands, reports refused writes as typed `StorageWriteError`s (subscribers via `onStorageWriteError`; the root component toasts the first failure of a streak) instead of throwing or vanishing, and `loadIdeas` falls back to the mirror when the main value is corrupt — quarantining both raw strings when neither parses. Why: the whole library plus version histories lives in one ~5 MB-quota localStorage value, so quota exhaustion and corruption must degrade loudly, never destructively.
