@@ -8,6 +8,8 @@ import {
   onStorageWriteError,
   replaceIdeas,
   saveIdea,
+  storedIdeasBytes,
+  storedMirrorBytes,
   type Idea,
 } from "./ideas";
 
@@ -148,5 +150,95 @@ describe("storage guard — corruption fallback", () => {
     // The store still works afterwards — the next write starts clean.
     replaceIdeas([idea()]);
     expect(loadIdeas()).toEqual([idea()]);
+  });
+});
+
+describe("storage diet — slim mirror + version budget (Wave F)", () => {
+  const enc = (s: string) => new TextEncoder().encode(s).length;
+  // Deterministic fixture: 30 long articles, 5 frozen versions each.
+  // Current bodies ~6 KB, version texts ~7 KB — history alone is ~1 MB,
+  // over the 800,000-byte budget, so the write path must prune it.
+  const fixture = (): Idea[] =>
+    Array.from({ length: 30 }, (_, i) => ({
+      id: `f${i}`,
+      text: `raw-${i}`,
+      createdAt: 1_000 + i,
+      articleTitle: `مقال ${i}`,
+      articleBody: `current-${i}-` + "c".repeat(6_000),
+      versions: Array.from({ length: 5 }, (_, j) => ({
+        at: 5_000 + i * 100 + (5 - j),
+        text: `version-${i}-${j}-` + "v".repeat(7_000),
+        title: `title-${i}-${j}`,
+        source: "improve" as const,
+      })),
+    }));
+  const versionBytesOf = (all: Idea[]) =>
+    all.reduce(
+      (sum, i) =>
+        sum + (i.versions ?? []).reduce((s, e) => s + enc(e.text) + enc(e.title ?? ""), 0),
+      0,
+    );
+
+  it("the mirror is slim: articles and current texts intact, versions stripped", () => {
+    const ideas = fixture().slice(0, 3);
+    replaceIdeas(ideas);
+    const mirror = JSON.parse(localStorage.getItem(LAST_GOOD_KEY) ?? "[]") as Idea[];
+    expect(mirror).toHaveLength(3);
+    for (const [k, m] of mirror.entries()) {
+      expect(m.articleBody).toBe(ideas[k]?.articleBody);
+      expect(m).not.toHaveProperty("versions");
+    }
+    // Main still carries the history; the mirror gauge reports the slim size.
+    const main = JSON.parse(localStorage.getItem(MAIN_KEY) ?? "[]") as Idea[];
+    expect(main[0]?.versions).toHaveLength(5);
+    expect(storedMirrorBytes()).toBe(enc(localStorage.getItem(LAST_GOOD_KEY) ?? ""));
+    expect(storedMirrorBytes()).toBeLessThan(storedIdeasBytes());
+  });
+
+  it("a first save after the update replaces a fat legacy mirror with the slim one", () => {
+    const ideas = fixture().slice(0, 2);
+    localStorage.setItem(LAST_GOOD_KEY, JSON.stringify(ideas)); // legacy byte-for-byte shape
+    replaceIdeas(ideas);
+    const mirror = JSON.parse(localStorage.getItem(LAST_GOOD_KEY) ?? "[]") as Idea[];
+    expect(mirror[0]).not.toHaveProperty("versions");
+  });
+
+  it("MEASUREMENT: budget holds after a write and the total footprint drops by at least 45%", () => {
+    const ideas = fixture();
+    const legacyBytes = 2 * enc(JSON.stringify(ideas)); // 2 × full JSON, uncapped versions
+    replaceIdeas(ideas);
+    const mainRaw = localStorage.getItem(MAIN_KEY) ?? "";
+    const mirrorRaw = localStorage.getItem(LAST_GOOD_KEY) ?? "";
+    const persisted = JSON.parse(mainRaw) as Idea[];
+    // (a) the library-wide version budget holds in what was actually stored
+    expect(versionBytesOf(persisted)).toBeLessThanOrEqual(800_000);
+    // (b) main + mirror is at least 45% smaller than the legacy scheme
+    const newBytes = enc(mainRaw) + enc(mirrorRaw);
+    expect(newBytes).toBeLessThanOrEqual(Math.floor(legacyBytes * 0.55));
+    // (c) every article's newest version survived the pruning
+    for (const [i, p] of persisted.entries()) {
+      expect(p.versions?.some((e) => e.at === 5_000 + i * 100 + 5)).toBe(true);
+    }
+  });
+
+  it("mirror-restore returns every article with its current text, versions absent", () => {
+    const ideas = fixture();
+    replaceIdeas(ideas);
+    localStorage.setItem(MAIN_KEY, "{corrupt");
+    const restored = loadIdeas();
+    expect(restored).toHaveLength(30);
+    for (const [i, r] of restored.entries()) {
+      expect(r.articleBody).toBe(ideas[i]?.articleBody);
+      expect(r.versions).toBeUndefined();
+    }
+  });
+
+  it("a legacy full mirror still restores WITH its versions", () => {
+    const legacy = fixture().slice(0, 2);
+    localStorage.setItem(LAST_GOOD_KEY, JSON.stringify(legacy));
+    localStorage.setItem(MAIN_KEY, "{corrupt");
+    const restored = loadIdeas();
+    expect(restored).toEqual(legacy);
+    expect(restored[0]?.versions).toHaveLength(5);
   });
 });

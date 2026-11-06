@@ -6,7 +6,9 @@ import {
   mergeIdeas,
   mergeSourceVersions,
   parseVersions,
+  pruneVersionsToBudget,
   restoreVersion,
+  VERSION_BUDGET_BYTES,
   saveArticleIdea,
   saveIdea,
   updateArticle,
@@ -290,5 +292,100 @@ describe("mergeSourceVersions + saveArticleIdea", () => {
     const merged = saveArticleIdea("خام مدمج", "المدمج", "نص مدمج", ["a"], { versions: entries });
     expect(merged.versions).toEqual(entries);
     expect(loadIdeas().find((i) => i.id === merged.id)?.versions).toEqual(entries);
+  });
+});
+
+describe("pruneVersionsToBudget (Wave F storage diet)", () => {
+  const bytes = (s: string) => new TextEncoder().encode(s).length;
+  const totalVersionBytes = (all: Idea[]) =>
+    all.reduce(
+      (sum, i) =>
+        sum + (i.versions ?? []).reduce((s, e) => s + bytes(e.text) + bytes(e.title ?? ""), 0),
+      0,
+    );
+  const bigIdea = (id: string, versionTexts: string[], startAt: number): Idea => ({
+    id,
+    text: `خام ${id}`,
+    createdAt: startAt,
+    articleTitle: `عنوان ${id}`,
+    articleBody: `المتن الحالي ${id}`,
+    versions: versionTexts.map((text, j) => v(startAt + versionTexts.length - j, text)),
+  });
+
+  it("is exported with the documented 800,000-byte budget", () => {
+    expect(VERSION_BUDGET_BYTES).toBe(800_000);
+  });
+
+  it("drops exact-duplicate texts within an article and any copy of the current body", () => {
+    const idea: Idea = {
+      id: "d",
+      text: "خام",
+      createdAt: 1,
+      articleBody: "المتن الحالي",
+      versions: [v(40, "نسخة فريدة"), v(30, "المتن الحالي"), v(20, "نسخة فريدة"), v(10, "أخرى")],
+    };
+    const [out] = pruneVersionsToBudget([idea]);
+    expect(out?.versions?.map((e) => e.at)).toEqual([40, 10]);
+  });
+
+  it("prunes the globally oldest versions first until the budget holds", () => {
+    // 10 articles × 5 versions × ~30 KB ≈ 1.5 MB of history — over budget.
+    const filler = "س".repeat(15_000); // ~30,000 UTF-8 bytes
+    const all = Array.from({ length: 10 }, (_, i) =>
+      bigIdea(
+        `a${i}`,
+        Array.from({ length: 5 }, (_, j) => `نسخة ${i}-${j} ${filler}`),
+        (i + 1) * 100,
+      ),
+    );
+    const out = pruneVersionsToBudget(all);
+    expect(totalVersionBytes(out)).toBeLessThanOrEqual(VERSION_BUDGET_BYTES);
+    // The globally oldest snapshot (article a0, at=100... its oldest is at 101)
+    // goes before newer ones; every article keeps at least one version.
+    const remaining = out.flatMap((i) => i.versions ?? []).map((e) => e.at);
+    // a0's four oldest are gone; its newest (at=105) is protected and stays.
+    expect(remaining).not.toContain(101);
+    expect(remaining).not.toContain(102);
+    expect(remaining).not.toContain(103);
+    expect(remaining).not.toContain(104);
+    expect(remaining).toContain(105);
+    for (const idea of out) expect(idea.versions?.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("always keeps each article's newest version, even when it alone busts the budget", () => {
+    const huge = "ح".repeat(450_000); // ~900,000 UTF-8 bytes > the whole budget
+    const idea = bigIdea("big", [huge, "صغيرة قديمة"], 100);
+    // bigIdea maps newest first: at=102 is the huge one, at=101 the small old one.
+    const [out] = pruneVersionsToBudget([idea]);
+    expect(out?.versions).toHaveLength(1);
+    expect(out?.versions?.[0]?.text).toBe(huge);
+  });
+
+  it("never mutates the caller's data and is idempotent", () => {
+    const filler = "س".repeat(15_000);
+    const all = Array.from({ length: 10 }, (_, i) =>
+      bigIdea(
+        `m${i}`,
+        Array.from({ length: 5 }, (_, j) => `نسخة ${i}-${j} ${filler}`),
+        (i + 1) * 100,
+      ),
+    );
+    const snapshot = JSON.parse(JSON.stringify(all)) as Idea[];
+    const once = pruneVersionsToBudget(all);
+    expect(all).toEqual(snapshot);
+    expect(pruneVersionsToBudget(once)).toEqual(once);
+  });
+
+  it("an article whose history is fully pruned as duplicates loses the versions key", () => {
+    const idea: Idea = {
+      id: "x",
+      text: "خام",
+      createdAt: 1,
+      articleBody: "المتن",
+      versions: [v(2, "المتن"), v(1, "المتن")],
+    };
+    const [out] = pruneVersionsToBudget([idea]);
+    expect(out).not.toHaveProperty("versions");
+    expect(idea.versions).toHaveLength(2);
   });
 });

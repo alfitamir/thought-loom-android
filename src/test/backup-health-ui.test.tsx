@@ -88,3 +88,17 @@ describe("the Drive song line states the songs' real backup state (audit §4)", 
     expect(sectionText("Google Drive")).toContain("مفعّل — كل الأغاني (٢) محفوظة");
   });
 });
+
+describe("the backup-health block shows the slim mirror's size (Wave F)", () => {
+  it("states the safety-mirror size next to the library size", () => {
+    seedIdeas([{ id: "a", text: "نص", createdAt: 1 }]);
+    localStorage.setItem(
+      "afkari.ideas.lastGood",
+      JSON.stringify([{ id: "a", text: "نص", createdAt: 1 }]),
+    );
+    render(<SettingsDialog open onOpenChange={() => {}} />);
+    const text = sectionText("حالة النسخ الاحتياطي");
+    expect(text).toContain("حجم مكتبتك على هذا الهاتف");
+    expect(text).toContain("نسخة الأمان:");
+  });
+});

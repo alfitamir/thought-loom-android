@@ -84,6 +84,104 @@ export type Idea = {
 /** At most this many snapshots are kept per article — the newest ones. */
 export const MAX_VERSIONS = 5;
 
+/**
+ * Library-wide budget for version history, in UTF-8 bytes of version
+ * texts + titles (Wave F). The whole library shares one ~5 MB
+ * localStorage quota with the auth session and every other afkari.*
+ * key, and current texts already need their share twice over (main
+ * value + slim safety mirror, below). Capping frozen history at
+ * 800,000 bytes (~16% of the quota) leaves the bulk of the quota for
+ * the writing itself while still holding dozens of full-length
+ * snapshots across the library. Enforced by pruneVersionsToBudget on
+ * the single write path — see the safety-net note above writeIdeas.
+ */
+export const VERSION_BUDGET_BYTES = 800_000;
+
+const utf8Encoder = new TextEncoder();
+const utf8Bytes = (s: string): number => utf8Encoder.encode(s).length;
+
+/** UTF-8 bytes one frozen version costs against VERSION_BUDGET_BYTES. */
+const versionBytes = (v: IdeaVersion): number => utf8Bytes(v.text) + utf8Bytes(v.title ?? "");
+
+/**
+ * Bring a library's version history inside VERSION_BUDGET_BYTES,
+ * purely: the caller's array and objects are never mutated, unchanged
+ * articles keep their object identity, and applying the result again
+ * changes nothing (idempotent).
+ *
+ * Two passes, cheapest savings first:
+ * 1. Within each article, drop exact-duplicate version texts — a text
+ *    another kept version already holds, or one identical to the
+ *    article's CURRENT body (that state is live, not history).
+ * 2. If the budget still busts, drop the globally OLDEST versions
+ *    first (lowest `at` across the whole library) — except each
+ *    article's newest version, which is always kept even when it
+ *    alone busts the budget: the latest pre-AI snapshot is the one
+ *    that matters most.
+ * An article left with no versions loses the `versions` key entirely.
+ */
+export function pruneVersionsToBudget(all: Idea[]): Idea[] {
+  const staged = all.map((idea) => {
+    const versions = idea.versions;
+    if (!versions?.length) return { idea, kept: versions, changed: false };
+    const currentBody = getArticle(idea).body;
+    const seen = new Set<string>();
+    const kept: IdeaVersion[] = [];
+    let changed = false;
+    for (const v of versions) {
+      if (v.text === currentBody || seen.has(v.text)) {
+        changed = true;
+        continue;
+      }
+      seen.add(v.text);
+      kept.push(v);
+    }
+    return { idea, kept, changed };
+  });
+  let total = 0;
+  for (const s of staged) for (const v of s.kept ?? []) total += versionBytes(v);
+  if (total > VERSION_BUDGET_BYTES) {
+    // Global oldest-first candidates; each article's newest entry (the
+    // first one carrying its maximum `at`) is protected, never a candidate.
+    const candidates: Array<{ stage: number; v: IdeaVersion }> = [];
+    staged.forEach((s, stage) => {
+      const kept = s.kept ?? [];
+      if (!kept.length) return;
+      const newestAt = Math.max(...kept.map((v) => v.at));
+      let protectedNewest = false;
+      for (const v of kept) {
+        if (!protectedNewest && v.at === newestAt) {
+          protectedNewest = true;
+          continue;
+        }
+        candidates.push({ stage, v });
+      }
+    });
+    candidates.sort((a, b) => a.v.at - b.v.at);
+    const dropped = new Map<number, Set<IdeaVersion>>();
+    for (const c of candidates) {
+      if (total <= VERSION_BUDGET_BYTES) break;
+      let set = dropped.get(c.stage);
+      if (!set) dropped.set(c.stage, (set = new Set()));
+      set.add(c.v);
+      total -= versionBytes(c.v);
+    }
+    staged.forEach((s, stage) => {
+      const set = dropped.get(stage);
+      if (!set?.size) return;
+      s.kept = (s.kept ?? []).filter((v) => !set.has(v));
+      s.changed = true;
+    });
+  }
+  return staged.map(({ idea, kept, changed }) => {
+    if (!changed) return idea;
+    const copy: Idea = { ...idea };
+    if (kept?.length) copy.versions = kept;
+    else delete copy.versions;
+    return copy;
+  });
+}
+
 const VERSION_SOURCES: readonly string[] = ["improve", "clean", "merge", "restore"];
 
 /** Newest first, capped at MAX_VERSIONS. */
@@ -223,17 +321,34 @@ const DEL_KEY = "afkari.deleted";
  * session and every other afkari.* key) makes a refused write a when,
  * not an if. Three guards keep a bad moment from becoming lost writing:
  *
- * 1. LAST-GOOD MIRROR — every successful write also lands, byte for byte,
- *    under `afkari.ideas.lastGood`. The mirror is written only AFTER the
- *    main value is safely stored, so a write that dies on quota can never
- *    clobber the mirror with the very data that failed to save.
- * 2. TYPED WRITE ERRORS — a refused write never throws into the calling
+ * 1. LAST-GOOD MIRROR — every successful write also lands a SLIM copy
+ *    under `afkari.ideas.lastGood`: every article with its current
+ *    text, but with version histories stripped (Wave F storage diet —
+ *    the old byte-for-byte mirror doubled the cost of the single most
+ *    expensive part of the library, which is exactly what Lovable's
+ *    2026-11-05 quota warning flagged). The mirror is written only
+ *    AFTER the main value is safely stored, so a write that dies on
+ *    quota can never clobber the mirror with the very data that failed
+ *    to save. Disaster recovery from the mirror therefore restores
+ *    every article and its current text — the frozen pre-AI snapshots
+ *    are the one thing a mirror-restore does not bring back; in normal
+ *    operation they still live in the main value and in the cloud /
+ *    Drive sync copies.
+ * 2. VERSION BUDGET — the same write path first runs
+ *    pruneVersionsToBudget, so frozen history across the whole library
+ *    never exceeds VERSION_BUDGET_BYTES (duplicates and the globally
+ *    oldest snapshots go first; each article's newest snapshot is
+ *    always kept). The first successful save after the Wave F update
+ *    is what reclaims the space: it replaces the fat mirror with the
+ *    slim one and prunes any over-budget history. No migration and no
+ *    writes on the read path.
+ * 3. TYPED WRITE ERRORS — a refused write never throws into the calling
  *    flow (the on-screen state stays exactly as the user left it), but it
  *    is never silent either: subscribers registered through
  *    `onStorageWriteError` hear about the FIRST failure of a streak (the
  *    root component turns it into a toast), and `lastStorageWriteError`
  *    keeps the failure retrievable until a write succeeds again.
- * 3. CORRUPTION FALLBACK — a main value that no longer parses (or is not
+ * 4. CORRUPTION FALLBACK — a main value that no longer parses (or is not
  *    an array) is NOT an empty library: `loadIdeas` falls back to the
  *    mirror. Only when the mirror is unusable too is the library read as
  *    empty, and the corrupt strings are quarantined first so nothing
@@ -327,13 +442,32 @@ const quarantine = (entries: Array<{ key: string; raw: string }>) => {
 };
 
 /**
+ * The library with version histories stripped — the slim shape the
+ * last-good mirror stores (Wave F). Articles and their current texts
+ * are untouched; only the `versions` key is removed. Articles without
+ * history keep their object identity.
+ */
+export function stripVersionsForMirror(all: Idea[]): Idea[] {
+  return all.map((idea) => {
+    if (!idea.versions?.length) return idea;
+    const copy: Idea = { ...idea };
+    delete copy.versions;
+    return copy;
+  });
+}
+
+/** The exact JSON the last-good mirror stores for a library. */
+export const slimMirrorJson = (all: Idea[]): string => JSON.stringify(stripVersionsForMirror(all));
+
+/**
  * The one write path for the library blob — replaceIdeas and the
  * save/delete helpers below all land here. Returns false when storage
  * refused the write; the failure is recorded and broadcast (see the
  * safety-net note above), never thrown into the caller's flow.
  */
 const writeIdeas = (all: Idea[]): boolean => {
-  const json = JSON.stringify(all);
+  const pruned = pruneVersionsToBudget(all);
+  const json = JSON.stringify(pruned);
   try {
     localStorage.setItem(KEY, json);
   } catch (e) {
@@ -342,9 +476,10 @@ const writeIdeas = (all: Idea[]): boolean => {
   }
   currentWriteError = null;
   // The mirror updates only after the main value is stored: a failed main
-  // write leaves the previous good mirror untouched.
+  // write leaves the previous good mirror untouched. It stores the slim
+  // (version-stripped) shape, not the main JSON byte for byte.
   try {
-    localStorage.setItem(LAST_GOOD_KEY, json);
+    localStorage.setItem(LAST_GOOD_KEY, slimMirrorJson(pruned));
   } catch {
     /* best effort */
   }
@@ -358,7 +493,10 @@ export const loadIdeas = (): Idea[] => {
   if (parsed) return parsed;
   // The main value is corrupt: fall back to the last-good mirror rather
   // than reading a damaged library as empty (and letting the next write
-  // destroy whatever was recoverable).
+  // destroy whatever was recoverable). Both mirror shapes parse the
+  // same way: a legacy byte-for-byte mirror restores WITH its version
+  // histories, a slim Wave F mirror restores articles and current
+  // texts with histories absent.
   const mirrorRaw = getRaw(LAST_GOOD_KEY);
   const mirror = parseIdeas(mirrorRaw);
   if (mirror) {
@@ -381,15 +519,20 @@ export const replaceIdeas = (all: Idea[]) => {
   writeIdeas(all);
 };
 
-/** Byte size of the stored library blob — the Settings backup-health gauge. */
-export const storedIdeasBytes = (): number => {
+const storedBytesFor = (key: string): number => {
   try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? new TextEncoder().encode(raw).length : 0;
+    const raw = localStorage.getItem(key);
+    return raw ? utf8Bytes(raw) : 0;
   } catch {
     return 0;
   }
 };
+
+/** Byte size of the stored library blob — the Settings backup-health gauge. */
+export const storedIdeasBytes = (): number => storedBytesFor(KEY);
+
+/** Byte size of the stored slim last-good mirror — shown beside the library size in Settings. */
+export const storedMirrorBytes = (): number => storedBytesFor(LAST_GOOD_KEY);
 
 export function getArticle(idea: Idea): { title: string; body: string } {
   const local = toArticle(idea.text);
