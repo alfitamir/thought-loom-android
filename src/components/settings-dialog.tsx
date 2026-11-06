@@ -21,7 +21,7 @@ import { StatsSection } from "@/components/stats-section";
 import { isMyVoicePublic } from "@/lib/my-voice";
 import { buildBackup, parseBackup, restoreBackup } from "@/lib/backup";
 import { lastDriveSync, syncDrive } from "@/lib/drive-sync";
-import { arabicNumber } from "@/lib/archive-pick";
+import { arabicNumber } from "@/lib/format";
 import { loadDeleted, loadDriveDeleted, loadIdeas, storedIdeasBytes } from "@/lib/ideas";
 import { loadPendingDeletes } from "@/lib/pending-deletes";
 import { lastCloudSync, lastCloudSyncError, syncNow } from "@/lib/sync";
@@ -126,7 +126,7 @@ export function SettingsDialog({
     setDriveMsg(
       result.ok
         ? result.restored
-          ? `تمت المزامنة ✓ واستُعيدت ${result.restored} فكرة من Drive.`
+          ? `تمت المزامنة ✓ واستُعيدت ${arabicNumber(result.restored)} فكرة من Drive.`
           : "تمت المزامنة ✓ كل أفكارك محفوظة في Google Drive."
         : result.message,
     );
@@ -167,7 +167,9 @@ export function SettingsDialog({
     try {
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: "نسخة أفكاري الاحتياطية" });
-        setBackupMsg(`جُهزت النسخة (${ideas.length} فكرة) ✓ اختر Google Drive لحفظها.`);
+        setBackupMsg(
+          `جُهزت النسخة (${arabicNumber(ideas.length)} فكرة) ✓ اختر Google Drive لحفظها.`,
+        );
         return;
       }
     } catch (error) {
@@ -180,7 +182,7 @@ export function SettingsDialog({
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setBackupMsg(
-      `نُزّلت النسخة (${ideas.length} فكرة) ✓ ارفعها إلى Google Drive من مجلد التنزيلات.`,
+      `نُزّلت النسخة (${arabicNumber(ideas.length)} فكرة) ✓ ارفعها إلى Google Drive من مجلد التنزيلات.`,
     );
   };
   const importBackup = async (file: File | undefined) => {

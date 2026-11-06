@@ -6,6 +6,7 @@ import { getInsights } from "@/lib/ai-features";
 import type { Insights } from "@/lib/ai-prompts";
 import { getArticle, saveIdea, type Idea } from "@/lib/ideas";
 import { fingerprint } from "@/lib/merge";
+import { arabicNumber } from "@/lib/format";
 
 const CACHE = "afkari.insights";
 const readCache = (): { fp: string; data: Insights } | null => {
@@ -123,7 +124,7 @@ export function InsightsDialog({
                     <p className="font-semibold">
                       {t.name}{" "}
                       <span className="text-xs font-normal text-muted-foreground">
-                        ({t.ids.length} مقالات)
+                        ({arabicNumber(t.ids.length)} مقالات)
                       </span>
                     </p>
                     {t.summary && (
@@ -139,7 +140,7 @@ export function InsightsDialog({
                                 onPick(titleOf(id));
                                 onOpenChange(false);
                               }}
-                              className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground hover:opacity-80"
+                              className="inline-flex min-h-11 items-center rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground hover:opacity-80"
                             >
                               {titleOf(id)}
                             </button>

@@ -19,6 +19,7 @@ import { deleteSongDriveCopy } from "@/lib/song-drive";
 import { pushIdea } from "@/lib/sync";
 import { getGeminiKey } from "@/lib/gemini";
 import { resolveEngine } from "@/lib/ai-engine";
+import { arabicNumber } from "@/lib/format";
 import {
   dismissSuggestion,
   findMerges,
@@ -86,8 +87,9 @@ export function MergeBanner({
         <Lightbulb className="mt-0.5 size-5 shrink-0 text-primary" />
         <button className="min-w-0 flex-1 text-start" onClick={() => setActive(current)}>
           <span className="block text-foreground">
-            نقترح دمج {current.ids.length === 2 ? "مقالين" : `${current.ids.length} مقالات`} في مقال
-            واحد: «{current.title}»
+            نقترح دمج{" "}
+            {current.ids.length === 2 ? "مقالين" : `${arabicNumber(current.ids.length)} مقالات`} في
+            مقال واحد: «{current.title}»
           </span>
           {current.reason && (
             <span className="mt-1 block text-sm text-muted-foreground">{current.reason}</span>
@@ -390,7 +392,8 @@ function MergeDialog({
               <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
                 <p className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
                   <TriangleAlert className="size-4 shrink-0" />
-                  الأسطر غير الموجودة في النسخة المقترحة ({incomplete.missing.length}):
+                  الأسطر غير الموجودة في النسخة المقترحة ({arabicNumber(incomplete.missing.length)}
+                  ):
                 </p>
                 <ul className="mt-2 max-h-40 list-inside list-disc space-y-1 overflow-y-auto text-sm text-foreground">
                   {incomplete.missing.map((line, i) => (

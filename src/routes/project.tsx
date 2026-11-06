@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   articleTopic,
   clearProject,
@@ -42,6 +42,7 @@ import {
   X,
 } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
+import { arabicNumber } from "@/lib/format";
 
 export const Route = createFileRoute("/project")({
   // `?project=<name>` names the project; `&section=medical` scopes it to
@@ -223,31 +224,34 @@ export function ProjectView({
     setCompileOpen(false);
   };
 
-  const groups: Record<string, Idea[]> = {};
-  members
-    .filter((i) => matchesArticle(i, query))
-    .forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
-  // Hand-pinned articles ride to the top of their own topic group.
-  for (const list of Object.values(groups)) {
-    const sorted = sortWithPinnedFirst(list);
-    list.splice(0, list.length, ...sorted);
-  }
-
-  // Search-highlight accounting, in the exact order articles render
-  // below (same scheme as the library and the medical section).
   const queryActive = !!query.trim();
-  const matchStarts = new Map<string, number>();
-  let totalMatches = 0;
-  if (queryActive) {
+  // Memoized list model (same scheme as the library, audit F-5.1).
+  const { groups, matchStarts, totalMatches, articlesCount } = useMemo(() => {
+    const groups: Record<string, Idea[]> = {};
+    members
+      .filter((i) => matchesArticle(i, query))
+      .forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
+    // Hand-pinned articles ride to the top of their own topic group.
     for (const list of Object.values(groups)) {
-      for (const i of list) {
-        const a = getArticle(i);
-        matchStarts.set(i.id, totalMatches);
-        totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+      const sorted = sortWithPinnedFirst(list);
+      list.splice(0, list.length, ...sorted);
+    }
+    // Search-highlight accounting, in the exact order articles render
+    // below (same scheme as the library and the medical section).
+    const matchStarts = new Map<string, number>();
+    let totalMatches = 0;
+    if (queryActive) {
+      for (const list of Object.values(groups)) {
+        for (const i of list) {
+          const a = getArticle(i);
+          matchStarts.set(i.id, totalMatches);
+          totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+        }
       }
     }
-  }
-  const articlesCount = Object.values(groups).reduce((n, l) => n + l.length, 0);
+    const articlesCount = Object.values(groups).reduce((n, l) => n + l.length, 0);
+    return { groups, matchStarts, totalMatches, articlesCount };
+  }, [members, query, queryActive]);
   const safeCurrent =
     currentMatch !== null && totalMatches > 0 ? Math.min(currentMatch, totalMatches - 1) : null;
   const goToMatch = (delta: number) => {
@@ -283,7 +287,10 @@ export function ProjectView({
             <FolderOpen className="size-8 shrink-0 text-primary" />
             <span className="min-w-0 truncate">{name}</span>
             {members.length > 0 && (
-              <span className="shrink-0 text-xl text-muted-foreground"> ({members.length})</span>
+              <span className="shrink-0 text-xl text-muted-foreground">
+                {" "}
+                ({arabicNumber(members.length)})
+              </span>
             )}
           </h1>
           <div className="flex shrink-0 gap-2">
@@ -373,7 +380,7 @@ export function ProjectView({
               <div className="flex items-center gap-2 pt-2">
                 {totalMatches > 0 && (
                   <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">
-                    {totalMatches} مرة في {articlesCount} مقالة
+                    {arabicNumber(totalMatches)} مرة في {arabicNumber(articlesCount)} مقالة
                   </span>
                 )}
                 {totalMatches === 0 && articlesCount > 0 && (
@@ -383,7 +390,7 @@ export function ProjectView({
                 )}
                 {safeCurrent !== null && (
                   <span className="shrink-0 whitespace-nowrap text-sm font-medium text-foreground">
-                    {safeCurrent + 1} من {totalMatches}
+                    {arabicNumber(safeCurrent + 1)} من {arabicNumber(totalMatches)}
                   </span>
                 )}
                 <span className="ms-auto flex items-center gap-2">
@@ -445,7 +452,7 @@ export function ProjectView({
                   {topic}
                 </span>
                 <span className="flex items-center gap-3 text-muted-foreground">
-                  {list.length}
+                  {arabicNumber(list.length)}
                   <ChevronDown className={openTopic === topic ? "rotate-180" : ""} />
                 </span>
               </Button>
@@ -497,8 +504,9 @@ export function ProjectView({
               <span>تجميع مشروع «{name}» في مستند واحد</span>
             </DialogTitle>
             <p className="text-sm text-muted-foreground">
-              {members.length} {members.length === 1 ? "مقالة" : "مقالات"} — المستند مرتّب حسب
-              الموضوع، والمقالات الأقدم أولًا داخل كل موضوع، والنصوص كما هي تمامًا دون أي تعديل.
+              {arabicNumber(members.length)} {members.length === 1 ? "مقالة" : "مقالات"} — المستند
+              مرتّب حسب الموضوع، والمقالات الأقدم أولًا داخل كل موضوع، والنصوص كما هي تمامًا دون أي
+              تعديل.
             </p>
             <div className="flex flex-col gap-2 pt-1">
               <Button className="w-full rounded-full" onClick={downloadAll}>

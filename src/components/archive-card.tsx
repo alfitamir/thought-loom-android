@@ -192,7 +192,7 @@ export function ArchiveCard() {
           <button
             type="button"
             onClick={cycle}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:bg-accent"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:bg-accent"
           >
             <RefreshCw className="size-3.5" />
             واحدة تانية

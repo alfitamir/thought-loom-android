@@ -25,6 +25,7 @@ import { formatElapsed, joinTranscript, transcribeFinished } from "@/lib/voice-s
 import { ArchiveCard } from "@/components/archive-card";
 import { recoverPendingSongs, saveRecordedSong } from "@/lib/songs";
 import { syncSongAudio } from "@/lib/song-drive";
+import { arabicNumber } from "@/lib/format";
 
 export const Route = createFileRoute("/")({
   // `?record=<nonce>` is the bottom navigation's "open the recorder" signal:
@@ -626,7 +627,7 @@ function Index() {
             <span className="block font-display text-lg text-foreground">القسم الطبي</span>
             <span className="block text-sm text-muted-foreground">
               {medicalCount > 0
-                ? `${medicalCount} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل`
+                ? `${arabicNumber(medicalCount)} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل`
                 : "قسم مستقل لمقالاتك الطبية"}
             </span>
           </span>
@@ -645,7 +646,7 @@ function Index() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-display text-lg text-foreground">الأغاني</span>
-            <span className="block text-sm text-muted-foreground">{`${songsCount} ${songsCount === 1 ? "أغنية مسجلة" : "أغاني مسجلة"} في قسم مستقل`}</span>
+            <span className="block text-sm text-muted-foreground">{`${arabicNumber(songsCount)} ${songsCount === 1 ? "أغنية مسجلة" : "أغاني مسجلة"} في قسم مستقل`}</span>
           </span>
           <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
         </Link>

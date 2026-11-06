@@ -113,7 +113,7 @@ export function AskDialog({
                 key={q}
                 onClick={() => void ask(q)}
                 disabled={!online}
-                className="rounded-full bg-secondary px-3 py-1.5 text-xs text-secondary-foreground hover:opacity-80 disabled:opacity-50"
+                className="inline-flex min-h-11 items-center rounded-full bg-secondary px-3 py-1.5 text-xs text-secondary-foreground hover:opacity-80 disabled:opacity-50"
               >
                 {q}
               </button>

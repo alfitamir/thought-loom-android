@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { downloadDocument, printDocument } from "@/lib/document";
 import type { Idea } from "@/lib/ideas";
+import { arabicNumber } from "@/lib/format";
 import { FileDown, FileText, Printer, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -54,7 +55,7 @@ export function CompileBar({ ideas, onCancel }: { ideas: Idea[]; onCancel: () =>
           <DialogTitle className="flex items-center gap-2 text-start font-display">
             <FileText className="size-5 text-primary" />
             <span>
-              تجميع {count} {count === 1 ? "مقالة" : "مقالات"} في مستند واحد
+              تجميع {arabicNumber(count)} {count === 1 ? "مقالة" : "مقالات"} في مستند واحد
             </span>
           </DialogTitle>
           <p className="text-sm text-muted-foreground">

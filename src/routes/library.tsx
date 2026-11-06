@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cleanFull } from "@/lib/article-ai";
 import { resolveEngine } from "@/lib/ai-engine";
 import {
@@ -54,6 +54,7 @@ import {
   X,
 } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
+import { arabicNumber } from "@/lib/format";
 
 export const Route = createFileRoute("/library")({
   head: () => ({
@@ -210,8 +211,8 @@ export function Library() {
         (m) =>
           m ||
           (controller.signal.aborted || done < queue.length
-            ? `توقف الضبط بعد ${done} من ${queue.length}. اضغط لاحقًا للمتابعة.`
-            : `تم ضبط المقالات ✓${skipped ? ` (تُرك ${skipped} كما هو لأن النسخة المقترحة كانت ناقصة)` : ""}`),
+            ? `توقف الضبط بعد ${arabicNumber(done)} من ${arabicNumber(queue.length)}. اضغط لاحقًا للمتابعة.`
+            : `تم ضبط المقالات ✓${skipped ? ` (تُرك ${arabicNumber(skipped)} كما هو لأن النسخة المقترحة كانت ناقصة)` : ""}`),
       );
     }
   };
@@ -238,34 +239,41 @@ export function Library() {
     };
   }, []);
 
-  const likedCount = ideas.filter((i) => i.liked).length;
-  const groups: Record<string, Idea[]> = {};
-  ideas
-    .filter((i) => matchesArticle(i, query) && (!likedOnly || i.liked))
-    .forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
-  // Hand-pinned articles ride to the top of their own topic group; the rest
-  // keep their order.
-  for (const list of Object.values(groups)) {
-    const sorted = sortWithPinnedFirst(list);
-    list.splice(0, list.length, ...sorted);
-  }
-
-  // Search-highlight accounting, in the exact order articles render below
-  // (topic groups in order, title occurrences before body occurrences), so a
-  // global match index identifies one rendered <mark data-match-idx="…">.
   const queryActive = !!query.trim();
-  const matchStarts = new Map<string, number>();
-  let totalMatches = 0;
-  if (queryActive) {
+  // The list model — filter, group, pinned-first sort, and the search
+  // accounting (a full-text scan of every article) — is memoized on
+  // (ideas, query, likedOnly): unrelated re-renders no longer rescan the
+  // whole library on every keystroke render (audit F-5.1).
+  const { likedCount, groups, matchStarts, totalMatches, articlesCount } = useMemo(() => {
+    const likedCount = ideas.filter((i) => i.liked).length;
+    const groups: Record<string, Idea[]> = {};
+    ideas
+      .filter((i) => matchesArticle(i, query) && (!likedOnly || i.liked))
+      .forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
+    // Hand-pinned articles ride to the top of their own topic group; the
+    // rest keep their order.
     for (const list of Object.values(groups)) {
-      for (const i of list) {
-        const a = getArticle(i);
-        matchStarts.set(i.id, totalMatches);
-        totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+      const sorted = sortWithPinnedFirst(list);
+      list.splice(0, list.length, ...sorted);
+    }
+    // Search-highlight accounting, in the exact order articles render
+    // below (topic groups in order, title occurrences before body
+    // occurrences), so a global match index identifies one rendered
+    // <mark data-match-idx="…">.
+    const matchStarts = new Map<string, number>();
+    let totalMatches = 0;
+    if (queryActive) {
+      for (const list of Object.values(groups)) {
+        for (const i of list) {
+          const a = getArticle(i);
+          matchStarts.set(i.id, totalMatches);
+          totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+        }
       }
     }
-  }
-  const articlesCount = Object.values(groups).reduce((n, l) => n + l.length, 0);
+    const articlesCount = Object.values(groups).reduce((n, l) => n + l.length, 0);
+    return { likedCount, groups, matchStarts, totalMatches, articlesCount };
+  }, [ideas, query, likedOnly, queryActive]);
   const safeCurrent =
     currentMatch !== null && totalMatches > 0 ? Math.min(currentMatch, totalMatches - 1) : null;
   const goToMatch = (delta: number) => {
@@ -298,7 +306,7 @@ export function Library() {
           <h1 className="font-display text-3xl text-foreground">
             مقالاتي
             {ideas.length > 0 && (
-              <span className="text-xl text-muted-foreground"> ({ideas.length})</span>
+              <span className="text-xl text-muted-foreground"> ({arabicNumber(ideas.length)})</span>
             )}
           </h1>
           <div className="flex gap-2">
@@ -349,7 +357,7 @@ export function Library() {
             <span className="block font-display text-lg text-foreground">القسم الطبي</span>
             <span className="block text-sm text-muted-foreground">
               {medicalCount > 0
-                ? `${medicalCount} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل`
+                ? `${arabicNumber(medicalCount)} ${medicalCount === 1 ? "مقالة طبية" : "مقالات طبية"} في قسم مستقل`
                 : "قسم مستقل لمقالاتك الطبية"}
             </span>
           </span>
@@ -368,7 +376,7 @@ export function Library() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block font-display text-lg text-foreground">الأغاني</span>
-              <span className="block text-sm text-muted-foreground">{`${songsCount} ${songsCount === 1 ? "أغنية مسجلة" : "أغاني مسجلة"} في قسم مستقل`}</span>
+              <span className="block text-sm text-muted-foreground">{`${arabicNumber(songsCount)} ${songsCount === 1 ? "أغنية مسجلة" : "أغاني مسجلة"} في قسم مستقل`}</span>
             </span>
             <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
           </Link>
@@ -378,21 +386,23 @@ export function Library() {
         <ProjectsStrip ideas={ideas} />
         {(bulk || bulkMsg) && (
           <p role="status" className="mb-4 text-sm text-muted-foreground">
-            {bulk ? `جارٍ الضبط… تم ${bulk.done} من ${bulk.total}` : bulkMsg}
+            {bulk
+              ? `جارٍ الضبط… تم ${arabicNumber(bulk.done)} من ${arabicNumber(bulk.total)}`
+              : bulkMsg}
           </p>
         )}
         {ideas.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-2">
             <button
               onClick={() => setAskOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
               <MessageCircleQuestion className="size-5" />
               اسأل أفكاري
             </button>
             <button
               onClick={() => setInsightsOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
             >
               <Lightbulb className="size-5" />
               رؤى
@@ -401,16 +411,16 @@ export function Library() {
               <button
                 onClick={() => setLikedOnly(!likedOnly)}
                 aria-pressed={likedOnly}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${likedOnly ? "bg-rose-500 text-white hover:opacity-90" : "border border-border bg-card text-foreground hover:bg-accent"}`}
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${likedOnly ? "bg-rose-500 text-white hover:opacity-90" : "border border-border bg-card text-foreground hover:bg-accent"}`}
               >
                 <Heart className="size-5" />
-                أعجبني ({likedCount})
+                أعجبني ({arabicNumber(likedCount)})
               </button>
             )}
             <button
               onClick={() => (selecting ? exitSelection() : setSelecting(true))}
               aria-pressed={selecting}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${selecting ? "bg-primary text-primary-foreground hover:opacity-90" : "border border-border bg-card text-foreground hover:bg-accent"}`}
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${selecting ? "bg-primary text-primary-foreground hover:opacity-90" : "border border-border bg-card text-foreground hover:bg-accent"}`}
             >
               <ListChecks className="size-5" />
               اختيار
@@ -420,7 +430,7 @@ export function Library() {
                 <button
                   type="button"
                   aria-label="المزيد"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
                 >
                   <MoreHorizontal className="size-5" />
                   المزيد
@@ -453,8 +463,8 @@ export function Library() {
                   >
                     <Tags />
                     {labeling
-                      ? `جارٍ التصنيف ${labeling.done}/${labeling.total}…`
-                      : `صنّف بالذكاء الاصطناعي (${stale})`}
+                      ? `جارٍ التصنيف ${arabicNumber(labeling.done)}/${arabicNumber(labeling.total)}…`
+                      : `صنّف بالذكاء الاصطناعي (${arabicNumber(stale)})`}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -513,7 +523,7 @@ export function Library() {
               <div className="flex items-center gap-2 pt-2">
                 {totalMatches > 0 && (
                   <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">
-                    {totalMatches} مرة في {articlesCount} مقالة
+                    {arabicNumber(totalMatches)} مرة في {arabicNumber(articlesCount)} مقالة
                   </span>
                 )}
                 {totalMatches === 0 && articlesCount > 0 && (
@@ -523,7 +533,7 @@ export function Library() {
                 )}
                 {safeCurrent !== null && (
                   <span className="shrink-0 whitespace-nowrap text-sm font-medium text-foreground">
-                    {safeCurrent + 1} من {totalMatches}
+                    {arabicNumber(safeCurrent + 1)} من {arabicNumber(totalMatches)}
                   </span>
                 )}
                 <span className="ms-auto flex items-center gap-2">
@@ -585,7 +595,7 @@ export function Library() {
                   {topic}
                 </span>
                 <span className="flex items-center gap-3 text-muted-foreground">
-                  {list.length}
+                  {arabicNumber(list.length)}
                   <ChevronDown className={openTopic === topic ? "rotate-180" : ""} />
                 </span>
               </Button>
@@ -614,7 +624,7 @@ export function Library() {
                                 <button
                                   key={t}
                                   onClick={() => pick(t)}
-                                  className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80"
                                 >
                                   #{t}
                                 </button>

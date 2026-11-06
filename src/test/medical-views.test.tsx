@@ -77,7 +77,7 @@ describe("main library partition", () => {
     render(<Library />);
     // The entry card to the medical section, with its count.
     expect(screen.getByText("القسم الطبي")).toBeTruthy();
-    expect(screen.getByText(/1 مقالة طبية/)).toBeTruthy();
+    expect(screen.getByText(/١ مقالة طبية/)).toBeTruthy();
     // The general topic group renders; the medical one does not exist here.
     expect(screen.getByText("موضوع عام")).toBeTruthy();
     expect(screen.queryByText("موضوع طبي")).toBeNull();

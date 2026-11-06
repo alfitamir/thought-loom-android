@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   articleTopic,
   getArticle,
@@ -32,6 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
+import { arabicNumber } from "@/lib/format";
 
 export const Route = createFileRoute("/medical")({
   head: () => ({
@@ -125,31 +126,36 @@ export function MedicalSection() {
     };
   }, []);
 
-  const groups: Record<string, Idea[]> = {};
-  ideas
-    .filter((i) => matchesArticle(i, query))
-    .forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
-  // Hand-pinned articles ride to the top of their own topic group.
-  for (const list of Object.values(groups)) {
-    const sorted = sortWithPinnedFirst(list);
-    list.splice(0, list.length, ...sorted);
-  }
-
-  // Search-highlight accounting, in the exact order articles render below
-  // (same scheme as the library, over the medical partition only).
   const queryActive = !!query.trim();
-  const matchStarts = new Map<string, number>();
-  let totalMatches = 0;
-  if (queryActive) {
+  // Memoized list model (same scheme as the library, audit F-5.1): the
+  // grouping and the full-text search accounting rescan only when the
+  // partition or the query actually changes.
+  const { groups, matchStarts, totalMatches, articlesCount } = useMemo(() => {
+    const groups: Record<string, Idea[]> = {};
+    ideas
+      .filter((i) => matchesArticle(i, query))
+      .forEach((i) => (groups[articleTopic(i)] ??= []).push(i));
+    // Hand-pinned articles ride to the top of their own topic group.
     for (const list of Object.values(groups)) {
-      for (const i of list) {
-        const a = getArticle(i);
-        matchStarts.set(i.id, totalMatches);
-        totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+      const sorted = sortWithPinnedFirst(list);
+      list.splice(0, list.length, ...sorted);
+    }
+    // Search-highlight accounting, in the exact order articles render
+    // below (over the medical partition only).
+    const matchStarts = new Map<string, number>();
+    let totalMatches = 0;
+    if (queryActive) {
+      for (const list of Object.values(groups)) {
+        for (const i of list) {
+          const a = getArticle(i);
+          matchStarts.set(i.id, totalMatches);
+          totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+        }
       }
     }
-  }
-  const articlesCount = Object.values(groups).reduce((n, l) => n + l.length, 0);
+    const articlesCount = Object.values(groups).reduce((n, l) => n + l.length, 0);
+    return { groups, matchStarts, totalMatches, articlesCount };
+  }, [ideas, query, queryActive]);
   const safeCurrent =
     currentMatch !== null && totalMatches > 0 ? Math.min(currentMatch, totalMatches - 1) : null;
   const goToMatch = (delta: number) => {
@@ -187,7 +193,7 @@ export function MedicalSection() {
             <Stethoscope className="size-8 text-primary" />
             القسم الطبي
             {ideas.length > 0 && (
-              <span className="text-xl text-muted-foreground"> ({ideas.length})</span>
+              <span className="text-xl text-muted-foreground"> ({arabicNumber(ideas.length)})</span>
             )}
           </h1>
           <div className="flex gap-2">
@@ -267,7 +273,7 @@ export function MedicalSection() {
               <div className="flex items-center gap-2 pt-2">
                 {totalMatches > 0 && (
                   <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">
-                    {totalMatches} مرة في {articlesCount} مقالة
+                    {arabicNumber(totalMatches)} مرة في {arabicNumber(articlesCount)} مقالة
                   </span>
                 )}
                 {totalMatches === 0 && articlesCount > 0 && (
@@ -277,7 +283,7 @@ export function MedicalSection() {
                 )}
                 {safeCurrent !== null && (
                   <span className="shrink-0 whitespace-nowrap text-sm font-medium text-foreground">
-                    {safeCurrent + 1} من {totalMatches}
+                    {arabicNumber(safeCurrent + 1)} من {arabicNumber(totalMatches)}
                   </span>
                 )}
                 <span className="ms-auto flex items-center gap-2">
@@ -350,7 +356,7 @@ export function MedicalSection() {
                   {topic}
                 </span>
                 <span className="flex items-center gap-3 text-muted-foreground">
-                  {list.length}
+                  {arabicNumber(list.length)}
                   <ChevronDown className={openTopic === topic ? "rotate-180" : ""} />
                 </span>
               </Button>
