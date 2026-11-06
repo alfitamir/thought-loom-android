@@ -5,7 +5,6 @@ import {
   ChevronDown,
   Copy,
   Download,
-  Facebook,
   FolderOpen,
   Heart,
   HelpCircle,
@@ -65,6 +64,28 @@ import {
   type Idea,
   type VersionSource,
 } from "@/lib/ideas";
+
+/** Facebook brand glyph: lucide-react 1.x removed brand icons, so the old
+ *  lucide `Facebook` path is inlined here with identical stroke styling. */
+function FacebookIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </svg>
+  );
+}
 import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { pushIdea } from "@/lib/sync";
 import { improveFull } from "@/lib/article-ai";
@@ -826,7 +847,7 @@ export function ArticleEditor({
                     onSelect={openFacebook}
                     className="[&>svg]:size-5"
                   >
-                    <Facebook className="text-[#1877F2]" />
+                    <FacebookIcon className="text-[#1877F2]" />
                     منشور فيسبوك
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -1165,7 +1186,7 @@ export function ArticleEditor({
       <Dialog open={fbOpen} onOpenChange={setFbOpen}>
         <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
           <DialogTitle className="text-start font-display flex items-center gap-2">
-            <Facebook className="size-5 text-[#1877F2]" />
+            <FacebookIcon className="size-5 text-[#1877F2]" />
             <span>منشور فيسبوك مقترح</span>
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
