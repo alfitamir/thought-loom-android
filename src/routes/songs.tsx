@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   articleTopic,
   getArticle,
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { ArticleEditor } from "@/components/article-editor";
 import { ArrowRight, ChevronDown, ChevronUp, Music, Search, X } from "lucide-react";
 import { countOccurrences } from "@/lib/search-highlight";
+import { arabicNumber } from "@/lib/format";
 
 export const Route = createFileRoute("/songs")({
   head: () => ({
@@ -89,23 +90,26 @@ export function SongsSection() {
     };
   }, []);
 
-  // A flat list — songs are recordings, not topic material — with
-  // hand-pinned songs riding to the top, as in every other view.
-  const visible = sortWithPinnedFirst(ideas.filter((i) => matchesArticle(i, query)));
-
-  // Search-highlight accounting, in the exact order songs render below
-  // (same scheme as the library and the medical section, over the songs
-  // partition only — a match counts title occurrences before lyrics).
   const queryActive = !!query.trim();
-  const matchStarts = new Map<string, number>();
-  let totalMatches = 0;
-  if (queryActive) {
-    for (const i of visible) {
-      const a = getArticle(i);
-      matchStarts.set(i.id, totalMatches);
-      totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+  // Memoized list model (same scheme as the library, audit F-5.1).
+  const { visible, matchStarts, totalMatches } = useMemo(() => {
+    // A flat list — songs are recordings, not topic material — with
+    // hand-pinned songs riding to the top, as in every other view.
+    const visible = sortWithPinnedFirst(ideas.filter((i) => matchesArticle(i, query)));
+    // Search-highlight accounting, in the exact order songs render below
+    // (over the songs partition only — a match counts title occurrences
+    // before lyrics).
+    const matchStarts = new Map<string, number>();
+    let totalMatches = 0;
+    if (queryActive) {
+      for (const i of visible) {
+        const a = getArticle(i);
+        matchStarts.set(i.id, totalMatches);
+        totalMatches += countOccurrences(a.title, query) + countOccurrences(a.body, query);
+      }
     }
-  }
+    return { visible, matchStarts, totalMatches };
+  }, [ideas, query, queryActive]);
   const safeCurrent =
     currentMatch !== null && totalMatches > 0 ? Math.min(currentMatch, totalMatches - 1) : null;
   const goToMatch = (delta: number) => {
@@ -139,7 +143,7 @@ export function SongsSection() {
             <Music className="size-8 text-primary" />
             الأغاني
             {ideas.length > 0 && (
-              <span className="text-xl text-muted-foreground"> ({ideas.length})</span>
+              <span className="text-xl text-muted-foreground"> ({arabicNumber(ideas.length)})</span>
             )}
           </h1>
           <div className="flex gap-2">
@@ -193,7 +197,7 @@ export function SongsSection() {
               <div className="flex items-center gap-2 pt-2">
                 {totalMatches > 0 && (
                   <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">
-                    {totalMatches} مرة في {visible.length} أغنية
+                    {arabicNumber(totalMatches)} مرة في {arabicNumber(visible.length)} أغنية
                   </span>
                 )}
                 {totalMatches === 0 && visible.length > 0 && (
@@ -203,7 +207,7 @@ export function SongsSection() {
                 )}
                 {safeCurrent !== null && (
                   <span className="shrink-0 whitespace-nowrap text-sm font-medium text-foreground">
-                    {safeCurrent + 1} من {totalMatches}
+                    {arabicNumber(safeCurrent + 1)} من {arabicNumber(totalMatches)}
                   </span>
                 )}
                 <span className="ms-auto flex items-center gap-2">

@@ -9,7 +9,7 @@
 - [x] Backup export / restore file (save to Google Drive).
 - [x] Gemini connection: fast models, automatic fallback, no hanging.
 - [x] Google Drive automatic sync (owner only) with "sync now" in settings.
-- [ ] AI follows the user's writing-style guide (polish + merge, Gemini and cloud).
-- [ ] Merged originals are never suggested again and never come back after sync.
-- [ ] Real voice recording (audio file) transcribed by AI; no auto-stop, no beeps, no lost words.
+- [x] AI follows the user's writing-style guide (polish + merge, Gemini and cloud).
+- [x] Merged originals are never suggested again and never come back after sync.
+- [x] Real voice recording (audio file) transcribed by AI; no auto-stop, no beeps, no lost words.
 - [ ] Verify signed-in cloud proofreading end-to-end. Blocker: no requesting-user app session available (Gemini path verified).

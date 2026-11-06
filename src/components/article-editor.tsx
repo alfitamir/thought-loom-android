@@ -47,6 +47,8 @@ import { ManualMergeDialog } from "@/components/manual-merge-dialog";
 import { getArticleEnrichment, getFacebookPost, type ArticleEnrichment } from "@/lib/ai-features";
 import { HighlightedText } from "@/components/highlighted-text";
 import { countOccurrences } from "@/lib/search-highlight";
+import { countWords } from "@/lib/stats";
+import { arabicNumber } from "@/lib/format";
 import {
   articleTopic,
   clearArticleTopic,
@@ -64,6 +66,12 @@ import {
   type Idea,
   type VersionSource,
 } from "@/lib/ideas";
+
+/** Facebook's brand blue — the ONE place the color is named (audit F-4.1);
+ *  a brand color, kept exact and readable on both themes. The literal
+ *  utility class stays whole in this constant so Tailwind's scanner sees
+ *  it; every Facebook glyph below takes its color from here. */
+const FACEBOOK_BRAND_CLASS = "text-[#1877F2]";
 
 /** Facebook brand glyph: lucide-react 1.x removed brand icons, so the old
  *  lucide `Facebook` path is inlined here with identical stroke styling. */
@@ -140,8 +148,6 @@ import {
   useReadingPrefs,
 } from "@/lib/reading-prefs";
 
-const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
-
 /** Arabic labels for why a version snapshot was frozen (see IdeaVersion). */
 const VERSION_SOURCE_LABELS: Record<VersionSource, string> = {
   improve: "تحسين",
@@ -155,8 +161,8 @@ const readingTimeLabel = (text: string) => {
   const mins = Math.max(1, Math.round(countWords(text) / 180));
   if (mins === 1) return "قراءة دقيقة";
   if (mins === 2) return "قراءة دقيقتان";
-  if (mins <= 10) return `قراءة ${mins} دقائق`;
-  return `قراءة ${mins} دقيقة`;
+  if (mins <= 10) return `قراءة ${arabicNumber(mins)} دقائق`;
+  return `قراءة ${arabicNumber(mins)} دقيقة`;
 };
 
 export function ArticleEditor({
@@ -493,7 +499,11 @@ export function ArticleEditor({
 
   return (
     <article
-      className="border-b border-border py-6 last:border-0"
+      // Rendering first step for long lists (audit F-5.1): the browser may
+      // skip layout/paint of off-screen cards, keeping their space via the
+      // intrinsic-size estimate (auto = it remembers the real size after
+      // the first render).
+      className="border-b border-border py-6 last:border-0 [contain-intrinsic-size:auto_220px] [content-visibility:auto]"
       style={readingStyleVars(readingPrefs)}
     >
       {editing ? (
@@ -511,7 +521,9 @@ export function ArticleEditor({
             rows={10}
             className={`w-full rounded-md border border-input bg-card p-3 font-article text-[length:var(--reading-font-size,1.25rem)] leading-[var(--reading-line-height,2)] outline-none focus:ring-2 focus:ring-ring${readingPrefs.bgTint === 1 ? " reading-tinted" : ""}`}
           />
-          <p className="text-xs text-muted-foreground">عدد الكلمات: {countWords(body)}</p>
+          <p className="text-xs text-muted-foreground">
+            عدد الكلمات: {arabicNumber(countWords(body))}
+          </p>
           <div className="flex gap-2">
             <Button onClick={() => save(title, body)} disabled={!title.trim() || !body.trim()}>
               <Check />
@@ -713,7 +725,7 @@ export function ArticleEditor({
                     setNewTopic("");
                     setTopicOpen(true);
                   }}
-                  className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80"
                 >
                   التصنيف: {topic}
                   {idea.topicManual && <Lock className="size-3" />}
@@ -733,7 +745,7 @@ export function ArticleEditor({
                     setNewProject("");
                     setProjectOpen(true);
                   }}
-                  className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80"
                 >
                   <FolderOpen className="size-3" />
                   {idea.project ? `المشروع: ${idea.project}` : "بدون مشروع"}
@@ -746,7 +758,7 @@ export function ArticleEditor({
                   aria-label={isMedical ? "إخراج إلى المكتبة العامة" : "نقل إلى القسم الطبي"}
                   title={isMedical ? "إخراج إلى المكتبة العامة" : "نقل إلى القسم الطبي"}
                   onClick={toggleMedical}
-                  className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground hover:opacity-80"
                 >
                   {isMedical ? <Library className="size-3" /> : <Stethoscope className="size-3" />}
                   {isMedical ? "إخراج إلى المكتبة العامة" : "نقل إلى القسم الطبي"}
@@ -847,7 +859,7 @@ export function ArticleEditor({
                     onSelect={openFacebook}
                     className="[&>svg]:size-5"
                   >
-                    <FacebookIcon className="text-[#1877F2]" />
+                    <FacebookIcon className={FACEBOOK_BRAND_CLASS} />
                     منشور فيسبوك
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -906,7 +918,7 @@ export function ArticleEditor({
                 )}
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
-                عدد الكلمات: {countWords(article.body)}
+                عدد الكلمات: {arabicNumber(countWords(article.body))}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Button
@@ -1038,21 +1050,21 @@ export function ArticleEditor({
                   onClick={() => setEnrichTab("quotes")}
                 >
                   <Quote className="size-3.5" />
-                  <span>اقتباسات ومراجع ({enrichment.quotes?.length || 0})</span>
+                  <span>اقتباسات ومراجع ({arabicNumber(enrichment.quotes?.length || 0)})</span>
                 </button>
                 <button
                   className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${enrichTab === "additions" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                   onClick={() => setEnrichTab("additions")}
                 >
                   <PlusCircle className="size-3.5" />
-                  <span>زوايا فكرية ({enrichment.additions?.length || 0})</span>
+                  <span>زوايا فكرية ({arabicNumber(enrichment.additions?.length || 0)})</span>
                 </button>
                 <button
                   className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${enrichTab === "questions" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                   onClick={() => setEnrichTab("questions")}
                 >
                   <HelpCircle className="size-3.5" />
-                  <span>أسئلة كاشفة ({enrichment.questions?.length || 0})</span>
+                  <span>أسئلة كاشفة ({arabicNumber(enrichment.questions?.length || 0)})</span>
                 </button>
               </div>
 
@@ -1086,7 +1098,7 @@ export function ArticleEditor({
                         <Button
                           size="sm"
                           variant="outline"
-                          className="w-full text-xs h-8 mt-2 justify-center gap-1.5"
+                          className="w-full text-xs h-11 mt-2 justify-center gap-1.5"
                           onClick={() =>
                             insertTextIntoArticle(
                               `وكما قال ${q.author}: «${q.quote}».`,
@@ -1119,7 +1131,7 @@ export function ArticleEditor({
                         <Button
                           size="sm"
                           variant="outline"
-                          className="w-full text-xs h-8 justify-center gap-1.5"
+                          className="w-full text-xs h-11 justify-center gap-1.5"
                           onClick={() =>
                             insertTextIntoArticle(add, "أُضيفت الفكرة للمقال وحُفظت بنجاح ✓")
                           }
@@ -1151,7 +1163,7 @@ export function ArticleEditor({
                         <Button
                           size="sm"
                           variant="outline"
-                          className="w-full text-xs h-8 justify-center gap-1.5"
+                          className="w-full text-xs h-11 justify-center gap-1.5"
                           onClick={() =>
                             insertTextIntoArticle(
                               quest,
@@ -1186,7 +1198,7 @@ export function ArticleEditor({
       <Dialog open={fbOpen} onOpenChange={setFbOpen}>
         <DialogContent dir="rtl" className="max-h-[88dvh] overflow-y-auto">
           <DialogTitle className="text-start font-display flex items-center gap-2">
-            <FacebookIcon className="size-5 text-[#1877F2]" />
+            <FacebookIcon className={`size-5 ${FACEBOOK_BRAND_CLASS}`} />
             <span>منشور فيسبوك مقترح</span>
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
@@ -1437,7 +1449,7 @@ export function ArticleEditor({
                       {new Date(v.at).toLocaleString("ar")}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      · {countWords(v.text)} كلمة
+                      · {arabicNumber(countWords(v.text))} كلمة
                     </span>
                   </div>
                   {v.title && (
@@ -2243,7 +2255,8 @@ function ListenDialog({
       speechRef.current?.stop();
       const speech = speakWithDevice(text, {
         rate: r,
-        onChunk: (i, total) => setChunkLabel(`جزء ${i + 1} من ${total}`),
+        onChunk: (i, total) =>
+          setChunkLabel(`جزء ${arabicNumber(i + 1)} من ${arabicNumber(total)}`),
       });
       speechRef.current = speech;
       setSpeaking(true);
@@ -2621,12 +2634,12 @@ function ListenDialog({
                 />
                 {!legacy && playIndex >= 0 && (
                   <p className="text-sm text-muted-foreground">
-                    الجزء {playIndex + 1} من {totalChunks}
+                    الجزء {arabicNumber(playIndex + 1)} من {arabicNumber(totalChunks)}
                   </p>
                 )}
                 {!legacy && playIndex < 0 && (generating || readyCount > 0) && (
                   <p className="text-sm text-muted-foreground">
-                    تم توليد {readyCount} من {totalChunks} جزء
+                    تم توليد {arabicNumber(readyCount)} من {arabicNumber(totalChunks)} جزء
                   </p>
                 )}
                 {waiting && (

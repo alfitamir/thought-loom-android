@@ -66,10 +66,27 @@ export function resolveThemeDark(mode: ThemeMode, systemDark: boolean): boolean 
   return mode === "dark" || (mode === "system" && systemDark);
 }
 
-/** Apply a mode to the document now: `dark` class on <html> iff dark. */
+/** Browser/PWA chrome colors per resolved theme, for the `theme-color`
+ *  meta: the brand navy in dark mode (the meta's original static value),
+ *  the warm light background (styles.css `--background` under
+ *  `:root:not(.dark)`, oklch(0.96 0.02 80)) in light mode — so the chrome
+ *  follows the active theme instead of staying navy in light mode
+ *  (audit F-4.1). */
+export const THEME_COLOR_DARK = "#1F243D";
+export const THEME_COLOR_LIGHT = "#F9F1E3";
+
+/** Pure resolved-darkness → chrome color; the one place the pairing lives. */
+export function themeColorFor(dark: boolean): string {
+  return dark ? THEME_COLOR_DARK : THEME_COLOR_LIGHT;
+}
+
+/** Apply a mode to the document now: `dark` class on <html> iff dark, and
+ *  the `theme-color` meta follows the same resolution. */
 export function applyThemeMode(mode: ThemeMode): void {
   if (typeof document === "undefined") return;
-  document.documentElement.classList.toggle("dark", resolveThemeDark(mode, systemPrefersDark()));
+  const dark = resolveThemeDark(mode, systemPrefersDark());
+  document.documentElement.classList.toggle("dark", dark);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", themeColorFor(dark));
 }
 
 const CHANGE_EVENT = "afkari:theme-changed";

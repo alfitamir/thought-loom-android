@@ -97,7 +97,7 @@ describe("main library: songs are out", () => {
     render(<Library />);
     // The songs door, with its count.
     expect(screen.getByText("الأغاني")).toBeTruthy();
-    expect(screen.getByText(/2 أغاني مسجلة/)).toBeTruthy();
+    expect(screen.getByText(/٢ أغاني مسجلة/)).toBeTruthy();
     // The general topic group renders; no song appears anywhere here.
     expect(screen.getByText("موضوع عام")).toBeTruthy();
     expect(screen.queryByText("أغنيتي الأولى")).toBeNull();

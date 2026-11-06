@@ -68,7 +68,7 @@ describe("MergeDialog completeness states", () => {
   it("shows the missing lines and only the explicit accept-despite action when the proposal is incomplete", async () => {
     scriptMerge(`مدمج\n\n${bodyA}`);
     openDialog();
-    expect(await screen.findByText(/الأسطر غير الموجودة في النسخة المقترحة \(2\)/)).toBeTruthy();
+    expect(await screen.findByText(/الأسطر غير الموجودة في النسخة المقترحة \(٢\)/)).toBeTruthy();
     expect(
       screen.getByText("المقاومة فكرة تبدأ من رفض الظلم وتنتهي ببناء الإنسان الحر القادر."),
     ).toBeTruthy();

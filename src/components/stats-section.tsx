@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { ChartColumn } from "lucide-react";
-import { arabicNumber } from "@/lib/archive-pick";
+import { arabicNumber } from "@/lib/format";
 import { loadVisibleIdeas } from "@/lib/pending-deletes";
 import { computeStats } from "@/lib/stats";
 

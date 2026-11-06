@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { FolderOpen } from "lucide-react";
 import { projectOptions, type Idea } from "@/lib/ideas";
+import { arabicNumber } from "@/lib/format";
 
 /**
  * «المشاريع»: the discovery strip for one partition's projects — every
@@ -25,10 +26,10 @@ export function ProjectsStrip({ ideas, medical = false }: { ideas: Idea[]; medic
             key={project}
             to="/project"
             search={medical ? { project, section: "medical" as const } : { project }}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
           >
             {project}
-            <span className="text-xs text-muted-foreground">{count}</span>
+            <span className="text-xs text-muted-foreground">{arabicNumber(count)}</span>
           </Link>
         ))}
       </div>

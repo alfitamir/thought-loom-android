@@ -105,7 +105,7 @@ describe("projects strip discovery", () => {
     // The general «كتابي» counts its two general members only — the
     // medical article with the same project name is a different project.
     const chip = screen.getByText("كتابي").closest("a");
-    expect(chip?.textContent).toContain("2");
+    expect(chip?.textContent).toContain("٢");
     expect(screen.queryByText("ملف طبي")).toBeNull();
   });
 
@@ -122,7 +122,7 @@ describe("projects strip discovery", () => {
     expect(screen.getByText("ملف طبي")).toBeTruthy();
     // The medical «كتابي» chip counts its single medical member.
     const chip = screen.getByText("كتابي").closest("a");
-    expect(chip?.textContent).toContain("1");
+    expect(chip?.textContent).toContain("١");
   });
 });
 
