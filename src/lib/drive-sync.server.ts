@@ -2,46 +2,37 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
 import { mergeIdeas } from "./ideas";
+import { ideaSchema, ideaVersionSchema } from "./idea-schema";
 import { buildDriveFile, mergeDriveState, parseDriveFile, type DriveState } from "./drive-merge";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/google_drive";
 const FILE_NAME = "afkari-sync.json";
 const LEGACY_NAME = "afkari-backup.json";
 
-const idea = z.object({
+// The shared canonical Idea schema (idea-schema.ts) with this route's
+// payload caps layered on top. The FIELD LIST lives only in idea-schema.ts:
+// zod strips unknown keys, so a field missing there would silently vanish
+// from every Drive file — exactly the F-3.1 accident (a liked article's
+// flag and attribution stripped, turning someone else's writing into the
+// owner's own, AI-editable text on any other device's restore). Frozen
+// pre-AI texts ride along like every other field (capped at 5 per article
+// by the writer; the schema allows headroom, the backup parser re-caps).
+const idea = ideaSchema.extend({
   id: z.string().min(1).max(100),
   text: z.string().max(200000),
-  createdAt: z.number(),
   articleTitle: z.string().max(5000).optional(),
   articleBody: z.string().max(400000).optional(),
-  updatedAt: z.number().optional(),
-  aiPolishedAt: z.number().optional(),
   mergedFrom: z.array(z.string().max(100)).max(1000).optional(),
   topic: z.string().max(500).optional(),
-  topicManual: z.boolean().optional(),
-  song: z.boolean().optional(),
-  songDuration: z.number().optional(),
   driveFileId: z.string().max(200).optional(),
-  // A liked article's flag and attribution ride along like every other
-  // field: zod strips unknown keys, so without these three the Drive file
-  // would silently turn someone else's article into the owner's own
-  // writing and lift its hard AI ban on any other device's restore.
-  liked: z.boolean().optional(),
   source: z.string().max(5000).optional(),
   sources: z.array(z.string().max(5000)).max(100).optional(),
-  pinned: z.boolean().optional(),
-  medical: z.boolean().optional(),
   project: z.string().max(500).optional(),
-  // Frozen pre-AI texts ride along like every other field (capped at 5
-  // per article by the writer; the schema allows headroom, the backup
-  // parser re-caps on read).
   versions: z
     .array(
-      z.object({
-        at: z.number(),
+      ideaVersionSchema.extend({
         text: z.string().max(400000),
         title: z.string().max(5000).optional(),
-        source: z.enum(["improve", "clean", "merge", "restore"]),
       }),
     )
     .max(20)

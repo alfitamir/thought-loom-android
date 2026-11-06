@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   clearDeleted,
   loadDeleted,
@@ -8,6 +9,20 @@ import {
   replaceIdeas,
   type Idea,
 } from "./ideas";
+import { ideaSchema } from "./idea-schema";
+
+/** Copy one optional field from untrusted backup data onto the idea when
+ *  the shared idea schema accepts the value; drop the field otherwise. */
+function copyIdeaField<K extends keyof Idea>(
+  idea: Idea,
+  raw: Record<string, unknown>,
+  key: K,
+): void {
+  const value = raw[key];
+  if (value === undefined) return;
+  const parsed = (ideaSchema.shape[key] as z.ZodType<unknown>).safeParse(value);
+  if (parsed.success) idea[key] = parsed.data as Idea[K];
+}
 
 export function buildBackup(ideas: Idea[], exportedAt = Date.now()): string {
   return JSON.stringify({ app: "afkari", version: 1, exportedAt, ideas }, null, 2);
@@ -37,54 +52,61 @@ export function parseBackup(raw: string): Idea[] {
   }
   const list = Array.isArray(data) ? data : obj?.app === "afkari" ? obj.ideas : null;
   if (!Array.isArray(list)) throw new Error(BAD);
-  const ideas = list.flatMap((i): Idea[] => {
-    if (
-      !i ||
-      typeof i.id !== "string" ||
-      typeof i.text !== "string" ||
-      typeof i.createdAt !== "number"
-    )
-      return [];
-    const idea: Idea = { id: i.id, text: i.text, createdAt: i.createdAt };
-    if (typeof i.articleTitle === "string") idea.articleTitle = i.articleTitle;
-    if (typeof i.articleBody === "string") idea.articleBody = i.articleBody;
-    if (typeof i.updatedAt === "number") idea.updatedAt = i.updatedAt;
-    if (typeof i.aiPolishedAt === "number") idea.aiPolishedAt = i.aiPolishedAt;
-    if (Array.isArray(i.mergedFrom))
-      idea.mergedFrom = i.mergedFrom.filter((m: unknown): m is string => typeof m === "string");
-    // A hand-pinned topic must survive a restore, or the lock would silently vanish.
-    if (typeof i.topic === "string" && i.topic.trim()) idea.topic = i.topic;
-    if (i.topicManual === true && idea.topic) idea.topicManual = true;
-    // A song's flag and length travel in backups like any other field; the
-    // recording itself never does (audio stays on the recording device).
-    if (i.song === true) idea.song = true;
-    if (typeof i.songDuration === "number" && i.songDuration > 0)
-      idea.songDuration = i.songDuration;
-    // A liked article's flag and attribution travel too — a restore must
-    // never turn someone else's article into an unmarked, AI-editable one.
-    if (i.liked === true) idea.liked = true;
-    if (typeof i.source === "string" && i.source.trim()) idea.source = i.source;
-    if (Array.isArray(i.sources)) {
-      const sources = i.sources.filter(
+  const ideas = list.flatMap((raw): Idea[] => {
+    if (!raw || typeof raw !== "object") return [];
+    const i = raw as Record<string, unknown>;
+    // Core identity is validated by the shared idea schema (idea-schema.ts):
+    // an entry without a valid id/text/createdAt is not an idea at all.
+    const core = ideaSchema.pick({ id: true, text: true, createdAt: true }).safeParse(i);
+    if (!core.success) return [];
+    const idea: Idea = { ...core.data };
+    // Every optional field below is validated against that SAME schema,
+    // field by field (see copyIdeaField): a mistyped value drops the field,
+    // never the whole idea — the leniency this parser has always had, now
+    // with exactly one field list in the codebase.
+    copyIdeaField(idea, i, "articleTitle");
+    copyIdeaField(idea, i, "articleBody");
+    copyIdeaField(idea, i, "updatedAt");
+    copyIdeaField(idea, i, "aiPolishedAt");
+    if (Array.isArray(i["mergedFrom"]))
+      idea.mergedFrom = i["mergedFrom"].filter((m: unknown): m is string => typeof m === "string");
+    copyIdeaField(idea, i, "topic");
+    copyIdeaField(idea, i, "songDuration");
+    copyIdeaField(idea, i, "source");
+    copyIdeaField(idea, i, "driveFileId");
+    copyIdeaField(idea, i, "project");
+    // Strings that only mean something non-blank are dropped when blank:
+    // a hand-pinned topic (or the lock would silently vanish), a liked
+    // article's attribution, the Drive file id (a restored song must know
+    // where its copy lives) and the project assignment (or a restore would
+    // un-file an article from the book or series it belongs to).
+    for (const key of ["topic", "source", "driveFileId", "project"] as const) {
+      const value = idea[key];
+      if (value !== undefined && !value.trim()) delete idea[key];
+    }
+    if (idea.songDuration !== undefined && !(idea.songDuration > 0)) delete idea.songDuration;
+    // Boolean flags travel only as `true` — an explicit false in a file is
+    // the absence of the flag. Each one is load-bearing on restore: a
+    // song's flag (the recording itself never travels; audio stays on the
+    // recording device), a liked article's flag (or someone else's article
+    // would come back unmarked and AI-editable), the library pin (or a
+    // restore silently unpins) and section membership (or a medical
+    // article drops back into the general library).
+    for (const key of ["song", "liked", "pinned", "medical"] as const) {
+      copyIdeaField(idea, i, key);
+      if (idea[key] !== true) delete idea[key];
+    }
+    if (i["topicManual"] === true && idea.topic) idea.topicManual = true;
+    if (Array.isArray(i["sources"])) {
+      const sources = i["sources"].filter(
         (s: unknown): s is string => typeof s === "string" && !!s.trim(),
       );
       if (sources.length) idea.sources = sources;
     }
-    // The Drive file id travels too, so a restored song still knows where its copy lives.
-    if (typeof i.driveFileId === "string" && i.driveFileId.trim()) idea.driveFileId = i.driveFileId;
-    // The library pin travels too — a restore must not silently unpin what
-    // the user fixed to the top of its group.
-    if (i.pinned === true) idea.pinned = true;
-    // Section membership travels too — a restore must not drop a medical
-    // article back into the general library.
-    if (i.medical === true) idea.medical = true;
-    // Project assignment travels too — a restore must not un-file an
-    // article from the book or series it belongs to.
-    if (typeof i.project === "string" && i.project.trim()) idea.project = i.project;
     // Version history travels too — a restore must not strip the safety
     // net of frozen pre-AI texts. Malformed entries are dropped by the
     // validator, never guessed back into shape.
-    const versions = parseVersions(i.versions);
+    const versions = parseVersions(i["versions"]);
     if (versions) idea.versions = versions;
     return [idea];
   });
