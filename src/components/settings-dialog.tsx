@@ -22,7 +22,13 @@ import { isMyVoicePublic } from "@/lib/my-voice";
 import { buildBackup, parseBackup, restoreBackup } from "@/lib/backup";
 import { lastDriveSync, syncDrive } from "@/lib/drive-sync";
 import { arabicNumber } from "@/lib/format";
-import { loadDeleted, loadDriveDeleted, loadIdeas, storedIdeasBytes } from "@/lib/ideas";
+import {
+  loadDeleted,
+  loadDriveDeleted,
+  loadIdeas,
+  storedIdeasBytes,
+  storedMirrorBytes,
+} from "@/lib/ideas";
 import { loadPendingDeletes } from "@/lib/pending-deletes";
 import { lastCloudSync, lastCloudSyncError, syncNow } from "@/lib/sync";
 
@@ -66,6 +72,7 @@ export function SettingsDialog({
   const [cloudError, setCloudError] = useState("");
   const [pendingCount, setPendingCount] = useState(0);
   const [libraryBytes, setLibraryBytes] = useState(0);
+  const [mirrorBytes, setMirrorBytes] = useState(0);
   const [storageEst, setStorageEst] = useState<{ usage: number; quota: number } | null>(null);
   const [songBackup, setSongBackup] = useState({ total: 0, backed: 0 });
   const fileRef = useRef<HTMLInputElement>(null);
@@ -75,6 +82,7 @@ export function SettingsDialog({
     setCloudError(lastCloudSyncError());
     setPendingCount(loadDeleted().length + loadDriveDeleted().length + loadPendingDeletes().length);
     setLibraryBytes(storedIdeasBytes());
+    setMirrorBytes(storedMirrorBytes());
     // The honest song-backup state: how many of this device's songs
     // actually carry a Drive copy — not a sync timestamp (audit §4).
     const songs = loadIdeas().filter((i) => i.song);
@@ -391,7 +399,8 @@ export function SettingsDialog({
               : "لا توجد عناصر معلّقة بانتظار الترحيل."}
           </p>
           <p className="text-sm text-muted-foreground">
-            حجم مكتبتك على هذا الهاتف: {formatBytes(libraryBytes)}
+            حجم مكتبتك على هذا الهاتف: {formatBytes(libraryBytes)} · نسخة الأمان:{" "}
+            {formatBytes(mirrorBytes)}
             {storageEst
               ? ` · مساحة التطبيق المستخدمة ${formatBytes(storageEst.usage)} من أصل ${formatBytes(storageEst.quota)} تقريبًا`
               : ""}
